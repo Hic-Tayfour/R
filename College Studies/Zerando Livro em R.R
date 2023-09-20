@@ -1865,3 +1865,9 @@ Z~N(0,1)"
 #Percentil na Distribuição Normal----
 "encontrar o valor de 𝑥 tal que até esse valor tenha probabilidade acumulada igual a p=P(Z<=z)"
 #z=qnorm(p)=qnorm(p,lower.tail=TRUE)
+
+#Distribuição da Qui-Quadrado----
+#p=P(Y<=c)=pchisq(c,k), onde k é o grau de liberdade
+#p=P(Y>c)=1-pchisq(c,k)=pchisq(c,k,lower.tail=FALSE)
+#c=P(Y<=c)=qchisq(p,k)
+#c=P(Y>c)=qchisq(1-p,k)=qchisq(p,k,lower.tail=FALSE)
