@@ -1871,3 +1871,10 @@ Z~N(0,1)"
 #p=P(Y>c)=1-pchisq(c,k)=pchisq(c,k,lower.tail=FALSE)
 #c=P(Y<=c)=qchisq(p,k)
 #c=P(Y>c)=qchisq(1-p,k)=qchisq(p,k,lower.tail=FALSE)
+
+#Distribuição T-Student----
+#P(T<t)=pt(t,v), onde v é o grau de liberdade
+#P(T>t)=pt(t,v, lower.tail=FALSE)
+# Se p=P(T<t), então t=qt(p,v)
+# Se p=P(T>t), então t=qt(p,v,lower.tail=FALSE)
+
