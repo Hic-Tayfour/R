@@ -8,5 +8,5 @@ as funções presentes no R, em relação a análise descritiva e probailidades.
 encontrará meus trabalhos feitos junatamente com a base de dados para testar o programas.
 Faça um bom proveito do material que deixei disponível aqui.
 
-Atencisamente,
-  Hiicham Tayfour 
+Atenciosamente,
+  Hicham Tayfour 
