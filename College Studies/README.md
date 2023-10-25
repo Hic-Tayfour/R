@@ -9,4 +9,4 @@ normalmente conhecidas e certos tipos de testes de distrições de probabilidade
 Faça um bom proveito dessa material aqui presente.
 
 Atencisamente,
-  Hiicham Tayfour 
+  Hicham Tayfour 
