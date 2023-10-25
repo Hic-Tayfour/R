@@ -1,11 +1,12 @@
 # Rstudio
-Repository for R projects in RStudio: Academic work and exploring R functions for data analysis
-What You'll Find Here:
+Olá , tudo bem ? Espero que sim
 
-Academic Projects: This repository houses a collection of academic works, including research papers, assignments, and coursework projects. We've used R and RStudio to analyze data, create visualizations, and conduct statistical analyses for a wide range of academic subjects.
+Este aqui é um respsoitório voltado para o armazenamento de programas feitos em R
+no Rstudio.
+Nele você encontrará meu cadeno de estudos que fiz durante a faculdade em relação 
+as funções presentes no R, em relação a análise descritiva e probailidades. E também 
+encontrará meus trabalhos feitos junatamente com a base de dados para testar o programas.
+Faça um bom proveito do material que deixei disponível aqui.
 
-R Programming Exploration: Dive into the world of R programming with us! We explore the versatile capabilities of the R language within the RStudio environment. From basic operations to advanced data manipulation, our studies encompass a variety of functions and techniques that can be applied to real-world data analysis.
-
-Whether you're a fellow student, researcher, or simply curious about R and RStudio, this repository serves as a valuable resource to learn, collaborate, and gain insights into the fascinating world of data analysis and statistics using R.
-
-Feel free to explore our projects, contribute, or use our code as a reference for your own academic and data analysis endeavors. Happy coding!
+Atencisamente,
+  Hiicham Tayfour 
