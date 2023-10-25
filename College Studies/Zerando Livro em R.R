@@ -1885,5 +1885,5 @@ t.test(BaseDeDados$Variável,mu=Ho,alternative=c("tow.sided"),conf.level="alfa")
 t.test(BaseDeDados$Variável,mu=Ho,alternative=c("less"),conf.level="alfa")
 "Caso o teste seja unilateral a direita"
 t.test(BaseDeDados$Variável,mu=Ho,alternative=c("greater"),conf.level="alfa") 
-"Caso ele seja um teste t-pareado"
-t.test(BaseDeDados$Variável,mu=Ho,alternative=c("lateralidade"),conf.level="alfa",paired=TRUE)
+#Teste T-pareado
+t.test(BaseDeDados$Variável1~BaseDeDados$Variável2,mu=Ho,alternative=c("lateralidade"),conf.level="alfa",paired=TRUE)
