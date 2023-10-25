@@ -8,5 +8,5 @@ Junto desse programa você verá um módulo sobre funções de probabilidades qu
 normalmente conhecidas e certos tipos de testes de distrições de probabilidades e de hipótese.
 Faça um bom proveito dessa material aqui presente.
 
-Atencisamente,
+Atenciosamente,
   Hicham Tayfour 
