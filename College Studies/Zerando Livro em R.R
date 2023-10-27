@@ -1878,13 +1878,17 @@ Z~N(0,1)"
 # Se p=P(T<t), então t=qt(p,v)
 # Se p=P(T>t), então t=qt(p,v,lower.tail=FALSE)
 
-#Teste de Hipóetese no RStudio para a distribuição T e T-pareado
+#Teste de Hipóetese no RStudio para a distribuição T e T-pareado----
 "Caso o teste seja bilateral"
 t.test(BaseDeDados$Variável,mu=Ho,alternative=c("tow.sided"),conf.level="alfa") #o default dele é o biliateral
+
 "Caso o teste seja unilateral a esquarda"
 t.test(BaseDeDados$Variável,mu=Ho,alternative=c("less"),conf.level="alfa")
+
 "Caso o teste seja unilateral a direita"
 t.test(BaseDeDados$Variável,mu=Ho,alternative=c("greater"),conf.level="alfa") 
 #Teste T-pareado
 t.test(BaseDeDados$Variável1,BaseDeDados$Variável2,mu=Ho,alternative=c("lateralidade"),conf.level="alfa",paired=TRUE)
-"A ordem das variáveis é importante para a realização correta do teste"
+
+#Teste de Hipótese para variâncias de duas popupalções , Distribuição F----
+var.test(BaseDeDados$Variável1~BaseDeDados$Variável2, alternative=c("laterarildade"),conf.level="alfa")
