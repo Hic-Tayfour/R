@@ -1892,3 +1892,9 @@ t.test(BaseDeDados$Variável1,BaseDeDados$Variável2,mu=Ho,alternative=c("latera
 
 #Teste de Hipótese para variâncias de duas popupalções , Distribuição F----
 var.test(BaseDeDados$Variável1~BaseDeDados$Variável2, alternative=c("laterarildade"),conf.level="alfa")
+
+#Distribuição F----
+#P(F<f)=pt(f,v1,v2), onde v1 e v2 são os graus de liberdade
+#P(F>f)=pt(f,v1,v2, lower.tail=FALSE), onde v1 e v2 são os graus de liberdade
+# Se p=P(F<f), então f=qf(f,v1,v2)
+# Se p=P(F>f), então f=qf(f,v1,v2,lower.tail=FALSE)
