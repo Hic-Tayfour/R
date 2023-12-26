@@ -45,7 +45,7 @@ O propósito de um título de gráfico é resumir a principal descoberta. Evite 
 
 Se você precisar adicionar mais texto, existem outros dois rótulos úteis: subtitle adiciona detalhes adicionais em uma fonte menor abaixo do título e caption adiciona texto no canto inferior direito do gráfico, muitas vezes usado para descrever a fonte dos dados. Você também pode usar labs() para substituir os títulos dos eixos e da legenda. Geralmente é uma boa ideia substituir nomes de variáveis curtas por descrições mais detalhadas e incluir as unidades.
 
-É possível usar equações matemáticas em vez de strings de texto. Basta trocar "" por quote() e ler sobre as opções disponíveis em ?plotmath:
+É possível usar equações matemáticas em vez de strings de texto. Basta trocar as aspas por quote() e ler sobre as opções disponíveis em ?plotmath:
 "
 df <- tibble(
   x = 1:10,
