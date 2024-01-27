@@ -1,0 +1,84 @@
+---
+title: "Capítulo 28 Quarto"
+format: html
+editor: visual
+---
+
+# Capítulo 28 : Quarto
+
+## 28.1 Introdução
+
+Quarto oferece uma estrutura unificada de autoria para ciência de dados, combinando seu código, seus resultados e seu texto. Documentos Quarto são totalmente reproduzíveis e suportam dezenas de formatos de saída, como PDFs, arquivos Word, apresentações e mais.
+
+Arquivos Quarto são projetados para serem usados de três maneiras:
+
+1.  Para comunicar-se com tomadores de decisão, que querem focar nas conclusões, não no código por trás da análise.
+
+2.  Para colaborar com outros cientistas de dados (incluindo você no futuro!), que estão interessados tanto nas suas conclusões quanto em como você as alcançou (ou seja, o código).
+
+3.  Como um ambiente para fazer ciência de dados, como um caderno de laboratório moderno onde você pode registrar não apenas o que fez, mas também o que estava pensando.
+
+Quarto é uma ferramenta de interface de linha de comando, não um pacote R. Isso significa que a ajuda, em grande parte, não está disponível através de ?. Em vez disso, à medida que você trabalha neste capítulo e usa Quarto no futuro, você deve consultar a documentação do Quarto. <https://quarto.org/>
+
+Se você é um usuário de R Markdown, pode estar pensando “Quarto parece muito com R Markdown”. Você não está errado! Quarto unifica a funcionalidade de muitos pacotes do ecossistema R Markdown (rmarkdown, bookdown, distill, xaringan, etc.) em um único sistema consistente, além de estendê-lo com suporte nativo para várias linguagens de programação como Python e Julia, além de R. De certa forma, Quarto reflete tudo que foi aprendido com a expansão e suporte do ecossistema R Markdown ao longo de uma década.
+
+### 28.1.1 Pré-Requisitos
+
+Você precisa da interface de linha de comando Quarto (Quarto CLI), mas não precisa instalá-la ou carregá-la explicitamente, pois o RStudio faz automaticamente ambos quando necessário.
+
+## 28.2 Básicos de Quarto
+
+Esse é um arquivo de texto simples que tem a extensão .qmd:
+
+--
+title: "Diamond sizes"
+date: 2022-09-12
+format: html
+---
+
+\`\`\`{r}
+#\| label: setup
+#\| include: false
+
+library(tidyverse)
+
+smaller \<- diamonds \|\>
+filter(carat \<= 2.5)
+\`\`\`
+
+We have data about \`r nrow(diamonds)\` diamonds.
+Only \`r nrow(diamonds) - nrow(smaller)\` are larger than 2.5 carats.
+The distribution of the remainder is shown below:
+
+\`\`\`{r}
+#\| label: plot-smaller-diamonds
+#\| echo: false
+
+smaller \|\>
+ggplot(aes(x = carat)) +
+geom_freqpoly(binwidth = 0.01)
+\`\`\`
+
+Ele contém três tipos importantes de conteúdo:
+
+1.  Um cabeçalho YAML (opcional) cercado por **`---`**.
+
+2.  Blocos de código R cercados por \`\`\`.
+
+3.  Texto misturado com formatação de texto simples como **`#`** para cabeçalhos e **`_`** para *itálico*.
+
+A imagem abaixo mostra um documento **`.qmd`** no RStudio com interface de caderno, onde o código e a saída são intercalados. Você pode executar cada bloco de código clicando no ícone de execução.
+
+![](images/clipboard-631049631.png)
+
+Para produzir um relatório completo contendo todo o texto, código e resultados, clique em “Renderizar” ou pressione Cmd/Ctrl + Shift + K. Você também pode fazer isso programaticamente com `quarto::quarto_render("diamond-sizes.qmd")`. Isso exibirá o relatório no painel de visualização, como mostrado na figura a seguir, e criará um arquivo HTML.
+
+![](images/clipboard-20156666.png)
+
+Quando você renderiza o documento, Quarto envia o arquivo .qmd para o knitr (<https://yihui.org/knitr/>), que executa todos os blocos de código e cria um novo documento markdown (.md) que inclui o código e seu resultado. O arquivo markdown gerado pelo knitr é então processado pelo pandoc (<https://pandoc.org/>), que é responsável por criar o arquivo finalizado. Esse processo é mostrado na imagem abaixo . A vantagem desse fluxo de trabalho em duas etapas é que você pode criar uma ampla variedade de formatos de saída, como você aprenderá mais a frente
+
+![](images/clipboard-2868046292.png)
+
+Para começar com seu próprio arquivo .qmd, selecione Arquivo \> Novo Arquivo \> Documento Quarto… na barra de menu. O RStudio iniciará um assistente que você pode usar para pré-popular seu arquivo com conteúdo útil que lembra como as principais funcionalidades do Quarto funcionam.
+
+As próximas seções exploram com mais detalhes os três componentes de um documento Quarto: o texto markdown, os blocos de código e o cabeçalho YAML.
