@@ -1,5 +1,3 @@
-Não pretendo postar nada aqui, pois a intenção aqui é a criação de documentos para comunicação e tomada de decisão, e eu foquei no parte de scripts em R para Ciência de Dados.
-
 # Parte VI. **Comunicar**
 ## 28. **Quarto**
 - Introdução
