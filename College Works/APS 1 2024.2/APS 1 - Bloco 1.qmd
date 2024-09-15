@@ -1,0 +1,223 @@
+---
+title: "APS 1 - Bloco 1"
+author:
+  - name: "Arthur Di Croce Wohnrath"
+    email: "arthurcw1@al.insper.edu.br"
+  - name: "Erik Hund Bettamio Guimarães"
+    email: "erikhbg@al.insper.edu.br"
+  - name: "Érika Kaori Fuzisaka"
+    email: "erikafk1@al.insper.edu.br"
+  - name: "Hicham Munir Tayfour"
+    email: "hichamt@al.insper.edu.br"
+  - name: "Lucas Batista Ferreira"
+    email: "lucasbf1@al.insper.edu.br"
+  - name: "Sarah de Araújo Nascimento Silva"
+    email: "sarahans@al.insper.edu.br"
+format: html
+toc: true
+---
+
+# Questão 2
+
+## Letra A)
+- Qual é o impacto da promulgação das leis de direito ao porte de armas (Right-to-Carry Laws - RTC) sobre a taxa de crimes contra a propriedade nos estados dos EUA, no período de 1977 a 2014?
+
+## Letra B)
+### Modelo Microeconômico Baseado em Becker (1968)
+
+- O modelo de Becker assume que indivíduos são agentes racionais que maximizam sua utilidade esperada. Eles tomam decisões de participar em atividades criminosas com base em uma comparação entre os ganhos potenciais de cometer o crime e os custos esperados, que incluem a probabilidade de apreensão e a severidade da punição.
+
+- No contexto das Right-to-Carry Laws (RTC), a lógica de Becker pode ser aplicada ao comportamento dos criminosos. Se mais indivíduos estiverem armados (devido à presença das leis RTC), os criminosos podem enfrentar um maior risco de confrontação e de serem feridos ou mortos durante o cometimento de crimes contra a propriedade. Isso aumentaria o custo percebido do crime (equivalente à probabilidade de apreensão/punição, denotada por $p$ no modelo de Becker), reduzindo a utilidade esperada de se engajar em atividades criminosas.
+
+A utilidade esperada $U_E$ de cometer um crime contra a propriedade pode ser formalmente expressa como:
+
+$$
+U_E = p \cdot U(W - L) + (1 - p) \cdot U(W + G)
+$$
+
+Onde:
+- $W$ é a renda atual (livre de risco);
+- $L$ é a perda associada ao ser pego (incluindo prisão e possíveis confrontos com vítimas armadas);
+- $G$ é o ganho do crime;
+- $p$ é a probabilidade de ser pego ou confrontado.
+
+Se a probabilidade de confrontação armada $p$ aumenta com a introdução das leis RTC, a utilidade esperada de cometer crimes $U_E$ diminui, desincentivando os crimes contra a propriedade.
+
+## Letra C)
+
+### Configurando o ambinete de trabalho e importando as bibliotecas
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(haven)
+library(plm) 
+library(tidyverse)
+library(dplyr)
+library(gt)
+library(pastecs)
+library(fastDummies)
+library(stargazer)
+library(ggthemes)
+library(sandwich)
+```
+
+### Importando as bases de dados e juntando 
+```{r warning = FALSE, message = FALSE}
+base_1 <- read_dta("Base1_APS1.dta")
+base_2 <- read_dta("Base2_APS1.dta")
+base_3 <- read_dta("Base3_APS1.dta")
+
+# Combinar a base1 com a base2
+comb1 <- merge(base_1, base_2, by = c("state", "year"), all = TRUE)
+
+# Combinar o resultado com a base3
+df <- merge(comb1, base_3, by = c("state", "year"), all = TRUE)
+```
+
+### Verificando se o painel está balanceado
+```{r warning = FALSE, message = FALSE}
+pdim(df)
+```
+O painel está balanceado.
+
+### Estatísticas descritivas
+```{r warning = FALSE, message = FALSE}
+# Definir a função para criar a tabela formatada
+criar_tabela_formatada <- function(titulo, subtitulo, fonte, nomes_colunas, nomes_linhas, valores_linhas) {
+  
+  # Criar um data frame a partir dos nomes e valores fornecidos
+  dados <- data.frame(
+    nome = nomes_linhas,
+    matrix(valores_linhas, ncol = length(nomes_colunas), byrow = TRUE)
+  )
+  
+  # Renomear as colunas do data frame
+  colnames(dados) <- c("nome", nomes_colunas)
+  
+  # Criar a tabela com as formatações desejadas
+  tabela <- gt(data = dados) %>%
+    # Adicionar cabeçalho e rodapé
+    tab_header(
+      title = titulo,
+      subtitle = subtitulo
+    ) %>%
+    tab_source_note(
+      source_note = fonte
+    ) %>%
+    # Estilizar os cabeçalhos das colunas em negrito
+    tab_style(
+      style = cell_text(weight = "bold"),
+      locations = cells_column_labels(everything())
+    ) %>%
+    # Estilizar os nomes das linhas em negrito
+    tab_style(
+      style = cell_text(weight = "bold"),
+      locations = cells_body(columns = "nome")
+    )
+  
+  # Retornar a tabela formatada
+  return(tabela)
+}
+
+
+# Selecionando as variáveis de interesse
+variaveis_selecionadas <- df %>%
+  select(ln_property_rate, ln_incarc_rate, unemployment_rate, density)
+
+# Calculando as estatísticas descritivas
+media_real <- colMeans(variaveis_selecionadas, na.rm = TRUE)
+minimo_real <- apply(variaveis_selecionadas, 2, min, na.rm = TRUE)
+maximo_real <- apply(variaveis_selecionadas, 2, max, na.rm = TRUE)
+desv_pad_real <- apply(variaveis_selecionadas, 2, sd, na.rm = TRUE)
+
+# Definindo os parâmetros para a tabela
+titulo_real <- "Estatísticas Descritivas das Variáveis Reais"
+subtitulo_real <- "Análise Descritiva de Variáveis de Crime"
+fonte_real <- "Fonte: Base de Dados do Trabalho"
+nomes_colunas_reais <- c("ln_property_rate", "ln_incarc_rate", "unemployment_rate", "density")
+nomes_linhas_reais <- c("Média", "Mínimo", "Máximo", "Desvio Padrão")
+valores_linhas_reais <- c(media_real, minimo_real, maximo_real, desv_pad_real)
+
+# Criando a tabela formatada com os dados reais
+tabela_formatada_real <- criar_tabela_formatada(
+  titulo = titulo_real,
+  subtitulo = subtitulo_real,
+  fonte = fonte_real,
+  nomes_colunas = nomes_colunas_reais,
+  nomes_linhas = nomes_linhas_reais,
+  valores_linhas = valores_linhas_reais
+)
+
+# Imprimir a tabela
+tabela_formatada_real
+```
+### Média da taxa de crimes antes e depois das leis RTC
+```{r warning = FALSE, message = FALSE}
+df %>%
+  group_by(RTC) %>%
+  summarise(media_crimes = mean(ln_property_rate, na.rm = TRUE),
+            desvio_padrao = sd(ln_property_rate, na.rm = TRUE))
+```
+
+### Gráficos 
+```{r warning = FALSE, message = FALSE}
+# Melhorando o Boxplot
+ggplot(df, aes(x = factor(RTC), y = ln_property_rate)) +
+  geom_boxplot(fill = c("#0072B2", "red"), color = "black", alpha = 0.7) +
+  labs(x = "Leis RTC em Vigor (0 = Não, 1 = Sim)", 
+       y = "Taxa de Crimes contra a Propriedade (Log)", 
+       title = "Distribuição da Taxa de Crimes antes e depois das Leis RTC") +
+  theme_fivethirtyeight() +
+  theme(plot.title = element_text(face = "bold", size = 10),
+        axis.title = element_text(size = 14))
+
+# Melhorando o Gráfico de Dispersão
+ggplot(df, aes(x = ln_incarc_rate, y = ln_property_rate)) +
+  geom_point(color = "#009E73", alpha = 0.6, size = 3) +
+  geom_smooth(method = "lm", color = "#E69F00", se = FALSE, size = 1.5) +
+  labs(x = "Taxa de Encarceramento (Log)", 
+       y = "Taxa de Crimes contra a Propriedade (Log)", 
+       title = "Relação entre Taxa de Encarceramento e Taxa de Crimes",
+       subtitle = "Ajuste Linear sobre a Dispersão dos Dados",
+       caption = "Fonte: Base de Dados do Trabalho") +
+  theme_minimal(base_size = 10) +
+  theme(plot.title = element_text(face = "bold", hjust = 0.5),
+        plot.subtitle = element_text(hjust = 0.5),
+        plot.caption = element_text(size = 10),
+        axis.text = element_text(size = 12),
+        axis.title = element_text(face = "bold"))
+
+
+```
+## Letra D)
+
+### Fazendo as regressões
+```{r warning = FALSE, message = FALSE}
+# Estimando os modelos com o plm
+pols_model <- plm(ln_property_rate ~ RTC + ln_incarc_rate + unemployment_rate + density, 
+                  data = df, index = c("state", "year"), model = "pooling")
+
+fixed_model <- plm(ln_property_rate ~ RTC + ln_incarc_rate + unemployment_rate + density, 
+                   data = df, index = c("state", "year"), model = "within")
+
+random_model <- plm(ln_property_rate ~ RTC + ln_incarc_rate + unemployment_rate + density, 
+                    data = df, index = c("state", "year"), model = "random")
+```
+
+### Montando as Tabelas 
+```{r warning = FALSE, message = FALSE}
+stargazer(pols_model, fixed_model, random_model, 
+          type = "text", 
+          title = "Resultados das Regressões: Pooled OLS, Efeitos Fixos e Efeitos Aleatórios",
+          dep.var.labels = "Log da Taxa de Crimes contra a Propriedade",
+          covariate.labels = c("Leis RTC", "Log da Taxa de Encarceramento", "Taxa de Desemprego", "Densidade Populacional"),
+          align = TRUE, 
+          no.space = TRUE,
+          omit.stat = c("f", "ser"),
+          add.lines = list(c("Modelo", "Pooled OLS", "Efeitos Fixos", "Efeitos Aleatórios")))
+```
+### Teste de Hausman para Efeitos Fixos ou Aleatórios
+```{r warning = FALSE, message = FALSE}
+hausman_test <- phtest(fixed_model, random_model)
+print(hausman_test)
+```
+Os resultados indicam que o modelo de efeitos fixos captura melhor a heterogeneidade entre os estados dos EUA no período analisado (1977-2014), fornecendo estimativas mais consistentes para o impacto das leis RTC sobre as taxas de crimes contra a propriedade.
