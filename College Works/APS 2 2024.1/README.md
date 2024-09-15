@@ -1,6 +1,4 @@
-# Instruções para a APS 2
-
-Olá, tudo bem? Espero que sim.
+# Olá, tudo bem? Espero que sim.
 
 Nesta pasta, você encontrará dois arquivos principais: um script em R e uma base de dados em Excel. Esses arquivos são necessários para a realização da análise descritiva referente à segunda parte da APS.
 
