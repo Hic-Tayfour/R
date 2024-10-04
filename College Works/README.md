@@ -19,11 +19,13 @@ Aqui você encontrará meus trabalhos feitos na faculdade, sendo a maioria relac
 
 - **Econometria Avançada**:
   - APS 1 2024.2 (Time Series)
+  - APS 2 2024.2 (Time Series)
 
 - **Microeconomia IV**:
   - APS 1 2024.2
   - APS 2 2024.2
   - APS 3 2024.2
+  - APS 4 2024.2
 
 Atenciosamente,  
 Hicham Tayfour
