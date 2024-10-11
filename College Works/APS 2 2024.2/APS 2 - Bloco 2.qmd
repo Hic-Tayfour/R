@@ -1,0 +1,360 @@
+---
+title: "APS 2 - Bloco 2"
+author:
+  - name: "Arthur Di Croce Wohnrath"
+    email: "arthurcw1@al.insper.edu.br"
+  - name: "Erik Hund Bettamio Guimarães"
+    email: "erikhbg@al.insper.edu.br"
+  - name: "Érika Kaori Fuzisaka"
+    email: "erikafk1@al.insper.edu.br"
+  - name: "Hicham Munir Tayfour"
+    email: "hichamt@al.insper.edu.br"
+  - name: "Lucas Batista Ferreira"
+    email: "lucasbf1@al.insper.edu.br"
+  - name: "Sarah de Araújo Nascimento Silva"
+    email: "sarahans@al.insper.edu.br"
+format: html
+toc: true
+---
+
+# Questão 2
+
+## Letra A)
+
+"Como as atitudes em relação aos papéis tradicionais de gênero na família influenciam o bem-estar subjetivo das mulheres e homens no Brasil?"
+
+## Letra B)
+
+A teoria microeconômica que fundamenta essa pesquisa se baseia no modelo de **Akerlof e Kranton (2000)** sobre identidade e normas sociais.
+
+### Premissas
+
+A teoria parte das seguintes premissas:
+
+-   A identidade de um indivíduo é influenciada por normas sociais que prescrevem os papéis apropriados para homens e mulheres na sociedade.
+-   Papéis de gênero tradicionais, como a ideia de que "ser dona de casa é tão satisfatório quanto trabalhar remuneradamente", afetam as escolhas e percepções das pessoas, especialmente no que diz respeito ao seu bem-estar subjetivo (felicidade).
+-   Desviar-se dessas normas pode causar desconforto ou diminuição da utilidade, dependendo do grau de conformidade com essas prescrições sociais.
+
+### Função de Utilidade
+
+No modelo de **Akerlof e Kranton (2000)**, a utilidade dos indivíduos $U_j$ depende de suas ações $a_j$, das ações dos outros $a_{-j}$ e da identidade $I_j$, que por sua vez é afetada pelas normas sociais $P$ e pelas categorias sociais $c_j$ atribuídas a cada indivíduo. A função de utilidade é descrita da seguinte forma:
+
+$$
+U_j = U_j(a_j, a_{-j}, I_j)
+$$
+
+Onde a identidade $I_j$ é modelada como:
+
+$$
+I_j = I_j(a_j, a_{-j}, c_j, \epsilon_j, P)
+$$
+
+Nesse contexto:
+
+-   $a_j$: São as ações e comportamentos do indivíduo em relação aos papéis de gênero.
+-   $a_{-j}$: São as ações dos outros (a sociedade em geral).
+-   $c_j$: As categorias sociais atribuídas ao indivíduo (como ser homem ou mulher).
+-   $\epsilon_j$: Características próprias do indivíduo.
+-   $P$: As normas sociais que prescrevem o comportamento apropriado para cada gênero.
+
+### Hipótese Econômica
+
+A hipótese econômica fundamentada nesse modelo é que as percepções individuais sobre normas de gênero afetam diretamente o nível de satisfação ou felicidade (bem-estar subjetivo) de homens e mulheres.
+
+**Hipótese:** Indivíduos que aderem mais às normas tradicionais de gênero tendem a relatar maior bem-estar subjetivo, enquanto aqueles que se desviam dessas normas podem experimentar uma redução no seu bem-estar.
+
+## Letra C)
+
+## Letra D)
+
+# Código R
+
+## Importando as bibliotecas necessárias
+
+```{r, warning=FALSE, message=FALSE}
+
+library(tidyverse)      # para manipulação de dados
+library(dplyr)          # para manipulação de dados
+library(stargazer)      # para tabelas de regressão
+library(gt)             # para tabelas bonitas
+library(survey)         # para regressão logística
+library(sandwich)       # para erros padrão robustos
+library(lmtest)         # para testes de hipótese
+library(ggplot2)        # para gráficos
+library(ggthemes)       # para gráficos
+library(margins)        # para efeitos marginais
+library(readxl)         # para ler arquivos excel
+library(survey)         # para trabalhar com survey data
+```
+
+## Importando e verificando a estrutura dos dados
+
+```{r, warning = FALSE, message = FALSE}
+
+svy_wdl <- read_csv("wvs_world.csv")
+# str(svy_wdl)
+# colnames(svy_wdl)
+```
+
+## Fazendo alguns ajustes para facilitar o trabalho
+
+```{r, warning = FALSE, message = FALSE}
+
+df_relevante <- svy_wdl %>%
+  select(Q46,    
+         Q32,    
+         Q33,    
+         Q29,    
+         Q260,   
+         Q262,   
+         Q273,   
+         W_WEIGHT) %>%  
+  mutate(
+    feeling_happy = factor(Q46, levels = c(1, 2, 3, 4), labels = c("Nada Feliz", "Não Muito Feliz", "Bastante Feliz", "Muito Feliz")),
+    housewife_fulfilling = as.numeric(Q32),
+    men_priority_jobs = as.numeric(Q33),
+    men_better_leaders = as.numeric(Q29),
+    gender = as.factor(Q260),
+    age = as.numeric(Q262),
+    marital_status = as.factor(Q273),
+    happy_binary = ifelse(feeling_happy %in% c("Bastante Feliz", "Muito Feliz"), 1, 0)
+  )
+
+# Criando o objeto svydesign para amostragem complexa ----
+survey_design <- svydesign(
+  ids = ~1,  
+  weights = ~W_WEIGHT,  
+  data = df_relevante
+)
+
+```
+
+## Estatísticas descritivas
+
+```{r, warning = FALSE, message = FALSE}
+
+estatisticas_descritivas <- svymean(~feeling_happy + housewife_fulfilling + men_priority_jobs + men_better_leaders, design = survey_design, na.rm = TRUE)
+
+# Criando a tabela personalizada ----
+criar_tabela_formatada <- function(titulo, subtitulo, fonte, nomes_colunas, nomes_linhas, valores_linhas) {
+  dados <- data.frame(
+    nome = nomes_linhas,
+    matrix(valores_linhas, ncol = length(nomes_colunas), byrow = TRUE)
+  )
+  
+  colnames(dados) <- c("nome", nomes_colunas)
+  
+  tabela <- gt(data = dados) %>%
+    tab_header(
+      title = titulo,
+      subtitle = subtitulo
+    ) %>%
+    tab_source_note(
+      source_note = fonte
+    ) %>%
+    tab_style(
+      style = cell_text(weight = "bold"),
+      locations = cells_column_labels(everything())
+    ) %>%
+    tab_style(
+      style = cell_text(weight = "bold"),
+      locations = cells_body(columns = "nome")
+    )
+  
+  return(tabela)
+}
+
+tabela_formatada_real <- criar_tabela_formatada(
+  titulo = "Estatísticas Descritivas Relevantes",
+  subtitulo = "Análise de Bem-Estar Subjetivo e Normas de Gênero",
+  fonte = "Fonte: World Values Survey",
+  nomes_colunas = c("Felicidade (%)", "Concorda 'Dona de Casa (%)'", "Concorda 'Homens Prioridade Emprego (%)'", "Concorda 'Homens Melhores Líderes (%)'"),
+  nomes_linhas = c("Média"),
+  valores_linhas = c(estatisticas_descritivas[1], estatisticas_descritivas[2], estatisticas_descritivas[3], estatisticas_descritivas[4])
+)
+
+# Imprimindo a tabela ----
+tabela_formatada_real
+
+```
+
+## Gráficos
+
+### Gráficos de Barras
+
+```{r, warning = FALSE, message = FALSE}
+
+custom_bg_color <- "#ffffff"
+
+# Gráfico de barras para 'Ser dona de casa é tão satisfatório quanto trabalhar'
+ggplot(df_relevante, aes(x = housewife_fulfilling, fill = feeling_happy)) +
+  geom_bar(position = "dodge") +
+  labs(
+    title = "Distribuição das Respostas sobre o Papel de Dona de Casa",
+    subtitle = "Comparação entre Felizes e Não Felizes",
+    x = "Concordância com a frase 'Ser dona de casa é tão satisfatório quanto trabalhar'",
+    y = "Frequência",
+    fill = "Felicidade",
+    caption = "Fonte: World Values Survey"
+  ) +
+  theme_minimal(base_size = 15) +
+  theme(
+    panel.background = element_rect(fill = custom_bg_color),
+    plot.background = element_rect(fill = custom_bg_color),
+    panel.grid.major.x = element_blank(),
+    panel.grid.minor = element_blank(),
+    panel.grid.major.y = element_line(color = "#d3c7ba"),
+    plot.title = element_text(face = "bold", size = 18, hjust = 0.5),
+    plot.subtitle = element_text(size = 14, hjust = 0.5),
+    axis.text.x = element_text(angle = 0, hjust = 0.5),
+    axis.line = element_line(color = "#b0a392"),
+    plot.caption = element_text(hjust = 0, size = 10),
+    axis.title.x = element_text(size = 14),
+    axis.title.y = element_text(size = 14)
+  )
+
+# Gráfico de barras para 'Homens devem ter prioridade de emprego'
+ggplot(df_relevante, aes(x = men_priority_jobs, fill = feeling_happy)) +
+  geom_bar(position = "dodge") +
+  labs(
+    title = "Distribuição das Respostas sobre Prioridade de Emprego para Homens",
+    subtitle = "Comparação entre Felizes e Não Felizes",
+    x = "Concordância com a frase 'Homens devem ter prioridade de emprego'",
+    y = "Frequência",
+    fill = "Felicidade",
+    caption = "Fonte: World Values Survey"
+  ) +
+  theme_minimal(base_size = 15) +
+  theme(
+    panel.background = element_rect(fill = custom_bg_color),
+    plot.background = element_rect(fill = custom_bg_color),
+    panel.grid.major.x = element_blank(),
+    panel.grid.minor = element_blank(),
+    panel.grid.major.y = element_line(color = "#d3c7ba"),
+    plot.title = element_text(face = "bold", size = 18, hjust = 0.5),
+    plot.subtitle = element_text(size = 14, hjust = 0.5),
+    axis.text.x = element_text(angle = 0, hjust = 0.5),
+    axis.line = element_line(color = "#b0a392"),
+    plot.caption = element_text(hjust = 0, size = 10),
+    axis.title.x = element_text(size = 14),
+    axis.title.y = element_text(size = 14)
+  )
+
+# Gráfico de barras para 'Homens são melhores líderes políticos'
+ggplot(df_relevante, aes(x = men_better_leaders, fill = feeling_happy)) +
+  geom_bar(position = "dodge") +
+  labs(
+    title = "Distribuição das Respostas sobre Liderança Masculina",
+    subtitle = "Comparação entre Felizes e Não Felizes",
+    x = "Concordância com a frase 'Homens são melhores líderes políticos'",
+    y = "Frequência",
+    fill = "Felicidade",
+    caption = "Fonte: World Values Survey"
+  ) +
+  theme_minimal(base_size = 15) +
+  theme(
+    panel.background = element_rect(fill = custom_bg_color),
+    plot.background = element_rect(fill = custom_bg_color),
+    panel.grid.major.x = element_blank(),
+    panel.grid.minor = element_blank(),
+    panel.grid.major.y = element_line(color = "#d3c7ba"),
+    plot.title = element_text(face = "bold", size = 18, hjust = 0.5),
+    plot.subtitle = element_text(size = 14, hjust = 0.5),
+    axis.text.x = element_text(angle = 0, hjust = 0.5),
+    axis.line = element_line(color = "#b0a392"),
+    plot.caption = element_text(hjust = 0, size = 10),
+    axis.title.x = element_text(size = 14),
+    axis.title.y = element_text(size = 14)
+  )
+
+```
+
+### Gráficos de Histograma
+
+```{r, warning = FALSE, message = FALSE}
+
+ggplot(df_relevante, aes(x = as.numeric(feeling_happy))) +
+  geom_histogram(aes(y = ..density..), binwidth = 1, fill = "lightgreen", color = "black", alpha = 0.6) +
+  geom_density(color = "blue", fill = "lightblue", alpha = 0.4) +
+  labs(
+    title = "Histograma e Distribuição Alisada de Felicidade",
+    subtitle = "Distribuição do Sentimento de Felicidade com Plot Alisado",
+    x = "Sentimento de Felicidade (Escala)",
+    y = "Densidade",
+    caption = "Fonte: World Values Survey"
+  ) +
+  theme_minimal(base_size = 15) +
+  theme(
+    panel.background = element_rect(fill = custom_bg_color),
+    plot.background = element_rect(fill = custom_bg_color),
+    panel.grid.major = element_blank(),
+    panel.grid.minor = element_blank(),
+    plot.title = element_text(face = "bold", size = 18, hjust = 0.5),
+    plot.subtitle = element_text(size = 14, hjust = 0.5),
+    axis.line = element_line(color = "#b0a392"),
+    plot.caption = element_text(hjust = 0, size = 10),
+    axis.title.x = element_text(size = 14),
+    axis.title.y = element_text(size = 14)
+  )
+
+
+```
+
+## Regressões : MPL, Logit e Probit
+
+```{r, warning = FALSE, message = FALSE}
+
+# Regressão Logit ajustada pelo desenho amostral ----
+logit_model <- svyglm(happy_binary ~ housewife_fulfilling + men_priority_jobs + men_better_leaders + gender + age + marital_status, 
+                      design = survey_design, 
+                      family = quasibinomial(link = "logit"))
+
+# Regressão Probit ajustada pelo desenho amostral ----
+probit_model <- svyglm(happy_binary ~ housewife_fulfilling + men_priority_jobs + men_better_leaders + gender + age + marital_status, 
+                       design = survey_design, 
+                       family = quasibinomial(link = "probit"))
+
+# Função para calcular efeitos marginais usando svycontrast ----
+calcula_efeitos_marginais <- function(modelo) {
+  # Coeficientes do modelo
+  coeficientes <- coef(modelo)
+  # Efeitos marginais aproximados para variáveis contínuas e categóricas
+  marginais <- svycontrast(modelo, list("efeitos_marginais" = coeficientes))
+  return(marginais)
+}
+
+# Calculando os efeitos marginais para os modelos Logit e Probit ----
+marginais_logit <- calcula_efeitos_marginais(logit_model)
+marginais_probit <- calcula_efeitos_marginais(probit_model)
+
+```
+
+### Resultados das Regressões
+
+```{r, warning = FALSE, message = FALSE}
+
+stargazer(logit_model, probit_model, 
+          type = "text", 
+          title = "Resultados das Regressões: Logit e Probit (Com Desenho Amostral)", 
+          covariate.labels = c("Concorda 'Dona de Casa'", 
+                               "Concorda 'Homens Prioridade Emprego'", 
+                               "Concorda 'Homens Melhores Líderes'", 
+                               "Gênero (Mulher)", 
+                               "Idade", 
+                               "Estado Civil (Casado)"), 
+          dep.var.labels = "Probabilidade de Estar Feliz", 
+          ci = TRUE,  # Intervalos de confiança
+          align = TRUE, 
+          no.space = TRUE, 
+          omit.stat = c("f", "ser"))
+
+# Exibindo os efeitos marginais ajustados pelo desenho amostral ----
+print("Efeitos Marginais Logit:")
+print(marginais_logit)
+
+print("Efeitos Marginais Probit:")
+print(marginais_probit)
+
+
+
+```
