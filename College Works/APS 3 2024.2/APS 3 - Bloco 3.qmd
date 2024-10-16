@@ -1,0 +1,380 @@
+---
+title: "APS 3 - Bloco 3"
+author:
+  - name: "Arthur Di Croce Wohnrath"
+    email: "arthurcw1@al.insper.edu.br"
+  - name: "Erik Hund Bettamio Guimarães"
+    email: "erikhbg@al.insper.edu.br"
+  - name: "Érika Kaori Fuzisaka"
+    email: "erikafk1@al.insper.edu.br"
+  - name: "Hicham Munir Tayfour"
+    email: "hichamt@al.insper.edu.br"
+  - name: "Lucas Batista Ferreira"
+    email: "lucasbf1@al.insper.edu.br"
+  - name: "Sarah de Araújo Nascimento Silva"
+    email: "sarahans@al.insper.edu.br"
+format: html
+toc: true
+---
+
+# Questão 2
+
+## Letra A)
+
+A pergunta de pesquisa que nossa equipe pretende investigar é: *Como a formação dos professores, medida pela obtenção de um mestrado (indicada pela variável binária `tchmasters`), modera o efeito do tamanho da turma no desempenho dos alunos em Português no Projeto STAR?* Essa questão é relevante, pois o Projeto STAR aleatorizou alunos em diferentes tamanhos de turma e nos permite avaliar o impacto que a formação dos professores pode ter na atenuação ou amplificação do efeito do tamanho da turma no aprendizado.
+
+Para embasar essa investigação, utilizamos a teoria microeconômica de produção educacional, na qual o desempenho acadêmico dos alunos $A$ é uma função de diversos fatores, incluindo o tamanho da turma $T$ e a qualidade do professor $Q$. Nesse contexto, a qualidade do professor, que é representada pela obtenção de um mestrado, serve como uma proxy para o capital humano dos professores. O modelo utilizado pode ser descrito pela equação:
+
+$$
+A_i = \alpha + \beta_1 T_i + \beta_2 Q_i + \beta_3 (T_i \times Q_i) + \epsilon_i
+$$
+
+Neste modelo, $A_i$ representa o desempenho do aluno $i$ em Português, $T_i$ é o tamanho da turma do aluno $i$, $Q_i$ é uma variável binária que indica se o professor tem mestrado, e $T_i \times Q_i$ é uma interação que captura como o efeito do tamanho da turma varia de acordo com a formação do professor.
+
+Com base nesse modelo, a hipótese econômica que emerge é que professores com formação superior (mestrado) moderam o impacto negativo do aumento do tamanho da turma no desempenho dos alunos. Portanto, esperamos que o coeficiente $\beta_3$ seja positivo, indicando que a presença de professores com melhor formação reduz o efeito prejudicial de turmas maiores no desempenho dos alunos.
+
+## Letra B)
+
+## Letra C)
+
+### Hipótese Econômica:
+
+Nossa hipótese é que o tamanho da turma e a formação dos professores afetam o desempenho dos alunos. Professores com mestrado podem mitigar o impacto negativo de turmas maiores sobre o desempenho dos alunos.
+
+### Modelo Econométrico:
+
+Vamos estimar a seguinte equação de regressão múltipla:
+
+$$
+\text{readscore}_i = \beta_0 + \beta_1 \cdot \text{small}_i + \beta_2 \cdot \text{regular}_i + \beta_3 \cdot \text{tchmasters}_i + \beta_4 \cdot (\text{small}_i \times \text{tchmasters}_i) + \beta_5 \cdot (\text{regular}_i \times \text{tchmasters}_i) + \epsilon_i
+$$
+
+Onde: - $\text{readscore}_i$ é o score de leitura do aluno $i$. - $\text{small}_i$ é uma variável dummy que indica se o aluno está em uma turma pequena. - $\text{regular}_i$ é uma variável dummy que indica se o aluno está em uma turma regular. - $\text{tchmasters}_i$ é uma variável dummy que indica se o professor do aluno $i$ tem mestrado. - As interações $\text{small}_i \times \text{tchmasters}_i$ e $\text{regular}_i \times \text{tchmasters}_i$ capturam o efeito moderador da formação do professor sobre o impacto do tamanho da turma.
+
+### Resultados da Regressão:
+
+Utilizamos a regressão múltipla para testar essa hipótese e analisar o impacto das variáveis selecionadas. A seguir, apresentaremos os coeficientes estimados e sua significância estatística, permitindo avaliar o efeito do tamanho da turma e da formação dos professores no desempenho dos alunos.
+
+## Letra D)
+
+### Inclusão das Dummies de Escola no Modelo
+
+No Projeto STAR, os estudantes foram aleatorizados dentro das escolas, mas não entre elas. Isso significa que as escolas podem apresentar características institucionais que afetam o desempenho dos alunos, como localização em áreas com maior infraestrutura, professores mais qualificados ou maior acesso a recursos. Essas diferenças institucionais podem afetar o desempenho dos alunos, independentemente de variáveis observáveis como o tamanho da turma ou a formação dos professores.
+
+### O que representa a inclusão das variáveis \$ \text{escola}\_j \$?
+
+A inclusão das variáveis \$ \text{escola}\_j \$, que são dummies indicativas de cada escola, no modelo de regressão múltipla permite capturar os **efeitos fixos** das escolas. Isso significa que estamos controlando por todas as características que variam entre as escolas, mas que são constantes para os alunos de uma mesma escola, como localização, qualidade institucional, infraestrutura, e outros fatores não observáveis.
+
+### Modelo Econométrico Atualizado:
+
+O modelo econométrico com as dummies de escola pode ser representado da seguinte forma:
+
+$$
+\text{readscore}_i = \beta_0 + \beta_1 \cdot \text{small}_i + \beta_2 \cdot \text{regular}_i + \beta_3 \cdot \text{tchmasters}_i + \beta_4 \cdot (\text{small}_i \times \text{tchmasters}_i) + \beta_5 \cdot (\text{regular}_i \times \text{tchmasters}_i) + \sum_{j=1}^{78} \gamma_j \cdot \text{escola}_j + \epsilon_i
+$$
+
+Onde \$\gamma\_j\$ são os coeficientes das dummies de cada escola.
+
+### Teste de Significância Conjunta:
+
+Com a inclusão das dummies de escola, podemos realizar um teste de significância conjunta dos efeitos fixos das escolas para verificar se as diferenças institucionais entre as escolas têm um impacto significativo no desempenho dos alunos.
+
+## Letra E)
+
+### Verificação da Aleatorização com Modelo de Probabilidade Linear
+
+A aleatorização em um experimento como o Projeto STAR tem o objetivo de distribuir aleatoriamente os alunos entre as diferentes turmas. Isso significa que suas características observáveis, como gênero, etnia, desempenho passado, entre outros, não devem estar correlacionadas com o tipo de turma. Se a aleatorização foi bem-feita, as características dos alunos não devem ter impacto significativo sobre a probabilidade de o aluno estar em uma turma pequena (`small`).
+
+Um teste simples para verificar se a aleatorização foi bem executada é estimar um **modelo de probabilidade linear (LPM)**, onde a variável dependente é se o aluno foi alocado em uma turma pequena (`small`), e as variáveis explicativas são as características dos alunos, como sexo, etnia, etc. Se a aleatorização foi bem-feita, esperamos que os coeficientes das variáveis explicativas não sejam estatisticamente significativos.
+
+### Modelo Econométrico:
+
+Vamos estimar o seguinte modelo de probabilidade linear:
+
+$$
+\text{small}_i = \beta_0 + \beta_1 \cdot \text{boy}_i + \beta_2 \cdot \text{white\_asian}_i + \beta_3 \cdot \text{black}_i + \beta_4 \cdot \text{freelunch}_i + \beta_5 \cdot \text{tchwhite}_i + \epsilon_i
+$$
+
+Onde: - $\text{small}_i$ é uma variável binária que indica se o aluno está em uma turma pequena. - As variáveis explicativas incluem gênero ($boy$), etnia ($white\_asian$, $black$), se o aluno recebe merenda gratuita ($freelunch$), e se o professor é branco ($tchwhite$).
+
+### Interpretação dos Resultados:
+
+-   **Coeficientes não significativos**: Se os coeficientes das variáveis explicativas (gênero, etnia, etc.) não forem estatisticamente significativos, isso sugere que a aleatorização foi bem executada. Ou seja, as características dos alunos não influenciaram a alocação deles nas turmas pequenas, e a distribuição foi aleatória.
+
+-   **Coeficientes significativos**: Se algum coeficiente for significativo, isso indica que há um problema com a aleatorização. Isso sugere que uma ou mais características dos alunos influenciaram a alocação nas turmas pequenas, o que poderia introduzir viés nas estimativas de impacto do tamanho da turma no desempenho dos alunos.
+
+### Conclusão:
+
+Se a aleatorização foi bem executada, esperamos que as características dos alunos, como gênero, etnia, e status econômico, não estejam correlacionadas com a variável que indica se eles foram alocados em uma turma pequena. Isso seria indicado por coeficientes não significativos no modelo de probabilidade linear.
+
+# Código
+
+## Importando as Bibliotecas
+
+```{r, message = FALSE, warning = FALSE}
+
+library(tidyverse)      # manipulação de dados
+library(dplyr)          # manipulação de dados
+library(stargazer)      # tabelas de regressão
+library(gt)             # tabelas personalizadas
+library(survey)         # regressão logística
+library(sandwich)       # erros padrão robustos
+library(lmtest)         # testes de hipótese
+library(ggplot2)        # gráficos
+library(ggthemes)       # temas para gráficos
+library(margins)        # efeitos marginais
+library(readxl)         # leitura de arquivos excel
+library(haven)          # leitura de arquivos .dta
+
+```
+
+## Importando e verificando a estrutura dos dados
+
+```{r, message = FALSE, warning = FALSE}
+
+star_data <- read_dta("Star.dta")
+str(star_data)
+colnames(star_data)
+```
+
+## Estatísticas Descritivas
+
+### Turmas Pequenas (small)
+
+```{r, message = FALSE, warning = FALSE}
+
+estatisticas_small <- star_data %>%
+  filter(small == 1) %>%
+  summarise(
+    media_readscore = mean(readscore, na.rm = TRUE),
+    minimo_readscore = min(readscore, na.rm = TRUE),
+    maximo_readscore = max(readscore, na.rm = TRUE),
+    desvio_padrao_readscore = sd(readscore, na.rm = TRUE),
+    proporcao_tchmasters = mean(tchmasters, na.rm = TRUE) * 100
+  )
+```
+
+### Turmas Regulares (regular)
+
+```{r, message = FALSE, warning = FALSE}
+
+estatisticas_regular <- star_data %>%
+  filter(regular == 1) %>%
+  summarise(
+    media_readscore = mean(readscore, na.rm = TRUE),
+    minimo_readscore = min(readscore, na.rm = TRUE),
+    maximo_readscore = max(readscore, na.rm = TRUE),
+    desvio_padrao_readscore = sd(readscore, na.rm = TRUE),
+    proporcao_tchmasters = mean(tchmasters, na.rm = TRUE) * 100
+  )
+```
+
+### Turmas com Assitentes (aide)
+
+```{r, message = FALSE, warning = FALSE}
+
+estatisticas_aide <- star_data %>%
+  filter(aide == 1) %>%
+  summarise(
+    media_readscore = mean(readscore, na.rm = TRUE),
+    minimo_readscore = min(readscore, na.rm = TRUE),
+    maximo_readscore = max(readscore, na.rm = TRUE),
+    desvio_padrao_readscore = sd(readscore, na.rm = TRUE),
+    proporcao_tchmasters = mean(tchmasters, na.rm = TRUE) * 100
+  )
+```
+
+### Criando a Função para Tabela Formatada
+
+```{r, message = FALSE, warning = FALSE}
+
+criar_tabela_formatada <- function(titulo, subtitulo, fonte, nomes_colunas, nomes_linhas, valores_linhas) {
+  dados <- data.frame(
+    nome = nomes_linhas,
+    matrix(valores_linhas, ncol = length(nomes_colunas), byrow = TRUE)
+  )
+  
+  colnames(dados) <- c("nome", nomes_colunas)
+  
+  tabela <- gt(data = dados) %>%
+    tab_header(
+      title = titulo,
+      subtitle = subtitulo
+    ) %>%
+    tab_source_note(
+      source_note = fonte
+    ) %>%
+    tab_style(
+      style = cell_text(weight = "bold"),
+      locations = cells_column_labels(everything())
+    ) %>%
+    tab_style(
+      style = cell_text(weight = "bold"),
+      locations = cells_body(columns = "nome")
+    )
+  
+  return(tabela)
+}
+
+```
+
+### Criando a Tabela Formarada
+
+```{r, message = FALSE, warning = FALSE}
+
+tabela_formatada_real <- criar_tabela_formatada(
+  titulo = "Estatísticas Descritivas por Tipo de Turma",
+  subtitulo = "Média, Mínimo, Máximo e Desvio Padrão do Score de Português",
+  fonte = "Fonte: Projeto STAR",
+  nomes_colunas = c("Média Score", "Mínimo Score", "Máximo Score", "Desvio Padrão", "Proporção Professores com Mestrado (%)"),
+  nomes_linhas = c("Small", "Regular", "Aide"),
+  valores_linhas = c(
+    estatisticas_small$media_readscore, estatisticas_small$minimo_readscore, estatisticas_small$maximo_readscore, estatisticas_small$desvio_padrao_readscore, estatisticas_small$proporcao_tchmasters,
+    estatisticas_regular$media_readscore, estatisticas_regular$minimo_readscore, estatisticas_regular$maximo_readscore, estatisticas_regular$desvio_padrao_readscore, estatisticas_regular$proporcao_tchmasters,
+    estatisticas_aide$media_readscore, estatisticas_aide$minimo_readscore, estatisticas_aide$maximo_readscore, estatisticas_aide$desvio_padrao_readscore, estatisticas_aide$proporcao_tchmasters
+  )
+)
+
+# Exibindo a tabela formatada
+tabela_formatada_real
+```
+
+## Gráficos
+
+### Ajustando a Base de Dados
+
+```{r, message = FALSE, warning = FALSE}
+
+df_star <- star_data %>%
+  mutate(
+    turma = case_when(
+      small == 1 ~ "Small",
+      regular == 1 ~ "Regular",
+      aide == 1 ~ "Aide"
+    ),
+    turma = factor(turma, levels = c("Small", "Regular", "Aide"))
+  )
+
+# Definindo cor de fundo personalizada
+custom_bg_color <- "#ffffff"
+```
+
+### Histograma
+
+```{r, message = FALSE, warning = FALSE}
+
+ggplot(df_star, aes(x = readscore, fill = turma, color = turma)) +
+  geom_density(alpha = 0.05) +
+  labs(
+    title = "Densidade Suavizada do Score de Português",
+    subtitle = "Distribuição por Turmas Small, Regular e Aide",
+    x = "Score de Português",
+    y = "Densidade",
+    fill = "Turma",
+    color = "Turma",
+    caption = "Fonte: Projeto STAR"
+  ) +
+  theme_minimal(base_size = 15) +
+  theme(
+    panel.background = element_rect(fill = custom_bg_color),
+    plot.background = element_rect(fill = custom_bg_color),
+    panel.grid.major.x = element_blank(),
+    panel.grid.minor = element_blank(),
+    plot.title = element_text(face = "bold", size = 18, hjust = 0.5),
+    plot.subtitle = element_text(size = 14, hjust = 0.5),
+    axis.line = element_line(color = "#b0a392"),
+    plot.caption = element_text(hjust = 0, size = 10)
+  )
+```
+
+### Boxplot
+
+```{r, message = FALSE, warning = FALSE}
+
+ggplot(df_star, aes(x = turma, y = readscore, fill = turma)) +
+  geom_boxplot(alpha = 0.7) +
+  labs(
+    title = "Boxplot do Score de Português por Tipo de Turma",
+    subtitle = "Comparação entre Turmas Small, Regular e Aide",
+    x = "Turma",
+    y = "Score de Português",
+    fill = "Turma",
+    caption = "Fonte: Projeto STAR"
+  ) +
+  theme_minimal(base_size = 15) +
+  theme(
+    panel.background = element_rect(fill = custom_bg_color),
+    plot.background = element_rect(fill = custom_bg_color),
+    panel.grid.major.x = element_blank(),
+    panel.grid.minor = element_blank(),
+    plot.title = element_text(face = "bold", size = 18, hjust = 0.5),
+    plot.subtitle = element_text(size = 14, hjust = 0.5),
+    axis.line = element_line(color = "#b0a392"),
+    plot.caption = element_text(hjust = 0, size = 10)
+  )
+```
+
+## Regressão Múltipla
+
+```{r, message = FALSE, warning = FALSE}
+
+modelo_regressao <- lm(readscore ~ small + regular + tchmasters + small * tchmasters + regular * tchmasters, data = star_data)
+```
+
+### Resultados da Regressão
+
+```{r, message = FALSE, warning = FALSE}
+
+stargazer(modelo_regressao, type = "text", title = "Resultados da Regressão Múltipla", 
+          covariate.labels = c("Turma Pequena (Small)", "Turma Regular (Regular)", 
+                               "Professor com Mestrado (tchmasters)", 
+                               "Interação: Small x Professor com Mestrado", 
+                               "Interação: Regular x Professor com Mestrado"), 
+          dep.var.labels = "Score em Português", align = TRUE)
+```
+
+### Incluindo dummies de escola no modelo
+
+```{r, message = FALSE, warning = FALSE}
+
+modelo_regressao_escola <- lm(readscore ~ small + regular + tchmasters + small * tchmasters + regular * tchmasters + factor(schid), data = star_data)
+```
+
+### Exibindo os resultados da regressão com dummies de escola
+
+```{r, message = FALSE, warning = FALSE}
+
+stargazer(modelo_regressao_escola, type = "text", title = "Resultados da Regressão com Efeitos Fixos de Escola", 
+          covariate.labels = c("Turma Pequena (Small)", "Turma Regular (Regular)", 
+                               "Professor com Mestrado (tchmasters)", 
+                               "Interação: Small x Professor com Mestrado", 
+                               "Interação: Regular x Professor com Mestrado", 
+                               "Dummies de Escola"),
+          dep.var.labels = "Score em Português", align = TRUE)
+```
+
+### Teste de Significância Conjunta
+
+```{r, message = FALSE, warning = FALSE}
+
+anova(modelo_regressao_escola)
+```
+
+## Estimando o modelo de probabilidade linear (LPM) ----
+
+```{r, message = FALSE, warning = FALSE}
+
+modelo_lpm <- lm(small ~ boy + white_asian + black + freelunch + tchwhite, data = star_data)
+
+```
+
+## Exibindo os resultados da regressão LPM
+
+```{r, message = FALSE, warning = FALSE}
+
+stargazer(modelo_lpm, type = "text", title = "Modelo de Probabilidade Linear: Verificação da Aleatorização", 
+          covariate.labels = c("Gênero (Menino)", "Raça (Branco/Asiático)", 
+                               "Raça (Negro)", "Merenda Gratuita (Freelunch)", 
+                               "Professor Branco (Tchwhite)"), 
+          dep.var.labels = "Turma Pequena (Small)", align = TRUE)
+```
