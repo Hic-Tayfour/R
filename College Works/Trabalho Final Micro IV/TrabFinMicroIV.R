@@ -12,9 +12,11 @@ library(microdatasus)   # acesso a microdados do DataSUS
 
 minf <- data.frame()
 ninf <- data.frame()
+cnes <- data.frame()
 
 geo <- read_excel("CADMUN.xls") %>%
   mutate(
+    MUNCOD   = as.character(MUNCOD),
     MICROCOD = as.character(MICROCOD),
     MSAUDCOD = as.character(MSAUDCOD),
     UF = substr(MICROCOD, 1, 2), 
@@ -24,27 +26,22 @@ geo <- read_excel("CADMUN.xls") %>%
       MUNNOME  
     )
   ) %>%
-  select(MUNNOME, MICROCOD, MSAUDCOD, UF, LATITUDE, LONGITUDE)
+  select(MUNCOD,MUNNOME, MICROCOD, MSAUDCOD, UF, LATITUDE, LONGITUDE)
 
 processar_dados <- function(db, geo, col_cod) {
   db %>%
-    mutate(
-      UF = substr(!!sym(col_cod), 1, 2),  
-      MSAUDCOD = substr(!!sym(col_cod), 1, 4),  
-      MICROCOD = substr(!!sym(col_cod), 1, 5)  
-    ) %>%
-    left_join(geo, by = c("UF", "MSAUDCOD", "MICROCOD")) %>%  
-    select(everything(), MUNNOME)  
+    left_join(geo, by = setNames("MUNCOD", col_cod)) %>%
+    select(everything(), MUNNOME, MICROCOD, MSAUDCOD, UF, LATITUDE, LONGITUDE)
 }
 
-for (ano in 2014:2023) {
+for (ano in 2015:2019) {
   db_sim <- fetch_datasus(
     year_start = ano,
     year_end = ano,
     information_system = "SIM-DOINF",
     vars = c(
       "SEXO",
-      "CODMUNNATU",
+      "CODMUNOCOR",
       "LOCOCOR",
       "IDADEMAE",
       "ESCMAE",
@@ -54,7 +51,7 @@ for (ano in 2014:2023) {
   )
   db_sim <- process_sim(db_sim)
   db_sim <- db_sim %>% mutate(ANO = ano)
-  db_sim <- processar_dados(db_sim, geo, "CODMUNNATU")
+  db_sim <- processar_dados(db_sim, geo, "CODMUNOCOR")
   minf <- bind_rows(minf, db_sim)
   
   db_sinasc <- fetch_datasus(
@@ -76,12 +73,26 @@ for (ano in 2014:2023) {
   db_sinasc <- processar_dados(db_sinasc, geo, "CODMUNNASC")
   ninf <- bind_rows(ninf, db_sinasc)
   
-  if (ano == 2023) {
+  db_cnes_lt <- fetch_datasus(
+    year_start = ano,
+    month_start = 12,
+    year_end = ano,
+    month_end = 12, 
+    information_system = "CNES-LT",
+    vars = c("CODUFMUN", "MICR_REG")  
+  )
+  db_cnes_lt <- db_cnes_lt %>% mutate(ANO = ano)
+  db_cnes_lt <- processar_dados(db_cnes_lt, geo, "CODUFMUN")
+  cnes <- bind_rows(cnes_lt, db_cnes_lt)
+  
+  if (ano == 2019) {
     save(minf, file = "minf.Rdata")
     save(ninf, file = "ninf.Rdata")
-    remove(db_sim, db_sinasc, minf, ninf, ano, geo)
+    save(cnes_lt, file = "cnes_lt.Rdata")
+    remove(db_sim, db_sinasc, minf, ninf, cnes,ano, geo)
   }
 }
 
 load("minf.Rdata")
 load("ninf.Rdata")
+load("cnes.Rdata")
