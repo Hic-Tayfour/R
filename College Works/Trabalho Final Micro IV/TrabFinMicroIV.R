@@ -1,6 +1,7 @@
 # Bibliotecas a Serem Usadas ----
 
 library(tidyverse)      # manipulação de dados
+library(broom)          # manipulação de dados
 library(readxl)         # leitura de arquivos excel
 library(microdatasus)   # acesso a microdados do DataSUS
 library(sf)             # manipulação de dados geográficos
@@ -11,6 +12,8 @@ library(ggpubr)         # gráficos
 library(RColorBrewer)   # paletas de cores
 library(ggthemes)       # temas para gráficos
 library(purrr)          # para funções funcionais como map e walk
+library(fixest)         # para regressões de Did 
+library(stargazer)      # tabelas de regressão
 
 # DataFrames a Serem Usados ----
 
@@ -94,15 +97,17 @@ processar_dados_ano <- function(ano, geo) {
     mutate(ANO = ano) %>%
     processar_dados(geo, "CODMUNRES")
   
-  db_cnes <- fetch_datasus(
-    year_start = ano,
-    year_end = ano,
-    month_start = 1,
-    month_end = 12,
-    information_system = "CNES-ST",
-    vars = c("CODUFMUN", "MICR_REG")
-  ) %>%
-    mutate(ANO = ano) %>%
+  db_cnes <- map_dfr(1:12, function(mes) {
+    fetch_datasus(
+      year_start = ano,
+      year_end = ano,
+      month_start = mes,
+      month_end = mes,
+      information_system = "CNES-ST",
+      vars = c("CODUFMUN", "TP_UNID")
+    ) %>%
+      mutate(ANO = ano, MES = mes)
+  }) %>%
     processar_dados(geo, "CODUFMUN")
   
   list(db_sim = db_sim, db_sinasc = db_sinasc, db_cnes = db_cnes)
@@ -155,14 +160,14 @@ minf_grouped_month <- minf %>%
     ocorrencias_6 = sum(LOCOCOR == "6", na.rm = TRUE),
     Vaginal = sum(PARTO == "Vaginal", na.rm = TRUE),
     Cesareo = sum(PARTO == "Cesáreo", na.rm = TRUE),
-    esc_mae_4a7 = sum(ESCMAE == "4 a 7 anos", na.rm = TRUE),
-    esc_mae_8a11 = sum(ESCMAE == "8 a 11 anos", na.rm = TRUE),
-    esc_mae_12oumais = sum(ESCMAE == "12 anos ou mais", na.rm = TRUE),
-    esc_mae_1a3 = sum(ESCMAE == "1 a 3 anos", na.rm = TRUE),
-    esc_mae_nenhuma = sum(ESCMAE == "Nenhuma", na.rm = TRUE),
-    esc_mae_na = sum(is.na(ESCMAE))
+    Idade_otima = sum(IDADEMAE <= 35, na.rm = TRUE),
+    Idade_atencao = sum(IDADEMAE > 35, na.rm = TRUE)
     , .groups = "drop") %>%
+  mutate(
+    Prop_otima = Idade_otima / (Idade_otima + Idade_atencao)
+  ) %>% 
   arrange(MICROCOD, ano, mes)
+
 
 minf_grouped_year <- minf_grouped_month %>%
   group_by(MICROCOD, ano) %>%
@@ -180,13 +185,11 @@ minf_grouped_year <- minf_grouped_month %>%
     ocorrencias_6 = sum(ocorrencias_6, na.rm = TRUE),
     Vaginal = sum(Vaginal, na.rm = TRUE),
     Cesareo = sum(Cesareo, na.rm = TRUE),
-    esc_mae_4a7 = sum(esc_mae_4a7, na.rm = TRUE),
-    esc_mae_8a11 = sum(esc_mae_8a11, na.rm = TRUE),
-    esc_mae_12oumais = sum(esc_mae_12oumais, na.rm = TRUE),
-    esc_mae_1a3 = sum(esc_mae_1a3, na.rm = TRUE),
-    esc_mae_nenhuma = sum(esc_mae_nenhuma, na.rm = TRUE),
-    esc_mae_na = sum(esc_mae_na, na.rm = TRUE)
-    , .groups = "drop") %>%
+    Idade_otima = sum(Idade_otima, na.rm = TRUE),
+    Idade_atencao = sum(Idade_atencao, na.rm = TRUE))%>%
+    mutate(
+    Prop_otima = Idade_otima / (Idade_otima + Idade_atencao)
+    )%>% 
   arrange(MICROCOD, ano)
 
 minf_grouped_clean <- minf_grouped_year %>%
@@ -422,7 +425,9 @@ ninf_grouped_month <- ninf %>%
     esc_mae_12oumais = sum(ESCMAE %in% c("12 anos ou mais", "5"), na.rm = TRUE),
     esc_mae_1a3 = sum(ESCMAE %in% c("1 a 3 anos", "2"), na.rm = TRUE),
     esc_mae_nenhuma = sum(ESCMAE %in% c("Nenhuma", "1"), na.rm = TRUE),
-    esc_mae_ignorado = sum(ESCMAE %in% c("Ignorado", "9"), na.rm = TRUE)
+    esc_mae_ignorado = sum(ESCMAE %in% c("Ignorado", "9"), na.rm = TRUE),
+    Idade_otima = sum(IDADEMAE <= 35, na.rm = TRUE),
+    Idade_atencao = sum(IDADEMAE > 35, na.rm = TRUE)
     , .groups = "drop") %>%
   arrange(MICROCOD, ano, mes)
 
@@ -448,7 +453,9 @@ ninf_grouped_year <- ninf_grouped_month %>%
     esc_mae_12oumais = sum(esc_mae_12oumais, na.rm = TRUE),
     esc_mae_1a3 = sum(esc_mae_1a3, na.rm = TRUE),
     esc_mae_nenhuma = sum(esc_mae_nenhuma, na.rm = TRUE),
-    esc_mae_ignorado = sum(esc_mae_ignorado, na.rm = TRUE)
+    esc_mae_ignorado = sum(esc_mae_ignorado, na.rm = TRUE),
+    Idade_otima = sum(Idade_otima, na.rm = TRUE),
+    Idade_atencao = sum(Idade_atencao, na.rm = TRUE))
     , .groups = "drop") %>%
   arrange(MICROCOD, ano)
 
@@ -822,3 +829,245 @@ grafico_linha_razao_anual <- gerar_grafico_linha_razao_anual(
 )
 
 grafico_linha_razao_anual
+
+# Dados de Estabelecimentos de Saúde ----
+
+cnes_grouped_month <- cnes %>%
+  group_by(MICROCOD, ANO, MES) %>%
+  summarize(
+    total_observacoes = n(),
+    LATITUDE = first(LATITUDE[!is.na(LATITUDE)]),  
+    LONGITUDE = first(LONGITUDE[!is.na(LONGITUDE)]), 
+    Hospital = sum(TP_UNID == "05", na.rm = TRUE),
+    , .groups = "drop") %>%
+  arrange(MICROCOD, ANO, MES)
+
+cnes_grouped_year <- cnes_grouped_month %>%
+  group_by(MICROCOD, ANO) %>%
+  summarize(
+    total_observacoes = sum(total_observacoes, na.rm = TRUE),
+    LATITUDE = first(LATITUDE[!is.na(LATITUDE)]),  
+    LONGITUDE = first(LONGITUDE[!is.na(LONGITUDE)]), 
+    Hospital = sum(Hospital, na.rm = TRUE)
+    , .groups = "drop") %>%
+  arrange(MICROCOD, ANO)
+
+
+cnes_grouped_clean <- cnes_grouped_year %>%
+  filter(!is.na(LATITUDE) & !is.na(LONGITUDE))
+
+cnes_grouped_sf <- st_as_sf(cnes_grouped_clean,
+                            coords = c("LONGITUDE", "LATITUDE"),
+                            crs = 4326)
+
+cnes_cropped <- st_intersection(cnes_grouped_sf, brasil)
+
+cnes_cropped_coords <- cnes_cropped %>%
+  mutate(LONGITUDE = st_coordinates(.)[, 1], LATITUDE = st_coordinates(.)[, 2]) %>%
+  st_drop_geometry()
+
+## Gráficos de Hexágonos
+
+gerar_grafico_hex_cnes <- function(df,
+                                   ano,
+                                   brasil,
+                                   palette,
+                                   title = NULL,
+                                   subtitle = NULL,
+                                   xlim = c(-75, -30),
+                                   ylim = c(-35, 5)) {
+  ggplot(df %>% filter(ANO == ano)) +
+    geom_sf(data = brasil,
+            fill = "white",
+            color = "black") +
+    geom_hex(aes(x = LONGITUDE, y = LATITUDE), bins = 60) +
+    palette +
+    labs(title = title %||% as.character(ano),
+         subtitle = subtitle) +
+    coord_sf(xlim = xlim,
+             ylim = ylim,
+             expand = FALSE) +
+    theme_void() +
+    theme(plot.title = element_text(hjust = 0.5),
+          plot.subtitle = element_text(hjust = 0.5))
+}
+
+palette_cnes <- scale_fill_gradient(low = "lightgreen",
+                                    high = "green4",
+                                    name = "Estabelecimentos de Saúde")
+
+anos <- 2014:2019
+
+hex_graficos_cnes <- map(
+  anos,
+  ~ gerar_grafico_hex_cnes(
+    cnes_cropped_coords,
+    .x,
+    brasil,
+    palette_cnes,
+    title = paste("Estabelecimentos de Saúde em", .x),
+    subtitle = "Análise por MicroRegião"
+  )
+)
+
+hex_graficos_cnes <- map(hex_graficos_cnes, ~ .x + theme(legend.position = "none"))
+
+combined_hex_cnes <- wrap_plots(hex_graficos_cnes, nrow = 2) +
+  plot_annotation(
+    title = "Estabelecimentos de Saúde nas MicroRegiões da Saúde (2014-2019)",
+    subtitle = "Análise Geográfica dos Estabelecimentos de Saúde",
+    theme = theme(
+      plot.title = element_text(hjust = 0.5, size = 16, face = "bold"),
+      plot.subtitle = element_text(hjust = 0.5, size = 12)
+    )
+  )
+
+combined_hex_cnes
+
+
+## Gráficos de Violino
+
+gerar_grafico_violino_cnes <- function(df,
+                                       title = "Distribuição de Estabelecimentos de Saúde por Ano",
+                                       subtitle = NULL,
+                                       xlab = "Ano",
+                                       ylab = "Ocorrências (Escala Logarítmica)",
+                                       fill_colors = c("#1f77b4", "#ff7f0e", "#2ca02c", "#d62728", "#9467bd", "#8c564b")) {
+  ggplot(df, aes(
+    x = as.factor(ANO),
+    y = total_observacoes,
+    fill = as.factor(ANO)
+  )) +
+    geom_violin(trim = TRUE,
+                color = "black",
+                alpha = 0.2) +
+    geom_boxplot(
+      width = 0.1,
+      fill = "white",
+      color = "black",
+      outlier.shape = NA,
+      alpha = 0.5
+    ) +
+    stat_summary(
+      fun = "mean",
+      geom = "point",
+      color = "red",
+      size = 4,
+      shape = 23,
+      fill = "red"
+    ) +
+    scale_y_log10(breaks = c(1, 10, 100, 1000),
+                  labels = c("1", "10", "100", "1000")) +
+    labs(
+      title = title,
+      subtitle = subtitle,
+      x = xlab,
+      y = ylab,
+      caption = "Fonte: DataSUS"
+    ) +
+    scale_fill_manual(values = fill_colors) +
+    theme_classic(base_size = 15) +
+    theme(
+      plot.title = element_text(hjust = 0.5, face = "bold"),
+      plot.subtitle = element_text(hjust = 0.5),
+      axis.text.x = element_text(angle = 45, hjust = 1),
+      legend.position = "none",
+      panel.grid.major = element_blank(),
+      panel.grid.minor = element_blank(),
+      panel.border = element_blank(),
+      axis.ticks = element_blank()
+    )
+}
+
+grafico_violino_cnes <- gerar_grafico_violino_cnes(
+  cnes_grouped_year,
+  title = "Distribuição de Estabelecimentos de Saúde por Ano",
+  subtitle = "Análise Geográfica dos Estabelecimentos de Saúde",
+  xlab = "Ano",
+  ylab = "Ocorrências (Escala Logarítmica)",
+  fill_colors = c("#2c7bb6", "#abd9e9", "#fdae61", "#d7191c", "#f46d43", "#1f78b4")
+)
+
+grafico_violino_cnes
+
+
+## Gráfico de Linha
+
+gerar_grafico_linha_cnes <- function(df,
+                                     title = "Total de Estabelecimentos de Saúde por Ano",
+                                     subtitle = NULL,
+                                     xlab = "Ano",
+                                     ylab = "Total de Ocorrências",
+                                     line_color = "#1f77b4",
+                                     point_color = "#ff7f0e",
+                                     background_color = "#f9f9f9") {
+  ggplot(df, aes(
+    x = as.factor(ANO),
+    y = total_observacoes,
+    group = 1
+  )) +
+    stat_summary(
+      fun = sum,
+      geom = "line",
+      color = line_color,
+      size = 1.2
+    ) +
+    stat_summary(
+      fun = sum,
+      geom = "point",
+      color = point_color,
+      size = 4,
+      shape = 21,
+      fill = "white",
+      stroke = 1.5
+    ) +
+    labs(
+      title = title,
+      subtitle = subtitle,
+      x = xlab,
+      y = ylab,
+      caption = "Fonte: DataSUS"
+    ) +
+    theme_minimal(base_size = 15) +
+    theme(
+      plot.title = element_text(
+        hjust = 0.5,
+        face = "bold",
+        size = 16
+      ),
+      plot.subtitle = element_text(hjust = 0.5, size = 12),
+      axis.text.x = element_text(angle = 45, hjust = 1),
+      panel.grid.major = element_blank(),
+      panel.grid.minor = element_blank(),
+      panel.background = element_rect(fill = background_color, color = NA),
+      plot.background = element_rect(fill = background_color, color = NA),
+      axis.line = element_line(color = "gray50", size = 0.5),
+      axis.ticks = element_line(color = "gray50")
+    )
+}
+
+grafico_linha_cnes <- gerar_grafico_linha_cnes(
+  cnes_grouped_year,
+  title = "Estabelecimentos de Saúde por Ano",
+  subtitle = "Total de Ocorrências Registradas de 2014 a 2019",
+  xlab = "Ano",
+  ylab = "Total de Ocorrências",
+  line_color = "#2c7bb6",
+  point_color = "#d7191c",
+  background_color = "#f9f9f9"
+)
+
+grafico_linha_cnes
+
+# Análise de Regressão da Mortalidade Ínfantil, usando um Stagared DiD
+
+minf_grouped_month <- minf_grouped_month %>%
+  mutate(ano_mes = paste(ano, mes, sep = "_"))
+
+model_mortalidade <- feols(total_observacoes ~ Hospital | 
+                             MICROCOD + ano + mes, 
+                           data = minf_grouped_month)
+
+model_mortalidade_controles <- feols(total_observacoes ~ Hospital + Masculino + Feminino + Vaginal + Cesareo | 
+                                       MICROCOD + ano + mes, 
+                                     data = minf_grouped_month)
