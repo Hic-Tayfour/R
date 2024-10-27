@@ -1,31 +1,29 @@
 # Base de Dados Trabalho Final
-## Natalidade Infantil (2014:2019)
 
-download.file("https://alinsperedu-my.sharepoint.com/:u:/g/personal/hichamt_al_insper_edu_br/EYe5f-Gp1-ZFtLRn9l6k6OIBq3dZQjqv71bYatO81v8MbA?download=1", 
-              tempfile(fileext = ".RData"), 
-              mode = "wb")
-              
-load(tempfile(fileext = ".RData"))
+```{R}
+# Links ajustados para download direto
+onedrive_links <- c(
+  "https://alinsperedu-my.sharepoint.com/personal/hichamt_al_insper_edu_br/_layouts/15/download.aspx?UniqueId=edn8umxftjdaor4ltvhopgabiqnniicvqcxlqunyamh2qg",
+  "https://alinsperedu-my.sharepoint.com/personal/hichamt_al_insper_edu_br/_layouts/15/download.aspx?UniqueId=ebvazlzz7o1bvuuffmwqxecab2jvav3wusga6y_xedfpnra",
+  "https://alinsperedu-my.sharepoint.com/personal/hichamt_al_insper_edu_br/_layouts/15/download.aspx?UniqueId=ectnwrhb7ftnrfp21llqtuwb2lulnlvqmq8_qy6vtyjjqy"
+)
 
-## Mortalidade Infantil (2014:2019)
+# Nome dos arquivos locais onde você quer salvar os arquivos RData
+local_files_rdata <- c("ninf.Rdata", "minf.Rdata", "cnes.Rdata")
 
-# Baixe o arquivo diretamente do OneDrive
+# Link direto para o arquivo CADMUN.xls no GitHub
+cadmun_link <- "https://github.com/Hic-Tayfour/R/raw/main/College%20Works/Trabalho%20Final%20Micro%20IV/CADMUN.xls"
+local_cadmun <- "CADMUN.xls"
 
-download.file("https://alinsperedu-my.sharepoint.com/:u:/g/personal/hichamt_al_insper_edu_br/ES6Rf-Uk59dOnxL41S0CUTcBluaNCspfIkNiFStKgZucgg?download=1", 
-              tempfile(fileext = ".RData"),
-              mode = "wb")
+# Loop para baixar os arquivos .Rdata
+for (i in seq_along(onedrive_links)) {
+  download.file(onedrive_links[i], destfile = local_files_rdata[i], mode = "wb")
+  load(local_files_rdata[i])  # Carregar os arquivos RData baixados
+  message(paste("Arquivo", local_files_rdata[i], "baixado e carregado com sucesso."))
+}
 
-load(tempfile(fileext = ".RData"))
-
-# Verifique o conteúdo do arquivo carregado
-ls()
-
-
-## Estabelicimento de Saúde (2014:2019)
-
-download.file("https://alinsperedu-my.sharepoint.com/:u:/g/personal/hichamt_al_insper_edu_br/EfyUyAGXriRCooXlzdAN_ZcBjHWhwZGN6mxg87x5X4EbTw?download=1", 
-              tempfile(fileext = ".RData"), 
-              mode = "wb")
-
-load(tempfile(fileext = ".RData"))
+# Baixar o arquivo CADMUN.xls do GitHub
+download.file(cadmun_link, destfile = local_cadmun, mode = "wb")
+message("Arquivo CADMUN.xls baixado com sucesso.")
+```
 
