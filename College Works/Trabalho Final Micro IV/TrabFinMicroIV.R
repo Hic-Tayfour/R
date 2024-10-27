@@ -455,9 +455,11 @@ ninf_grouped_year <- ninf_grouped_month %>%
     esc_mae_nenhuma = sum(esc_mae_nenhuma, na.rm = TRUE),
     esc_mae_ignorado = sum(esc_mae_ignorado, na.rm = TRUE),
     Idade_otima = sum(Idade_otima, na.rm = TRUE),
-    Idade_atencao = sum(Idade_atencao, na.rm = TRUE))
-    , .groups = "drop") %>%
+    Idade_atencao = sum(Idade_atencao, na.rm = TRUE),
+    .groups = "drop"
+  ) %>%
   arrange(MICROCOD, ano)
+
 
 ninf_grouped_clean <- ninf_grouped_year %>%
   filter(!is.na(LATITUDE) & !is.na(LONGITUDE))
@@ -1071,3 +1073,6 @@ model_mortalidade <- feols(total_observacoes ~ Hospital |
 model_mortalidade_controles <- feols(total_observacoes ~ Hospital + Masculino + Feminino + Vaginal + Cesareo | 
                                        MICROCOD + ano + mes, 
                                      data = minf_grouped_month)
+
+
+
