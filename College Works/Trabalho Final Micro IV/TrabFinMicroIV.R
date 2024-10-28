@@ -1207,3 +1207,53 @@ grafico_did_anual <- gerar_grafico_linha_did_anual(
 )
 
 print(grafico_did_anual)
+
+media_diferenca_anual <- media_mortalidade_anual %>%
+  group_by(ano, tratado) %>%
+  summarise(media_taxa_mortalidade = mean(media_taxa_mortalidade, na.rm = TRUE)) %>%
+  ungroup()
+
+gerar_grafico_barras_did_anual <- function(df,
+                                           title = "Diferenças na Taxa de Mortalidade Infantil por Ano",
+                                           subtitle = "Comparação entre os Grupos Tratado e Controle",
+                                           xlab = "Ano",
+                                           ylab = "Média da Taxa de Mortalidade Infantil",
+                                           bar_color_treated = "#1f77b4",
+                                           bar_color_control = "#ff7f0e",
+                                           background_color = "#f9f9f9") {
+  
+  ggplot(df, aes(x = as.factor(ano), y = media_taxa_mortalidade, fill = as.factor(tratado))) +
+    geom_bar(stat = "identity", position = "dodge", width = 0.7) +
+    scale_fill_manual(values = c(bar_color_control, bar_color_treated), labels = c("Controle", "Tratado")) +
+    labs(
+      title = title,
+      subtitle = subtitle,
+      x = xlab,
+      y = ylab,
+      fill = "Grupo",
+      caption = "Fonte: DataSUS"
+    ) +
+    theme_minimal(base_size = 15) +
+    theme(
+      plot.title = element_text(hjust = 0.5, face = "bold", size = 16),
+      plot.subtitle = element_text(hjust = 0.5, size = 12),
+      axis.text.x = element_text(angle = 45, hjust = 1),
+      panel.grid.major = element_blank(),
+      panel.grid.minor = element_blank(),
+      panel.background = element_rect(fill = background_color, color = NA),
+      plot.background = element_rect(fill = background_color, color = NA),
+      axis.line = element_line(color = "gray50", size = 0.5),
+      axis.ticks = element_line(color = "gray50")
+    )
+}
+
+grafico_barras_did_anual <- gerar_grafico_barras_did_anual(
+  media_mortalidade_anual,  
+  title = "Diferenças na Taxa de Mortalidade Infantil por Ano",
+  subtitle = "Comparação entre os Grupos Tratado e Controle",
+  xlab = "Ano",
+  ylab = "Média da Taxa de Mortalidade Infantil"
+)
+
+print(grafico_barras_did_anual)
+
