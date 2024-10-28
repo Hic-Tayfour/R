@@ -1,19 +1,19 @@
 # Bibliotecas a Serem Usadas ----
 
-library(tidyverse)      # manipulação de dados
-library(broom)          # manipulação de dados
-library(readxl)         # leitura de arquivos excel
-library(microdatasus)   # acesso a microdados do DataSUS
-library(sf)             # manipulação de dados geográficos
 library(rnaturalearth)  # dados geográficos
-library(gt)             # tabelas personalizadas
-library(patchwork)      # combinação de gráficos
-library(ggpubr)         # gráficos
+library(microdatasus)   # acesso a microdados do DataSUS
 library(RColorBrewer)   # paletas de cores
-library(ggthemes)       # temas para gráficos
-library(purrr)          # para funções funcionais como map e walk
-library(fixest)         # para regressões de Did 
+library(patchwork)      # combinação de gráficos
+library(tidyverse)      # manipulação de dados
 library(stargazer)      # tabelas de regressão
+library(ggthemes)       # temas para gráficos
+library(readxl)         # leitura de arquivos excel
+library(ggpubr)         # gráficos
+library(fixest)         # para regressões de Did 
+library(purrr)          # para funções funcionais como map e walk
+library(broom)          # manipulação de dados
+library(sf)             # manipulação de dados geográficos
+library(gt)             # tabelas personalizadas
 
 # DataFrames a Serem Usados ----
 
@@ -984,7 +984,7 @@ gerar_grafico_violino_cnes <- function(df,
 grafico_violino_cnes <- gerar_grafico_violino_cnes(
   cnes_grouped_year,
   title = "Distribuição de Estabelecimentos de Saúde por Ano",
-  subtitle = "Análise Geográfica dos Estabelecimentos de Saúde",
+  subtitle = "Análise Geográfica dos Hospitais",
   xlab = "Ano",
   ylab = "Ocorrências (Escala Logarítmica)",
   fill_colors = c("#2c7bb6", "#abd9e9", "#fdae61", "#d7191c", "#f46d43", "#1f78b4")
@@ -996,10 +996,10 @@ grafico_violino_cnes
 ## Gráfico de Linha
 
 gerar_grafico_linha_cnes <- function(df,
-                                     title = "Total de Estabelecimentos de Saúde por Ano",
+                                     title = "Total Hospitais por Ano",
                                      subtitle = NULL,
                                      xlab = "Ano",
-                                     ylab = "Total de Ocorrências",
+                                     ylab = "Número de Hospitais",
                                      line_color = "#1f77b4",
                                      point_color = "#ff7f0e",
                                      background_color = "#f9f9f9") {
@@ -1051,7 +1051,7 @@ gerar_grafico_linha_cnes <- function(df,
 grafico_linha_cnes <- gerar_grafico_linha_cnes(
   cnes_grouped_year,
   title = "Estabelecimentos de Saúde por Ano",
-  subtitle = "Total de Ocorrências Registradas de 2014 a 2019",
+  subtitle = "Total de Hospitais de 2014 a 2019",
   xlab = "Ano",
   ylab = "Total de Ocorrências",
   line_color = "#2c7bb6",
@@ -1061,18 +1061,149 @@ grafico_linha_cnes <- gerar_grafico_linha_cnes(
 
 grafico_linha_cnes
 
-# Análise de Regressão da Mortalidade Ínfantil, usando um Stagared DiD
+# Análise de Regressão da Mortalidade Ínfantil, usando um Stagared DiD ----
 
-minf_grouped_month <- minf_grouped_month %>%
-  mutate(ano_mes = paste(ano, mes, sep = "_"))
+rm(cnes_grouped_year, cnes_grouped_clean, cnes_grouped_sf, cnes_cropped, cnes_cropped_coords,
+   minf_grouped_year, minf_grouped_clean, minf_grouped_sf, minf_cropped, minf_cropped_coords,
+   ninf_grouped_year, ninf_grouped_clean, ninf_grouped_sf, ninf_cropped, ninf_cropped_coords)
 
-model_mortalidade <- feols(total_observacoes ~ Hospital | 
-                             MICROCOD + ano + mes, 
-                           data = minf_grouped_month)
+cnes_grouped_month <- cnes_grouped_month %>%
+  rename(ano = ANO, mes = MES)
 
-model_mortalidade_controles <- feols(total_observacoes ~ Hospital + Masculino + Feminino + Vaginal + Cesareo | 
-                                       MICROCOD + ano + mes, 
-                                     data = minf_grouped_month)
+merged_data <- minf_grouped_month %>%
+  full_join(ninf_grouped_month, by = c("MICROCOD", "ano", "mes"), suffix = c("(Mortalidade)", "(Natalidade)")) %>%
+  full_join(cnes_grouped_month, by = c("MICROCOD", "ano", "mes"))
+
+merged_data <- merged_data %>%
+  mutate(taxa_mortalidade_infantil = ifelse(
+    !is.na(`total_observacoes(Mortalidade)`) &
+      !is.na(`total_observacoes(Natalidade)`),
+    (
+      `total_observacoes(Mortalidade)` / `total_observacoes(Natalidade)`
+    ) * 1000,
+    NA
+  ))
+
+modelo_did <- lm(
+  taxa_mortalidade_infantil ~ `Hospital(Mortalidade)` + esc_mae_12oumais + esc_mae_8a11 + esc_mae_4a7 + esc_mae_nenhuma + esc_mae_1a3,
+  data = merged_data
+)
+
+summary(modelo_did)
+
+merged_data <- merged_data %>%
+  mutate(tratado = ifelse(`Hospital(Mortalidade)` > 0, 1, 0))
+
+media_mortalidade <- merged_data %>%
+  group_by(tratado, mes, ano) %>%
+  summarise(media_taxa_mortalidade = mean(taxa_mortalidade_infantil, na.rm = TRUE)) %>%
+  ungroup()
+
+gerar_grafico_linha_did_mensal <- function(df,
+                                           title = "Diferenças em Diferenças Mensal",
+                                           subtitle = "Média da Taxa de Mortalidade Infantil por Mês",
+                                           xlab = "Ano-Mês",
+                                           ylab = "Taxa de Mortalidade Infantil",
+                                           line_color_treated = "#1f77b4",
+                                           line_color_control = "#ff7f0e",
+                                           point_color_treated = "#2ca02c",
+                                           point_color_control = "#d62728",
+                                           background_color = "#f9f9f9") {
+  
+  df_grouped <- df %>%
+    mutate(ano_mes = paste0(ano, "-", sprintf("%02d", mes)))  # Combina ano e mês
+  
+  ggplot(df_grouped, aes(x = as.factor(ano_mes), y = media_taxa_mortalidade, group = tratado, color = as.factor(tratado))) +
+    geom_line(aes(linetype = as.factor(tratado)), size = 1.2) +
+    geom_point(aes(fill = as.factor(tratado)), size = 4, shape = 21, stroke = 1.5) +
+    scale_color_manual(values = c(line_color_control, line_color_treated)) +
+    scale_fill_manual(values = c(point_color_control, point_color_treated)) +
+    labs(
+      title = title,
+      subtitle = subtitle,
+      x = xlab,
+      y = ylab,
+      caption = "Fonte: DataSUS",
+      color = "Grupo",
+      fill = "Grupo",
+      linetype = "Grupo"
+    ) +
+    theme_minimal(base_size = 15) +
+    theme(
+      plot.title = element_text(hjust = 0.5, face = "bold", size = 16),
+      plot.subtitle = element_text(hjust = 0.5, size = 12),
+      axis.text.x = element_text(angle = 45, hjust = 1),
+      panel.grid.major = element_blank(),
+      panel.grid.minor = element_blank(),
+      panel.background = element_rect(fill = background_color, color = NA),
+      plot.background = element_rect(fill = background_color, color = NA),
+      axis.line = element_line(color = "gray50", size = 0.5),
+      axis.ticks = element_line(color = "gray50")
+    )
+}
+
+grafico_did_mensal <- gerar_grafico_linha_did_mensal(
+  media_mortalidade,  
+  title = "Diferenças em Diferenças Mensal",
+  subtitle = "Média da Taxa de Mortalidade Infantil por Mês",
+  xlab = "Ano-Mês",
+  ylab = "Taxa de Mortalidade Infantil"
+)
+
+print(grafico_did_mensal)
 
 
+media_mortalidade_anual <- merged_data %>%
+  group_by(tratado, ano) %>%
+  summarise(media_taxa_mortalidade = mean(taxa_mortalidade_infantil, na.rm = TRUE)) %>%
+  ungroup()
 
+gerar_grafico_linha_did_anual <- function(df,
+                                          title = "Diferenças em Diferenças Anual",
+                                          subtitle = "Média da Taxa de Mortalidade Infantil por Ano",
+                                          xlab = "Ano",
+                                          ylab = "Taxa de Mortalidade Infantil",
+                                          line_color_treated = "#1f77b4",
+                                          line_color_control = "#ff7f0e",
+                                          point_color_treated = "#2ca02c",
+                                          point_color_control = "#d62728",
+                                          background_color = "#f9f9f9") {
+  
+  ggplot(df, aes(x = as.factor(ano), y = media_taxa_mortalidade, group = tratado, color = as.factor(tratado))) +
+    geom_line(aes(linetype = as.factor(tratado)), size = 1.2) +
+    geom_point(aes(fill = as.factor(tratado)), size = 4, shape = 21, stroke = 1.5) +
+    scale_color_manual(values = c(line_color_control, line_color_treated)) +
+    scale_fill_manual(values = c(point_color_control, point_color_treated)) +
+    labs(
+      title = title,
+      subtitle = subtitle,
+      x = xlab,
+      y = ylab,
+      caption = "Fonte: DataSUS",
+      color = "Grupo",
+      fill = "Grupo",
+      linetype = "Grupo"
+    ) +
+    theme_minimal(base_size = 15) +
+    theme(
+      plot.title = element_text(hjust = 0.5, face = "bold", size = 16),
+      plot.subtitle = element_text(hjust = 0.5, size = 12),
+      axis.text.x = element_text(angle = 45, hjust = 1),
+      panel.grid.major = element_blank(),
+      panel.grid.minor = element_blank(),
+      panel.background = element_rect(fill = background_color, color = NA),
+      plot.background = element_rect(fill = background_color, color = NA),
+      axis.line = element_line(color = "gray50", size = 0.5),
+      axis.ticks = element_line(color = "gray50")
+    )
+}
+
+grafico_did_anual <- gerar_grafico_linha_did_anual(
+  media_mortalidade_anual,  
+  title = "Diferenças em Diferenças Anual",
+  subtitle = "Média da Taxa de Mortalidade Infantil por Ano",
+  xlab = "Ano",
+  ylab = "Taxa de Mortalidade Infantil"
+)
+
+print(grafico_did_anual)
