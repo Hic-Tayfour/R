@@ -58,7 +58,7 @@ library(MASS)        # Conjunto de funções estatísticas e regressão linear (
 library(pROC)        # Curvas ROC e AUC (Avaliação de modelos classificadores) - https://cran.r-project.org/web/packages/pROC/pROC.pdf
 library(ISLR)        # Conjunto de dados e funções para aprendizado de máquina - https://cran.r-project.org/web/packages/ISLR/ISLR.pdf
 library(MCMCpack)    # Modelagem Bayesiana e análise MCMC - https://cran.r-project.org/web/packages/MCMCpack/MCMCpack.pdf
-library(catboost)    # Algoritmo de gradient boosting para modelos de machine learning - https://cran.r-project.org/web/packages/catboost/catboost.pdf
+library(catboost)    # Algoritmo de gradient boosting para modelos de machine learning - https://catboost.ai/en/docs/concepts/r-quickstart
 
 # Conjuntos de Dados e Exemplos
 library(palmerpenguins)  # Conjunto de dados de pinguins para análise - https://cran.r-project.org/web/packages/palmerpenguins/palmerpenguins.pdf
