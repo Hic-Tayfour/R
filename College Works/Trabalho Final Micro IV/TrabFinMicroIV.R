@@ -1196,196 +1196,106 @@ grafico_linha_cnes
 
 # Análise de Regressão da Mortalidade Ínfantil, usando um Stagared DiD ----
 
+# Removendo os dados que não serão mais usados
+
 rm(
+  minf,
+  ninf,
+  cnes,
+  cnes_grouped_month,
   cnes_grouped_year,
-  cnes_grouped_clean,
   cnes_grouped_sf,
   cnes_cropped,
   cnes_cropped_coords,
+  minf_grouped_month,
   minf_grouped_year,
-  minf_grouped_clean,
   minf_grouped_sf,
   minf_cropped,
   minf_cropped_coords,
+  ninf_grouped_month,
   ninf_grouped_year,
-  ninf_grouped_clean,
   ninf_grouped_sf,
   ninf_cropped,
   ninf_cropped_coords,
   geo,
   geo_with_pib,
-  ppc
+  ppc,
+  brasil,
+  combined_df,
+  pib_per_capita_mean
 )
 
-cnes_grouped_month <- cnes_grouped_month %>%
-  rename(ano = ANO, mes = MES)
+# Ajustando o Dados do Cnes
 
-# Juntando as bases de mortalidade, natalidade e cnes
-merged_data <- minf_grouped_month %>%
-  full_join(
-    ninf_grouped_month,
-    by = c("MICROCOD", "ano", "mes"),
-    suffix = c("(Mortalidade)", "(Natalidade)")
+cnes_grouped_clean <- cnes_grouped_clean %>%
+  rename(ano = ANO)
+
+# Selecionar as colunas essenciais de cada dataframe
+
+ninf_selected <- ninf_grouped_clean %>%
+  select(MICROCOD, ano, total_observacoes)
+
+minf_selected <- minf_grouped_clean %>%
+  select(MICROCOD, ano, total_observacoes, media_pib_per_capita)
+
+cnes_selected <- cnes_grouped_clean %>%
+  select(MICROCOD, ano, Hospital)
+
+# Combinarndo os dataframes usando as colunas essenciais
+
+data_combined <- ninf_selected %>%
+  full_join(minf_selected, by = c("MICROCOD", "ano")) %>%
+  full_join(cnes_selected, by = c("MICROCOD", "ano"))
+
+#Limpeza e remoção de valores duplicados
+
+data_final <- data_combined %>%
+  select(
+    MICROCOD,
+    ano,
+    total_observacoes.x,
+    total_observacoes.y,
+    media_pib_per_capita,
+    Hospital
   ) %>%
-  full_join(cnes_grouped_month, by = c("MICROCOD", "ano", "mes"))
+  rename(total_observacoes_ninf = total_observacoes.x,
+         total_observacoes_minf = total_observacoes.y)
 
-# Calculando a taxa de mortalidade infantil
-merged_data <- merged_data %>%
-  mutate(taxa_mortalidade_infantil = ifelse(
-    !is.na(`total_observacoes(Mortalidade)`) &
-      !is.na(`total_observacoes(Natalidade)`),
-    (
-      `total_observacoes(Mortalidade)` / `total_observacoes(Natalidade)`
-    ) * 1000,
-    NA
-  ))
+# Coluna de taxa de mortalidade infantil
 
-# Calculando a diferença no número de hospitais construídos de um período para outro
-merged_data <- merged_data %>%
-  arrange(MICROCOD, ano, mes) %>%
+data_final <- data_final %>%
+  mutate(taxa_mortalidade_infantil = (total_observacoes_minf / total_observacoes_ninf) * 1000)
+
+# Coluna da variação dos hospitais por ano e microrregião
+
+data_final <- data_final %>%
+  arrange(MICROCOD, ano) %>%
   group_by(MICROCOD) %>%
-  mutate(hospitais_construidos = `Hospital(Mortalidade)` - lag(`Hospital(Mortalidade)`, default = 0)) %>%
+  mutate(delta_hospitais = Hospital - lag(Hospital, order_by = ano))
+
+# Coluna do primeiro ano de tratamento
+
+data_final <- data_final %>%
+  group_by(MICROCOD) %>%
+  mutate(first_treat_year = ifelse(sum(delta_hospitais > 0, na.rm = TRUE) > 0, min(ano[delta_hospitais > 0], na.rm = TRUE), 0)) %>%
   ungroup()
 
-# Modelo DID incluindo a diferença de hospitais e a proporção de mães em idade ótima
-modelo_did <- lm(
-  taxa_mortalidade_infantil ~ hospitais_construidos + esc_mae_12oumais + esc_mae_8a11 + esc_mae_4a7 + esc_mae_nenhuma + esc_mae_1a3 + `media_pib_per_capita(Mortalidade)` + `Prop_otima(Mortalidade)`,
-  data = merged_data
+# Ajustando a coluna MICROCOD
+
+data_final <- data_final %>%
+  mutate(MICROCOD = as.numeric(MICROCOD))
+
+resultado_did <- att_gt(
+  yname = "taxa_mortalidade_infantil",
+  tname = "ano",
+  idname = "MICROCOD",
+  gname = "first_treat_year",
+  xformla = ~ media_pib_per_capita,
+  data = data_final
 )
 
-# Resumo com stargazer
-stargazer(
-  modelo_did,
-  type = "text",
-  title = "Regressão Diferenças em Diferenças",
-  dep.var.labels = "Taxa de Mortalidade Infantil",
-  covariate.labels = c(
-    "Hospitais Construídos",
-    "Esc. Mãe 12+ anos",
-    "Esc. Mãe 8-11 anos",
-    "Esc. Mãe 4-7 anos",
-    "Esc. Mãe Nenhuma",
-    "Esc. Mãe 1-3 anos",
-    "PIB per Capita",
-    "Proporção Mães Idade Ótima"
-  ),
-  out = "summary_modelo_did.txt"
-)
+ggdid(resultado_did)
 
-# Criar variável de tratado
-merged_data <- merged_data %>%
-  mutate(tratado = ifelse(`Hospital(Mortalidade)` > 0, 1, 0))
-
-# Média mensal da taxa de mortalidade infantil
-media_mortalidade <- merged_data %>%
-  group_by(tratado, mes, ano) %>%
-  summarise(media_taxa_mortalidade = mean(taxa_mortalidade_infantil, na.rm = TRUE)) %>%
-  ungroup()
-
-# Função para gráfico de linha DID mensal
-gerar_grafico_linha_did_mensal <- function(df, title, subtitle, xlab, ylab) {
-  df_grouped <- df %>%
-    mutate(ano_mes = paste0(ano, "-", sprintf("%02d", mes)))
-  
-  ggplot(df_grouped, aes(x = as.factor(ano_mes), y = media_taxa_mortalidade, group = tratado, color = as.factor(tratado))) +
-    geom_line(aes(linetype = as.factor(tratado)), size = 1.2) +
-    geom_point(aes(fill = as.factor(tratado)), size = 4, shape = 21, stroke = 1.5) +
-    scale_color_manual(values = c("#ff7f0e", "#1f77b4")) +
-    scale_fill_manual(values = c("#d62728", "#2ca02c")) +
-    labs(title = title, subtitle = subtitle, x = xlab, y = ylab, caption = "Fonte: DataSUS", color = "Grupo", fill = "Grupo", linetype = "Grupo") +
-    theme_minimal(base_size = 15) +
-    theme(plot.title = element_text(hjust = 0.5, face = "bold", size = 16), plot.subtitle = element_text(hjust = 0.5, size = 12), axis.text.x = element_text(angle = 45, hjust = 1))
-}
-
-# Gerar gráfico DID mensal
-grafico_did_mensal <- gerar_grafico_linha_did_mensal(
-  media_mortalidade,
-  title = "Diferenças em Diferenças Mensal",
-  subtitle = "Média da Taxa de Mortalidade Infantil por Mês",
-  xlab = "Ano-Mês",
-  ylab = "Taxa de Mortalidade Infantil"
-)
-print(grafico_did_mensal)
-
-# Média anual da taxa de mortalidade infantil
-media_mortalidade_anual <- merged_data %>%
-  group_by(tratado, ano) %>%
-  summarise(media_taxa_mortalidade = mean(taxa_mortalidade_infantil, na.rm = TRUE)) %>%
-  ungroup()
-
-# Função para gráfico de linha DID anual
-gerar_grafico_linha_did_anual <- function(df, title, subtitle, xlab, ylab) {
-  ggplot(df, aes(x = as.factor(ano), y = media_taxa_mortalidade, group = tratado, color = as.factor(tratado))) +
-    geom_line(aes(linetype = as.factor(tratado)), size = 1.2) +
-    geom_point(aes(fill = as.factor(tratado)), size = 4, shape = 21, stroke = 1.5) +
-    scale_color_manual(values = c("#ff7f0e", "#1f77b4")) +
-    scale_fill_manual(values = c("#d62728", "#2ca02c")) +
-    labs(title = title, subtitle = subtitle, x = xlab, y = ylab, caption = "Fonte: DataSUS", color = "Grupo", fill = "Grupo", linetype = "Grupo") +
-    theme_minimal(base_size = 15) +
-    theme(plot.title = element_text(hjust = 0.5, face = "bold", size = 16), plot.subtitle = element_text(hjust = 0.5, size = 12), axis.text.x = element_text(angle = 45, hjust = 1))
-}
-
-# Gerar gráfico DID anual
-grafico_did_anual <- gerar_grafico_linha_did_anual(
-  media_mortalidade_anual,
-  title = "Diferenças em Diferenças Anual",
-  subtitle = "Média da Taxa de Mortalidade Infantil por Ano",
-  xlab = "Ano",
-  ylab = "Taxa de Mortalidade Infantil"
-)
-print(grafico_did_anual)
-
-# Calcular tempo relativo ao tratamento
-ano_intervencao <- 2014
-mes_intervencao <- 8
-merged_data <- merged_data %>%
-  mutate(time_to_treatment = ((ano - ano_intervencao) * 12) + (mes - mes_intervencao))
-
-# Modelo Event Study
-modelo_event_study <- lm(
-  taxa_mortalidade_infantil ~ factor(time_to_treatment) * tratado + `media_pib_per_capita(Mortalidade)` + `Prop_otima(Mortalidade)`,
-  data = merged_data
-)
-
-# Resumo Event Study com stargazer
-stargazer(
-  modelo_event_study,
-  type = "text",
-  title = "Event Study Mensal: Regressão Diferenças em Diferenças",
-  dep.var.labels = "Taxa de Mortalidade Infantil",
-  covariate.labels = c(
-    "Tempo relativo ao tratamento (meses)",
-    "Tratado",
-    "Interação Tratado x Tempo",
-    "PIB per Capita",
-    "Proporção Mães Idade Ótima"
-  ),
-  out = "summary_event_study_mensal.txt"
-)
-
-# Função para gráfico de Event Study
-gerar_grafico_event_study <- function(df, title, subtitle, xlab, ylab) {
-  ggplot(df, aes(x = as.numeric(gsub("factor\\(time_to_treatment\\)", "", term)), y = estimate)) +
-    geom_point(size = 4, color = "#ff7f0e") +
-    geom_errorbar(aes(ymin = estimate - 1.96 * std.error, ymax = estimate + 1.96 * std.error), width = 0.2, color = "#1f77b4") +
-    geom_hline(yintercept = 0, linetype = "dashed", color = "red") +
-    labs(title = title, subtitle = subtitle, x = xlab, y = ylab, caption = "Fonte: DataSUS") +
-    theme_minimal(base_size = 15) +
-    theme(plot.title = element_text(hjust = 0.5, face = "bold", size = 16), plot.subtitle = element_text(hjust = 0.5, size = 12), axis.text.x = element_text(angle     = 45, hjust = 1))
-}
-
-# Extrair coeficientes e gerar gráfico Event Study
-coef_event_study <- tidy(modelo_event_study) %>%
-  filter(grepl("factor\\(time_to_treatment\\)", term))
-
-grafico_event_study <- gerar_grafico_event_study(
-  coef_event_study,
-  title = "Gráfico de Event Study Mensal: Impacto da Construção de Hospitais",
-  subtitle = "Impacto ao longo do tempo",
-  xlab = "Tempo Relativo ao Tratamento (meses)",
-  ylab = "Coeficientes de Diferenças em Diferenças"
-)
-
-print(grafico_event_study)
-
-                                                                                                                                                             
+efeito_aggregado <- aggte(resultado_did, type = "dynamic")
+summary(efeito_aggregado)
+ggdid(efeito_aggregado)
