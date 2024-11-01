@@ -12,14 +12,13 @@ library(ggpubr)         # gráficos
 library(fixest)         # para regressões de Did
 library(purrr)          # para funções funcionais como map e walk
 library(broom)          # manipulação de dados
+library(did)            # regressões de Did
 library(sf)             # manipulação de dados geográficos
 library(gt)             # tabelas personalizadas
 
 # DataFrames a Serem Usados ----
 
-minf <- data.frame()
-ninf <- data.frame()
-cnes <- data.frame()
+# Codificação das regiões brasileiras, junto do códigos da Microregião da Saúde e Latitude e Longitude
 
 geo <- read_excel("CADMUN.xls") %>%
   mutate(
@@ -34,6 +33,8 @@ geo <- read_excel("CADMUN.xls") %>%
     )
   ) %>%
   select(MUNCOD, MUNNOME, MICROCOD, MSAUDCOD, UF, LATITUDE, LONGITUDE)
+
+# Dados de PIB per capita por município de 2010 a 2019
 
 ppc <- read_excel("PIB Per Capita IBGE.xls") %>%
   filter(Ano >= 2014) %>%
@@ -50,12 +51,16 @@ geo_with_pib <- geo %>%
   left_join(ppc %>% select(MUNNOME, Ano, PIBpercapita),
             by = c("MUNNOME", "Ano"))
 
+# Agregando esses dados
+
 pib_per_capita_mean <- geo_with_pib %>%
   group_by(MICROCOD, Ano) %>%
   summarise(media_pib_per_capita = mean(PIBpercapita, na.rm = TRUE),
             .groups = "drop")
 
 # Function a Serem Usadas ----
+
+# Function para tratar os dados do DataSUS
 
 processar_dados <- function(db, geo, col_cod) {
   db %>%
@@ -68,6 +73,8 @@ processar_dados <- function(db, geo, col_cod) {
            LATITUDE,
            LONGITUDE)
 }
+
+# Function para criar tabela formatada
 
 criar_tabela_formatada <- function(titulo,
                                    subtitulo,
@@ -155,29 +162,37 @@ processar_dados_ano <- function(ano, geo) {
 
 resultados <- map(2014:2019, ~ processar_dados_ano(.x, geo))
 
+# Separando os dados
+
 minf <- map_dfr(resultados, "db_sim")
 ninf <- map_dfr(resultados, "db_sinasc")
 cnes <- map_dfr(resultados, "db_cnes")
+
+# Salvando os dados
 
 save(minf, file = "minf.Rdata")
 save(ninf, file = "ninf.Rdata")
 save(cnes, file = "cnes.Rdata")
 
+# Removendo os dados desnecessários
+
 rm(minf, ninf, cnes, resultados)
 
-# Carregando os Dados Finais Para o Estudo ----
+# Carregando os Dados Finais Para o Estudo
 
 load("minf.Rdata")
 load("ninf.Rdata")
 load("cnes.Rdata")
 
-# Geografia Brasileira ----
+# Geografia Brasileira para mapas
 
 brasil <- ne_countries(scale = "medium",
                        country = "Brazil",
                        returnclass = "sf")
 
 # Dados de Mortalidade Infántil ----
+
+# Agrupando as Observações por Microregião da Saúde , mes e ano
 
 minf_grouped_month <- minf %>%
   mutate(
@@ -208,6 +223,7 @@ minf_grouped_month <- minf %>%
   mutate(Prop_otima = Idade_otima / (Idade_otima + Idade_atencao)) %>%
   arrange(MICROCOD, ano, mes)
 
+# Agrupando as Observações por Microregião da Saúde e ano
 
 minf_grouped_year <- minf_grouped_month %>%
   group_by(MICROCOD, ano) %>%
@@ -231,6 +247,8 @@ minf_grouped_year <- minf_grouped_month %>%
   left_join(pib_per_capita_mean, by = c("MICROCOD" = "MICROCOD", "ano" = "Ano")) %>%
   mutate(Prop_otima = Idade_otima / (Idade_otima + Idade_atencao)) %>%
   arrange(MICROCOD, ano)
+
+# Ajustando os dados para uma análise georeferencia
 
 minf_grouped_clean <- minf_grouped_year %>%
   filter(!is.na(LATITUDE) & !is.na(LONGITUDE))
@@ -277,17 +295,8 @@ palette <- scale_fill_gradient(low =  "#6495ED",
 
 anos <- 2014:2019
 
-hex_graficos <- map(
-  anos,
-  ~ gerar_grafico_hex(
-    minf_cropped_coords,
-    .x,
-    brasil,
-    palette,
-    title = paste("Ocorrências em", .x),
-    subtitle = "Análise por MicroRegião"
-  )
-)
+hex_graficos <- map(anos,
+                    ~ gerar_grafico_hex(minf_cropped_coords, .x, brasil, palette, title = paste(.x), ))
 
 hex_graficos <- map(hex_graficos, ~ .x + theme(legend.position = "none"))
 
@@ -365,7 +374,7 @@ gerar_grafico_violino <- function(df,
 grafico_violino <- gerar_grafico_violino(
   minf_grouped_year,
   title = "Distribuição de Mortalidade Infantil por Ano",
-  subtitle = "Análise Geográfica das Ocorrências",
+  subtitle = "Análise das Ocorrências",
   xlab = "Ano",
   ylab = "Ocorrências (Escala Logarítmica)",
   fill_colors = c(
@@ -438,17 +447,19 @@ gerar_grafico_linha <- function(df,
 grafico_linha <- gerar_grafico_linha(
   minf_grouped_year,
   title = "Mortalidade Infantil por Ano",
-  subtitle = "Total de Ocorrências Registradas de 2014 a 2019",
+  subtitle = "Ocorrências Registradas de 2014 a 2019",
   xlab = "Ano",
-  ylab = "Total de Ocorrências",
+  ylab = "Nº de Mortes",
   line_color =       "#00008B",
-  point_color =      "#87CEEB",
+  point_color =      "#00008B",
   background_color = "#f9f9f9"
 )
 
 grafico_linha
 
 # Dados de Natalidade ----
+
+# Agrupando as Observações por Microregião da Saúde , mes e ano
 
 ninf_grouped_month <- ninf %>%
   mutate(
@@ -487,6 +498,8 @@ ninf_grouped_month <- ninf %>%
   mutate(Prop_otima = Idade_otima / (Idade_otima + Idade_atencao)) %>%
   arrange(MICROCOD, ano, mes)
 
+# Agrupando as Observações por Microregião da Saúde e ano
+
 ninf_grouped_year <- ninf_grouped_month %>%
   group_by(MICROCOD, ano) %>%
   summarize(
@@ -518,6 +531,7 @@ ninf_grouped_year <- ninf_grouped_month %>%
   mutate(Prop_otima = Idade_otima / (Idade_otima + Idade_atencao)) %>%
   arrange(MICROCOD, ano)
 
+# Ajustando os dados para uma análise georeferencia
 
 ninf_grouped_clean <- ninf_grouped_year %>%
   filter(!is.na(LATITUDE) & !is.na(LONGITUDE))
@@ -571,8 +585,7 @@ hex_graficos_natalidade <- map(
     .x,
     brasil,
     palette_natalidade,
-    title = paste("Natalidade em", .x),
-    subtitle = "Análise por MicroRegião"
+    title = paste(.x),
   )
 )
 
@@ -652,15 +665,18 @@ gerar_grafico_violino_natalidade <- function(df,
 grafico_violino_natalidade <- gerar_grafico_violino_natalidade(
   ninf_grouped_year,
   title = "Distribuição de Natalidade por Ano",
-  subtitle = "Análise Geográfica das Ocorrências",
+  subtitle = "Análise das Ocorrências",
   xlab = "Ano",
   ylab = "Ocorrências (Escala Logarítmica)",
-  fill_colors = c("#00BFFF",
-                  "#1E90FF",
-                  "#4169E1",
-                  "#6495ED",
-                  "#0000FF",
-                  "#0000CD"))
+  fill_colors = c(
+    "#00BFFF",
+    "#1E90FF",
+    "#4169E1",
+    "#6495ED",
+    "#0000FF",
+    "#0000CD"
+  )
+)
 
 grafico_violino_natalidade
 
@@ -722,11 +738,11 @@ gerar_grafico_linha_natalidade <- function(df,
 grafico_linha_natalidade <- gerar_grafico_linha_natalidade(
   ninf_grouped_year,
   title = "Natalidade por Ano",
-  subtitle = "Total de Ocorrências Registradas de 2014 a 2019",
+  subtitle = "Ocorrências Registradas de 2014 a 2019",
   xlab = "Ano",
-  ylab = "Total de Ocorrências",
+  ylab = "Nº de Nascimentos",
   line_color =       "#00008B",
-  point_color =      "#87CEEB",
+  point_color =      "#00008B",
   background_color = "#f9f9f9"
 )
 
@@ -786,22 +802,15 @@ anos <- 2014:2019
 
 hex_graficos_razao <- map(
   anos,
-  ~ gerar_grafico_hex_razao(
-    combined_df,
-    .x,
-    brasil,
-    palette_razao,
-    title = paste("Razão Mortalidade/Natalidade em", .x),
-    subtitle = "Análise por MicroRegião"
-  )
+  ~ gerar_grafico_hex_razao(combined_df, .x, brasil, palette_razao, title = paste(.x), )
 )
 
 hex_graficos_razao <- map(hex_graficos_razao, ~ .x + theme(legend.position = "none"))
 
 combined_hex_razao <- wrap_plots(hex_graficos_razao, nrow = 2) +
   plot_annotation(
-    title = "Razão entre Mortalidade Infantil e Natalidade nas MicroRegiões da Saúde (2014-2019)",
-    subtitle = "Análise Geográfica da Razão entre Mortalidade e Natalidade",
+    title = "Taxa de Mortalidade Infantil nas MicroRegiões da Saúde (2014-2019)",
+    subtitle = "Análise Geográfica da Taxa de Mortalidade Infantil",
     theme = theme(
       plot.title = element_text(hjust = 0.5, size = 16, face = "bold"),
       plot.subtitle = element_text(hjust = 0.5, size = 12)
@@ -871,10 +880,10 @@ gerar_grafico_violino_razao <- function(df,
 
 grafico_violino_razao <- gerar_grafico_violino_razao(
   combined_df,
-  title = "Distribuição da Razão Mortalidade/Natalidade por Ano",
-  subtitle = "Análise Geográfica da Razão entre Mortalidade e Natalidade",
+  title = "Distribuição da Taxa de Mortalidade Infantil por Ano",
+  subtitle = "Análise da Taxa de Mortalidade Infantil",
   xlab = "Ano",
-  ylab = "Razão Mortalidade/Natalidade",
+  ylab = "Taxa de Mortalidade Infantil",
   fill_colors = c(
     "#00BFFF",
     "#1E90FF",
@@ -887,8 +896,6 @@ grafico_violino_razao <- gerar_grafico_violino_razao(
 
 grafico_violino_razao
 
-
-
 ## Gráfico de Linha
 
 gerar_grafico_linha_razao_anual <- function(df,
@@ -897,9 +904,8 @@ gerar_grafico_linha_razao_anual <- function(df,
                                             xlab = "Ano",
                                             ylab = "Razão Mortalidade/Natalidade",
                                             line_color =       "#00008B",
-                                            point_color =      "#87CEEB",
-                                            background_color = "#f9f9f9"
-) {
+                                            point_color =      "#00008B",
+                                            background_color = "#f9f9f9") {
   df <- df %>%
     group_by(ano) %>%
     summarize(razao_media_anual = mean(razao_mortalidade_natalidade, na.rm = TRUE))
@@ -943,15 +949,17 @@ gerar_grafico_linha_razao_anual <- function(df,
 
 grafico_linha_razao_anual <- gerar_grafico_linha_razao_anual(
   combined_df,
-  title = "Razão Mortalidade/Natalidade por Ano",
-  subtitle = "Média da Razão Anual",
+  title = "Taxa de Mortalidade Infantil por Ano",
+  subtitle = "Média da Taxa Anual",
   xlab = "Ano",
-  ylab = "Razão Mortalidade/Natalidade"
+  ylab = "Taxa de Mortalidade Infantil",
 )
 
 grafico_linha_razao_anual
 
 # Dados de Estabelecimentos de Saúde ----
+
+# Agrupando as Observações por Microregião da Saúde , mes e ano
 
 cnes_grouped_month <- cnes %>%
   group_by(MICROCOD, ANO, MES) %>%
@@ -965,6 +973,8 @@ cnes_grouped_month <- cnes %>%
   ) %>%
   arrange(MICROCOD, ANO, MES)
 
+# Agrupando as Observações por Microregião da Saúde e ano
+
 cnes_grouped_year <- cnes_grouped_month %>%
   group_by(MICROCOD, ANO) %>%
   summarize(
@@ -977,6 +987,7 @@ cnes_grouped_year <- cnes_grouped_month %>%
   ) %>%
   arrange(MICROCOD, ANO)
 
+# Ajustando os dados para uma análise georeferencia
 
 cnes_grouped_clean <- cnes_grouped_year %>%
   filter(!is.na(LATITUDE) & !is.na(LONGITUDE))
@@ -1025,14 +1036,7 @@ anos <- 2014:2019
 
 hex_graficos_cnes <- map(
   anos,
-  ~ gerar_grafico_hex_cnes(
-    cnes_cropped_coords,
-    .x,
-    brasil,
-    palette_cnes,
-    title = paste("Estabelecimentos de Saúde em", .x),
-    subtitle = "Análise por MicroRegião"
-  )
+  ~ gerar_grafico_hex_cnes(cnes_cropped_coords, .x, brasil, palette_cnes, title = paste(.x))
 )
 
 hex_graficos_cnes <- map(hex_graficos_cnes, ~ .x + theme(legend.position = "none"))
@@ -1040,7 +1044,7 @@ hex_graficos_cnes <- map(hex_graficos_cnes, ~ .x + theme(legend.position = "none
 combined_hex_cnes <- wrap_plots(hex_graficos_cnes, nrow = 2) +
   plot_annotation(
     title = "Estabelecimentos de Saúde nas MicroRegiões da Saúde (2014-2019)",
-    subtitle = "Análise Geográfica dos Hospitais",
+    subtitle = "Análise Geográfica do Nº Hospitais",
     theme = theme(
       plot.title = element_text(hjust = 0.5, size = 16, face = "bold"),
       plot.subtitle = element_text(hjust = 0.5, size = 12)
@@ -1049,6 +1053,68 @@ combined_hex_cnes <- wrap_plots(hex_graficos_cnes, nrow = 2) +
 
 combined_hex_cnes
 
+# Preparando os dados para o gráfico de calor
+
+cnes_grouped_clean_delta <- cnes_grouped_clean %>%
+  arrange(MICROCOD, ANO) %>%
+  group_by(MICROCOD) %>%
+  mutate(delta_hospitais = Hospital - lag(Hospital, order_by = ANO)) %>%   mutate(delta_hospitais = ifelse((delta_hospitais < 0) &
+                                                                                                             !is.na(delta_hospitais),
+                                                                                                           0,
+                                                                                                           delta_hospitais
+  ))
+
+# Gráficos de Hexágonos
+
+gerar_grafico_hex_cnes_delta <- function(df,
+                                         ano,
+                                         brasil,
+                                         palette,
+                                         title = NULL,
+                                         subtitle = NULL,
+                                         xlim = c(-75, -30),
+                                         ylim = c(-35, 5)) {
+  ggplot(df %>% filter(ANO == ano)) +
+    geom_sf(data = brasil,
+            fill = "white",
+            color = "black") +
+    geom_hex(aes(x = LONGITUDE, y = LATITUDE, z = delta_hospitais), bins = 60) +
+    palette +
+    labs(title = title %||% as.character(ano),
+         subtitle = subtitle) +
+    coord_sf(xlim = xlim,
+             ylim = ylim,
+             expand = FALSE) +
+    theme_void() +
+    theme(plot.title = element_text(hjust = 0.5),
+          plot.subtitle = element_text(hjust = 0.5))
+}
+
+
+palette_cnes <- scale_fill_gradient(low =  "#6495ED",
+                                    high = "#00008B",
+                                    name = "Estabelecimentos de Saúde")
+
+anos <- 2015:2019
+
+hex_graficos_cnes_delta <- map(
+  anos,
+  ~ gerar_grafico_hex_cnes_delta(cnes_grouped_clean_delta, .x, brasil, palette_cnes, title = paste(.x))
+)
+
+hex_graficos_cnes_delta <- map(hex_graficos_cnes_delta, ~ .x + theme(legend.position = "none"))
+
+combined_hex_cnes_delta <- wrap_plots(hex_graficos_cnes_delta, nrow = 2) +
+  plot_annotation(
+    title = "Criação de Estabelecimentos de Saúde nas MicroRegiões da Saúde (2015-2019)",
+    subtitle = "Análise Geográfica da Criação de Hospitais",
+    theme = theme(
+      plot.title = element_text(hjust = 0.5, size = 16, face = "bold"),
+      plot.subtitle = element_text(hjust = 0.5, size = 12)
+    )
+  )
+
+combined_hex_cnes_delta
 
 ## Gráficos de Violino
 
@@ -1112,9 +1178,9 @@ gerar_grafico_violino_cnes <- function(df,
 grafico_violino_cnes <- gerar_grafico_violino_cnes(
   cnes_grouped_year,
   title = "Distribuição de Estabelecimentos de Saúde por Ano",
-  subtitle = "Análise Geográfica dos Hospitais",
+  subtitle = "Análise dos Hospitais",
   xlab = "Ano",
-  ylab = "Ocorrências (Escala Logarítmica)",
+  ylab = "Observações (Escala Logarítmica)",
   fill_colors = c(
     "#00BFFF",
     "#1E90FF",
@@ -1127,7 +1193,6 @@ grafico_violino_cnes <- gerar_grafico_violino_cnes(
 
 grafico_violino_cnes
 
-
 ## Gráfico de Linha
 
 gerar_grafico_linha_cnes <- function(df,
@@ -1136,7 +1201,7 @@ gerar_grafico_linha_cnes <- function(df,
                                      xlab = "Ano",
                                      ylab = "Número de Hospitais",
                                      line_color =       "#00008B",
-                                     point_color =      "#87CEEB",
+                                     point_color =      "#00008B",
                                      background_color = "#f9f9f9") {
   ggplot(df, aes(
     x = as.factor(ANO),
@@ -1186,9 +1251,9 @@ gerar_grafico_linha_cnes <- function(df,
 grafico_linha_cnes <- gerar_grafico_linha_cnes(
   cnes_grouped_year,
   title = "Estabelecimentos de Saúde por Ano",
-  subtitle = "Total de Hospitais de 2014 a 2019",
+  subtitle = "Nº de Hospitais de 2014 a 2019",
   xlab = "Ano",
-  ylab = "Total de Ocorrências",
+  ylab = "Total de Hospitais",
   line_color =       "#00008B",
   point_color =      "#87CEEB",
   background_color = "#f9f9f9"
@@ -1209,6 +1274,7 @@ rm(
   cnes_grouped_sf,
   cnes_cropped,
   cnes_cropped_coords,
+  cnes_grouped_clean_delta,
   minf_grouped_month,
   minf_grouped_year,
   minf_grouped_sf,
@@ -1233,7 +1299,6 @@ cnes_grouped_clean <- cnes_grouped_clean %>%
   rename(ano = ANO)
 
 # Selecionar as colunas essenciais de cada dataframe
-
 ninf_selected <- ninf_grouped_clean %>%
   select(MICROCOD, ano, total_observacoes)
 
@@ -1241,7 +1306,7 @@ minf_selected <- minf_grouped_clean %>%
   select(MICROCOD, ano, total_observacoes, media_pib_per_capita)
 
 cnes_selected <- cnes_grouped_clean %>%
-  select(MICROCOD, ano, Hospital)
+  select(MICROCOD, ano, Hospital) # ANO representa o ano e Hospital é o número de hospitais
 
 # Combinarndo os dataframes usando as colunas essenciais
 
@@ -1250,7 +1315,6 @@ data_combined <- ninf_selected %>%
   full_join(cnes_selected, by = c("MICROCOD", "ano"))
 
 #Limpeza e remoção de valores duplicados
-
 data_final <- data_combined %>%
   select(
     MICROCOD,
@@ -1287,14 +1351,13 @@ data_final <- data_final %>%
 data_final <- data_final %>%
   mutate(MICROCOD = as.numeric(MICROCOD))
 
-# Stageared DiD
+# Event Study
 
 resultado_did <- att_gt(
   yname = "taxa_mortalidade_infantil",
   tname = "ano",
   idname = "MICROCOD",
   gname = "first_treat_year",
-  xformla = ~ media_pib_per_capita,
   data = data_final
 )
 
@@ -1357,8 +1420,8 @@ ggplot(plot_data,
     y = "Efeito Estimado do Tratamento"
   ) +
   scale_color_manual(values = c(
-    "Antes do Tratamento" = "#E74C3C",
-    "Após o Tratamento" =   "#2980B9"
+    "Antes do Tratamento" = "#00BFFF",
+    "Após o Tratamento" =   "#0000CD"
   )) +
   theme_minimal(base_size = 15) +
   theme(
@@ -1388,8 +1451,8 @@ ggplot(agg_plot_data, aes(x = factor(Tempo), y = Efeito, fill = Tratamento)) +
   ) +
   labs(title = "Efeito Agregado da Construção de Hospitais na Mortalidade Infantil", x = "Tempo (Período após Construção)", y = "Efeito Médio Estimado") +
   scale_fill_manual(values = c(
-    "Antes do Tratamento" = "#E74C3C",
-    "Após o Tratamento" =   "#2980B9"
+    "Antes do Tratamento" = "#00BFFF",
+    "Após o Tratamento" =   "#0000CD"
   )) +
   theme_minimal(base_size = 15) +
   theme(
