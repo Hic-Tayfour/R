@@ -1424,13 +1424,15 @@ ggplot(plot_data,
     "Após o Tratamento" =   "#0000CD"
   )) +
   theme_minimal(base_size = 15) +
+  ylim(-200, 400) +
   theme(
     plot.title = element_text(face = "bold", hjust = 0.5),
     plot.subtitle = element_text(hjust = 0.5, color = "gray40"),
     axis.title = element_text(face = "bold"),
     axis.text = element_text(color = "gray40"),
     legend.title = element_blank(),
-    legend.position = "bottom"
+    legend.position = "bottom",
+    panel.grid = element_blank()
   )
 
 agg_plot_data <- data.frame(Tempo = efeito_aggregado$egt, Efeito = efeito_aggregado$att.egt)
@@ -1454,6 +1456,8 @@ ggplot(agg_plot_data, aes(x = factor(Tempo), y = Efeito, fill = Tratamento)) +
     "Antes do Tratamento" = "#00BFFF",
     "Após o Tratamento" =   "#0000CD"
   )) +
+  geom_hline(yintercept = 0,
+             color = "black") +
   theme_minimal(base_size = 15) +
   theme(
     plot.title = element_text(face = "bold", hjust = 0.5),
@@ -1465,5 +1469,6 @@ ggplot(agg_plot_data, aes(x = factor(Tempo), y = Efeito, fill = Tratamento)) +
     ),
     axis.text.y = element_text(color = "gray40"),
     legend.title = element_blank(),
-    legend.position = "bottom"
+    legend.position = "bottom",
+    panel.grid = element_blank()
   )
