@@ -457,7 +457,7 @@ grafico_linha <- gerar_grafico_linha(
 
 grafico_linha
 
-# Estatísticas Descritivas 
+# Estatísticas Descritivas
 
 minf_media <- c(
   mean(minf_grouped_clean$total_observacoes[minf_grouped_clean$ano == 2014], na.rm = TRUE),
@@ -465,8 +465,8 @@ minf_media <- c(
   mean(minf_grouped_clean$total_observacoes[minf_grouped_clean$ano == 2016], na.rm = TRUE),
   mean(minf_grouped_clean$total_observacoes[minf_grouped_clean$ano == 2017], na.rm = TRUE),
   mean(minf_grouped_clean$total_observacoes[minf_grouped_clean$ano == 2018], na.rm = TRUE),
-  mean(minf_grouped_clean$total_observacoes[minf_grouped_clean$ano == 2019], na.rm = TRUE
-  ))
+  mean(minf_grouped_clean$total_observacoes[minf_grouped_clean$ano == 2019], na.rm = TRUE)
+)
 
 minf_min <- c(
   min(minf_grouped_clean$total_observacoes[minf_grouped_clean$ano == 2014], na.rm = TRUE),
@@ -474,8 +474,8 @@ minf_min <- c(
   min(minf_grouped_clean$total_observacoes[minf_grouped_clean$ano == 2016], na.rm = TRUE),
   min(minf_grouped_clean$total_observacoes[minf_grouped_clean$ano == 2017], na.rm = TRUE),
   min(minf_grouped_clean$total_observacoes[minf_grouped_clean$ano == 2018], na.rm = TRUE),
-  min(minf_grouped_clean$total_observacoes[minf_grouped_clean$ano == 2019], na.rm = TRUE
-  ))
+  min(minf_grouped_clean$total_observacoes[minf_grouped_clean$ano == 2019], na.rm = TRUE)
+)
 
 minf_max <- c(
   max(minf_grouped_clean$total_observacoes[minf_grouped_clean$ano == 2014], na.rm = TRUE),
@@ -483,8 +483,8 @@ minf_max <- c(
   max(minf_grouped_clean$total_observacoes[minf_grouped_clean$ano == 2016], na.rm = TRUE),
   max(minf_grouped_clean$total_observacoes[minf_grouped_clean$ano == 2017], na.rm = TRUE),
   max(minf_grouped_clean$total_observacoes[minf_grouped_clean$ano == 2018], na.rm = TRUE),
-  max(minf_grouped_clean$total_observacoes[minf_grouped_clean$ano == 2019], na.rm = TRUE
-  ))
+  max(minf_grouped_clean$total_observacoes[minf_grouped_clean$ano == 2019], na.rm = TRUE)
+)
 
 minf_sd <- c(
   sd(minf_grouped_clean$total_observacoes[minf_grouped_clean$ano == 2014], na.rm = TRUE),
@@ -492,8 +492,8 @@ minf_sd <- c(
   sd(minf_grouped_clean$total_observacoes[minf_grouped_clean$ano == 2016], na.rm = TRUE),
   sd(minf_grouped_clean$total_observacoes[minf_grouped_clean$ano == 2017], na.rm = TRUE),
   sd(minf_grouped_clean$total_observacoes[minf_grouped_clean$ano == 2018], na.rm = TRUE),
-  sd(minf_grouped_clean$total_observacoes[minf_grouped_clean$ano == 2019], na.rm = TRUE
-  ))
+  sd(minf_grouped_clean$total_observacoes[minf_grouped_clean$ano == 2019], na.rm = TRUE)
+)
 
 título_minf <- "Estatísticas Descritivas das Ocorrências de Mortalidade Infantil"
 subtitulo_minf <- "Análise Descritiva das Ocorrências de Mortalidade Infantil por Ano"
@@ -667,12 +667,12 @@ gerar_grafico_violino_natalidade <- function(df,
                                              subtitle = NULL,
                                              xlab = "Ano",
                                              ylab = "Ocorrências (Escala Logarítmica)",
-                                             fill_colors = c( "#3a2f6a",
-                                                              "#3a2f6b",
-                                                              "#36669c",
-                                                              "#41a0ae",
-                                                              "#3ec995",
-                                                              "#77f07f")) {
+                                             fill_colors = c("#3a2f6a",
+                                                             "#3a2f6b",
+                                                             "#36669c",
+                                                             "#41a0ae",
+                                                             "#3ec995",
+                                                             "#77f07f")) {
   ggplot(df, aes(
     x = as.factor(ano),
     y = total_observacoes,
@@ -813,8 +813,8 @@ ninf_media <- c(
   mean(ninf_grouped_clean$total_observacoes[ninf_grouped_clean$ano == 2016], na.rm = TRUE),
   mean(ninf_grouped_clean$total_observacoes[ninf_grouped_clean$ano == 2017], na.rm = TRUE),
   mean(ninf_grouped_clean$total_observacoes[ninf_grouped_clean$ano == 2018], na.rm = TRUE),
-  mean(ninf_grouped_clean$total_observacoes[ninf_grouped_clean$ano == 2019], na.rm = TRUE
-  ))
+  mean(ninf_grouped_clean$total_observacoes[ninf_grouped_clean$ano == 2019], na.rm = TRUE)
+)
 
 nin_min <- c(
   min(ninf_grouped_clean$total_observacoes[ninf_grouped_clean$ano == 2014], na.rm = TRUE),
@@ -822,8 +822,8 @@ nin_min <- c(
   min(ninf_grouped_clean$total_observacoes[ninf_grouped_clean$ano == 2016], na.rm = TRUE),
   min(ninf_grouped_clean$total_observacoes[ninf_grouped_clean$ano == 2017], na.rm = TRUE),
   min(ninf_grouped_clean$total_observacoes[ninf_grouped_clean$ano == 2018], na.rm = TRUE),
-  min(ninf_grouped_clean$total_observacoes[ninf_grouped_clean$ano == 2019], na.rm = TRUE
-  ))
+  min(ninf_grouped_clean$total_observacoes[ninf_grouped_clean$ano == 2019], na.rm = TRUE)
+)
 
 ninf_max <- c(
   max(ninf_grouped_clean$total_observacoes[ninf_grouped_clean$ano == 2014], na.rm = TRUE),
@@ -831,8 +831,8 @@ ninf_max <- c(
   max(ninf_grouped_clean$total_observacoes[ninf_grouped_clean$ano == 2016], na.rm = TRUE),
   max(ninf_grouped_clean$total_observacoes[ninf_grouped_clean$ano == 2017], na.rm = TRUE),
   max(ninf_grouped_clean$total_observacoes[ninf_grouped_clean$ano == 2018], na.rm = TRUE),
-  max(ninf_grouped_clean$total_observacoes[ninf_grouped_clean$ano == 2019], na.rm = TRUE
-  ))
+  max(ninf_grouped_clean$total_observacoes[ninf_grouped_clean$ano == 2019], na.rm = TRUE)
+)
 
 ninf_sd <- c(
   sd(ninf_grouped_clean$total_observacoes[ninf_grouped_clean$ano == 2014], na.rm = TRUE),
@@ -840,8 +840,8 @@ ninf_sd <- c(
   sd(ninf_grouped_clean$total_observacoes[ninf_grouped_clean$ano == 2016], na.rm = TRUE),
   sd(ninf_grouped_clean$total_observacoes[ninf_grouped_clean$ano == 2017], na.rm = TRUE),
   sd(ninf_grouped_clean$total_observacoes[ninf_grouped_clean$ano == 2018], na.rm = TRUE),
-  sd(ninf_grouped_clean$total_observacoes[ninf_grouped_clean$ano == 2019], na.rm = TRUE
-  ))
+  sd(ninf_grouped_clean$total_observacoes[ninf_grouped_clean$ano == 2019], na.rm = TRUE)
+)
 
 título_ninf <- "Estatísticas Descritivas das Ocorrências de Natalidade"
 subtitulo_ninf <- "Análise Descritiva das Ocorrências de Natalidade por Ano"
@@ -875,10 +875,13 @@ combined_df <- minf_grouped_clean %>%
 # Calculando a Taxa de Mortalidade Infantil
 
 combined_df <- combined_df %>%
-  mutate(razao_mortalidade_natalidade = (total_observacoes_minf / total_observacoes_ninf)*1000)
+  mutate(
+    razao_mortalidade_natalidade = (total_observacoes_minf / total_observacoes_ninf) *
+      1000
+  )
 
 combined_df <- combined_df %>%
-  filter(total_observacoes_ninf > 0) %>% 
+  filter(total_observacoes_ninf > 0) %>%
   filter(is.na(razao_mortalidade_natalidade) == FALSE)
 
 ## Gráficos Hexágono
@@ -895,9 +898,12 @@ gerar_grafico_hex_razao <- function(df,
     geom_sf(data = brasil,
             fill = "white",
             color = "black") +
-    geom_hex(aes(x = LONGITUDE_minf, y = LATITUDE_minf, z = razao_mortalidade_natalidade),
-             bins = 60,
-             fun = function(x) mean(x, na.rm = TRUE)) +
+    geom_hex(
+      aes(x = LONGITUDE_minf, y = LATITUDE_minf, z = razao_mortalidade_natalidade),
+      bins = 60,
+      fun = function(x)
+        mean(x, na.rm = TRUE)
+    ) +
     palette +
     labs(title = title %||% as.character(ano),
          subtitle = subtitle) +
@@ -1081,8 +1087,8 @@ razao_media <- round(c(
   mean(combined_df$razao_mortalidade_natalidade[combined_df$ano == 2016], na.rm = TRUE),
   mean(combined_df$razao_mortalidade_natalidade[combined_df$ano == 2017], na.rm = TRUE),
   mean(combined_df$razao_mortalidade_natalidade[combined_df$ano == 2018], na.rm = TRUE),
-  mean(combined_df$razao_mortalidade_natalidade[combined_df$ano == 2019], na.rm = TRUE
-  )),2)
+  mean(combined_df$razao_mortalidade_natalidade[combined_df$ano == 2019], na.rm = TRUE)
+), 2)
 
 razao_min <- round(c(
   min(combined_df$razao_mortalidade_natalidade[combined_df$ano == 2014], na.rm = TRUE),
@@ -1090,8 +1096,8 @@ razao_min <- round(c(
   min(combined_df$razao_mortalidade_natalidade[combined_df$ano == 2016], na.rm = TRUE),
   min(combined_df$razao_mortalidade_natalidade[combined_df$ano == 2017], na.rm = TRUE),
   min(combined_df$razao_mortalidade_natalidade[combined_df$ano == 2018], na.rm = TRUE),
-  min(combined_df$razao_mortalidade_natalidade[combined_df$ano == 2019], na.rm = TRUE
-  )),2)
+  min(combined_df$razao_mortalidade_natalidade[combined_df$ano == 2019], na.rm = TRUE)
+), 2)
 
 razao_max <- round(c(
   max(combined_df$razao_mortalidade_natalidade[combined_df$ano == 2014], na.rm = TRUE),
@@ -1099,8 +1105,8 @@ razao_max <- round(c(
   max(combined_df$razao_mortalidade_natalidade[combined_df$ano == 2016], na.rm = TRUE),
   max(combined_df$razao_mortalidade_natalidade[combined_df$ano == 2017], na.rm = TRUE),
   max(combined_df$razao_mortalidade_natalidade[combined_df$ano == 2018], na.rm = TRUE),
-  max(combined_df$razao_mortalidade_natalidade[combined_df$ano == 2019], na.rm = TRUE
-  )),2)
+  max(combined_df$razao_mortalidade_natalidade[combined_df$ano == 2019], na.rm = TRUE)
+), 2)
 
 razao_sd <- round(c(
   sd(combined_df$razao_mortalidade_natalidade[combined_df$ano == 2014], na.rm = TRUE),
@@ -1108,8 +1114,8 @@ razao_sd <- round(c(
   sd(combined_df$razao_mortalidade_natalidade[combined_df$ano == 2016], na.rm = TRUE),
   sd(combined_df$razao_mortalidade_natalidade[combined_df$ano == 2017], na.rm = TRUE),
   sd(combined_df$razao_mortalidade_natalidade[combined_df$ano == 2018], na.rm = TRUE),
-  sd(combined_df$razao_mortalidade_natalidade[combined_df$ano == 2019], na.rm = TRUE
-  )),2)
+  sd(combined_df$razao_mortalidade_natalidade[combined_df$ano == 2019], na.rm = TRUE)
+), 2)
 
 título_razao <- "Estatísticas Descritivas da Razão Mortalidade/Natalidade"
 subtitulo_razao <- "Análise Descritiva da Razão Mortalidade/Natalidade por Ano"
@@ -1441,8 +1447,8 @@ cnes_media <- c(
   mean(cnes_grouped_year$total_observacoes[cnes_grouped_year$ANO == 2016], na.rm = TRUE),
   mean(cnes_grouped_year$total_observacoes[cnes_grouped_year$ANO == 2017], na.rm = TRUE),
   mean(cnes_grouped_year$total_observacoes[cnes_grouped_year$ANO == 2018], na.rm = TRUE),
-  mean(cnes_grouped_year$total_observacoes[cnes_grouped_year$ANO == 2019], na.rm = TRUE
-  ))
+  mean(cnes_grouped_year$total_observacoes[cnes_grouped_year$ANO == 2019], na.rm = TRUE)
+)
 
 cnes_min <- c(
   min(cnes_grouped_year$total_observacoes[cnes_grouped_year$ANO == 2014], na.rm = TRUE),
@@ -1450,8 +1456,8 @@ cnes_min <- c(
   min(cnes_grouped_year$total_observacoes[cnes_grouped_year$ANO == 2016], na.rm = TRUE),
   min(cnes_grouped_year$total_observacoes[cnes_grouped_year$ANO == 2017], na.rm = TRUE),
   min(cnes_grouped_year$total_observacoes[cnes_grouped_year$ANO == 2018], na.rm = TRUE),
-  min(cnes_grouped_year$total_observacoes[cnes_grouped_year$ANO == 2019], na.rm = TRUE
-  ))
+  min(cnes_grouped_year$total_observacoes[cnes_grouped_year$ANO == 2019], na.rm = TRUE)
+)
 
 cnes_max <- c(
   max(cnes_grouped_year$total_observacoes[cnes_grouped_year$ANO == 2014], na.rm = TRUE),
@@ -1459,8 +1465,8 @@ cnes_max <- c(
   max(cnes_grouped_year$total_observacoes[cnes_grouped_year$ANO == 2016], na.rm = TRUE),
   max(cnes_grouped_year$total_observacoes[cnes_grouped_year$ANO == 2017], na.rm = TRUE),
   max(cnes_grouped_year$total_observacoes[cnes_grouped_year$ANO == 2018], na.rm = TRUE),
-  max(cnes_grouped_year$total_observacoes[cnes_grouped_year$ANO == 2019], na.rm = TRUE
-  ))
+  max(cnes_grouped_year$total_observacoes[cnes_grouped_year$ANO == 2019], na.rm = TRUE)
+)
 
 cnes_sd <- c(
   sd(cnes_grouped_year$total_observacoes[cnes_grouped_year$ANO == 2014], na.rm = TRUE),
@@ -1468,8 +1474,8 @@ cnes_sd <- c(
   sd(cnes_grouped_year$total_observacoes[cnes_grouped_year$ANO == 2016], na.rm = TRUE),
   sd(cnes_grouped_year$total_observacoes[cnes_grouped_year$ANO == 2017], na.rm = TRUE),
   sd(cnes_grouped_year$total_observacoes[cnes_grouped_year$ANO == 2018], na.rm = TRUE),
-  sd(cnes_grouped_year$total_observacoes[cnes_grouped_year$ANO == 2019], na.rm = TRUE
-  ))
+  sd(cnes_grouped_year$total_observacoes[cnes_grouped_year$ANO == 2019], na.rm = TRUE)
+)
 
 
 título_cnes <- "Estatísticas Descritivas dos Estabelecimentos de Saúde"
@@ -1530,7 +1536,10 @@ subtitulo_cnes_delta <- "Análise Descritiva da Criação de Hospitais por Ano"
 fonte_cnes_delta <- "Fonte: DataSUS"
 nomes_colunas_cnes_delta <- c("2015", "2016", "2017", "2018", "2019")
 nomes_linhas_cnes_delta <- c("Média", "Mínimo", "Máximo", "Desvio Padrão")
-valores_linhas_cnes_delta <- c(cnes_media_delta, cnes_min_delta, cnes_max_delta, cnes_sd_delta)
+valores_linhas_cnes_delta <- c(cnes_media_delta,
+                               cnes_min_delta,
+                               cnes_max_delta,
+                               cnes_sd_delta)
 
 tabela_formatada_cnes_delta <- criar_tabela_formatada(
   titulo = título_cnes_delta,
@@ -1548,7 +1557,9 @@ print(tabela_formatada_cnes_delta)
 # Removendo os dados que não serão mais usados
 
 # Lista de variáveis que você deseja manter
-variaveis_para_manter <- c("cnes_grouped_clean", "minf_grouped_clean", "ninf_grouped_clean")
+variaveis_para_manter <- c("cnes_grouped_clean",
+                           "minf_grouped_clean",
+                           "ninf_grouped_clean")
 
 # Remove todas as variáveis exceto as que estão na lista
 rm(list = setdiff(ls(), variaveis_para_manter))
@@ -1717,8 +1728,7 @@ ggplot(agg_plot_data, aes(x = factor(Tempo), y = Efeito, fill = Tratamento)) +
     "Antes do Tratamento" = "#00BFFF",
     "Após o Tratamento" =   "#0000CD"
   )) +
-  geom_hline(yintercept = 0,
-             color = "black") +
+  geom_hline(yintercept = 0, color = "black") +
   theme_minimal(base_size = 15) +
   theme(
     plot.title = element_text(face = "bold", hjust = 0.5),
