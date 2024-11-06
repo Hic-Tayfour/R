@@ -289,8 +289,8 @@ gerar_grafico_hex <- function(df,
           plot.subtitle = element_text(hjust = 0.5))
 }
 
-palette <- scale_fill_gradient(low =  "#6495ED",
-                               high = "#00008B",
+palette <- scale_fill_gradient(low =  "#ffed0a",
+                               high = "#eb5c3f",
                                name = "Ocorrências")
 
 anos <- 2014:2019
@@ -319,12 +319,12 @@ gerar_grafico_violino <- function(df,
                                   subtitle = NULL,
                                   xlab = "Ano",
                                   ylab = "Ocorrências (Escala Logarítmica)",
-                                  fill_colors = c("#00BFFF",
-                                                  "#1E90FF",
-                                                  "#4169E1",
-                                                  "#6495ED",
-                                                  "#0000FF",
-                                                  "#0000CD")) {
+                                  fill_colors = c("#ffed0a",
+                                                  "#ffed00",
+                                                  "#ffce0b",
+                                                  "#f8ac30",
+                                                  "#f0853c",
+                                                  "#eb5c3f")) {
   ggplot(df, aes(
     x = as.factor(ano),
     y = total_observacoes,
@@ -378,12 +378,12 @@ grafico_violino <- gerar_grafico_violino(
   xlab = "Ano",
   ylab = "Ocorrências (Escala Logarítmica)",
   fill_colors = c(
-    "#00BFFF",
-    "#1E90FF",
-    "#4169E1",
-    "#6495ED",
-    "#0000FF",
-    "#0000CD"
+    "#ffed0a",
+    "#ffed00",
+    "#ffce0b",
+    "#f8ac30",
+    "#f0853c",
+    "#eb5c3f"
   )
 )
 
@@ -396,8 +396,8 @@ gerar_grafico_linha <- function(df,
                                 subtitle = NULL,
                                 xlab = "Ano",
                                 ylab = "Total de Ocorrências",
-                                line_color =       "#00008B",
-                                point_color =      "#87CEEB",
+                                line_color =       "#eb5c3f",
+                                point_color =      "#eb5c3f",
                                 background_color = "#f9f9f9") {
   ggplot(df, aes(
     x = as.factor(ano),
@@ -450,8 +450,8 @@ grafico_linha <- gerar_grafico_linha(
   subtitle = "Ocorrências Registradas de 2014 a 2019",
   xlab = "Ano",
   ylab = "Nº de Mortes",
-  line_color =       "#00008B",
-  point_color =      "#00008B",
+  line_color =       "#eb5c3f",
+  point_color =      "#eb5c3f",
   background_color = "#f9f9f9"
 )
 
@@ -572,8 +572,8 @@ gerar_grafico_hex_natalidade <- function(df,
           plot.subtitle = element_text(hjust = 0.5))
 }
 
-palette_natalidade <- scale_fill_gradient(low =  "#6495ED",
-                                          high = "#00008B",
+palette_natalidade <- scale_fill_gradient(low =  "#77f07f",
+                                          high = "#3a2f6a",
                                           name = "Natalidade")
 
 anos <- 2014:2019
@@ -610,12 +610,12 @@ gerar_grafico_violino_natalidade <- function(df,
                                              subtitle = NULL,
                                              xlab = "Ano",
                                              ylab = "Ocorrências (Escala Logarítmica)",
-                                             fill_colors = c("#00BFFF",
-                                                             "#1E90FF",
-                                                             "#4169E1",
-                                                             "#6495ED",
-                                                             "#0000FF",
-                                                             "#0000CD")) {
+                                             fill_colors = c( "#3a2f6a",
+                                                              "#3a2f6b",
+                                                              "#36669c",
+                                                              "#41a0ae",
+                                                              "#3ec995",
+                                                              "#77f07f")) {
   ggplot(df, aes(
     x = as.factor(ano),
     y = total_observacoes,
@@ -669,12 +669,12 @@ grafico_violino_natalidade <- gerar_grafico_violino_natalidade(
   xlab = "Ano",
   ylab = "Ocorrências (Escala Logarítmica)",
   fill_colors = c(
-    "#00BFFF",
-    "#1E90FF",
-    "#4169E1",
-    "#6495ED",
-    "#0000FF",
-    "#0000CD"
+    "#3a2f6a",
+    "#3a2f6b",
+    "#36669c",
+    "#41a0ae",
+    "#3ec995",
+    "#77f07f"
   )
 )
 
@@ -687,8 +687,8 @@ gerar_grafico_linha_natalidade <- function(df,
                                            subtitle = NULL,
                                            xlab = "Ano",
                                            ylab = "Total de Ocorrências",
-                                           line_color =       "#00008B",
-                                           point_color =      "#87CEEB",
+                                           line_color =       "#77f07f",
+                                           point_color =      "#77f07f",
                                            background_color = "#f9f9f9") {
   ggplot(df, aes(
     x = as.factor(ano),
@@ -741,8 +741,8 @@ grafico_linha_natalidade <- gerar_grafico_linha_natalidade(
   subtitle = "Ocorrências Registradas de 2014 a 2019",
   xlab = "Ano",
   ylab = "Nº de Nascimentos",
-  line_color =       "#00008B",
-  point_color =      "#00008B",
+  line_color =       "#77f07f",
+  point_color =      "#77f07f",
   background_color = "#f9f9f9"
 )
 
@@ -794,8 +794,8 @@ gerar_grafico_hex_razao <- function(df,
           plot.subtitle = element_text(hjust = 0.5))
 }
 
-palette_razao <- scale_fill_gradient(low =  "#6495ED",
-                                     high = "#00008B",
+palette_razao <- scale_fill_gradient(low =  "#fdf542",
+                                     high = "#ff0000",
                                      name = "Razão M/N")
 
 anos <- 2014:2019
@@ -826,12 +826,12 @@ gerar_grafico_violino_razao <- function(df,
                                         subtitle = NULL,
                                         xlab = "Ano",
                                         ylab = "Razão Mortalidade/Natalidade",
-                                        fill_colors = c("#00BFFF",
-                                                        "#1E90FF",
-                                                        "#4169E1",
-                                                        "#6495ED",
-                                                        "#0000FF",
-                                                        "#0000CD")) {
+                                        fill_colors = c("#fdf540",
+                                                        "#fdf542",
+                                                        "#fbd808",
+                                                        "#ff9005",
+                                                        "#f9530b",
+                                                        "#ff0000")) {
   ggplot(df,
          aes(
            x = as.factor(ano),
@@ -885,12 +885,12 @@ grafico_violino_razao <- gerar_grafico_violino_razao(
   xlab = "Ano",
   ylab = "Taxa de Mortalidade Infantil",
   fill_colors = c(
-    "#00BFFF",
-    "#1E90FF",
-    "#4169E1",
-    "#6495ED",
-    "#0000FF",
-    "#0000CD"
+    "#fdf540",
+    "#fdf542",
+    "#fbd808",
+    "#ff9005",
+    "#f9530b",
+    "#ff0000"
   )
 )
 
@@ -903,9 +903,9 @@ gerar_grafico_linha_razao_anual <- function(df,
                                             subtitle = "Média da Razão Anual",
                                             xlab = "Ano",
                                             ylab = "Razão Mortalidade/Natalidade",
-                                            line_color =       "#00008B",
-                                            point_color =      "#00008B",
-                                            background_color = "#f9f9f9") {
+                                            line_color =       "#",
+                                            point_color =      "#ff0000",
+                                            background_color = "#ff0000") {
   df <- df %>%
     group_by(ano) %>%
     summarize(razao_media_anual = mean(razao_mortalidade_natalidade, na.rm = TRUE))
@@ -942,7 +942,7 @@ gerar_grafico_linha_razao_anual <- function(df,
       panel.grid.minor = element_blank(),
       panel.background = element_rect(fill = background_color, color = NA),
       plot.background = element_rect(fill = background_color, color = NA),
-      axis.line = element_line(color = "gray50", size = 0.5),
+      axis.line = element_line(color =  "gray50", size = 0.5),
       axis.ticks = element_line(color = "gray50")
     )
 }
@@ -1028,8 +1028,8 @@ gerar_grafico_hex_cnes <- function(df,
           plot.subtitle = element_text(hjust = 0.5))
 }
 
-palette_cnes <- scale_fill_gradient(low =  "#6495ED",
-                                    high = "#00008B",
+palette_cnes <- scale_fill_gradient(low =  "#00a886",
+                                    high = "#004235",
                                     name = "Estabelecimentos de Saúde")
 
 anos <- 2014:2019
@@ -1091,8 +1091,8 @@ gerar_grafico_hex_cnes_delta <- function(df,
 }
 
 
-palette_cnes <- scale_fill_gradient(low =  "#6495ED",
-                                    high = "#00008B",
+palette_cnes <- scale_fill_gradient(low =  "#00a886",
+                                    high = "#004235",
                                     name = "Estabelecimentos de Saúde")
 
 anos <- 2015:2019
@@ -1123,12 +1123,12 @@ gerar_grafico_violino_cnes <- function(df,
                                        subtitle = NULL,
                                        xlab = "Ano",
                                        ylab = "Ocorrências (Escala Logarítmica)",
-                                       fill_colors = c("#00BFFF",
-                                                       "#1E90FF",
-                                                       "#4169E1",
-                                                       "#6495ED",
-                                                       "#0000FF",
-                                                       "#0000CD")) {
+                                       fill_colors = c("#00a881",
+                                                       "#00a886",
+                                                       "#008e72",
+                                                       "#00755d",
+                                                       "#005b49",
+                                                       "#004235")) {
   ggplot(df, aes(
     x = as.factor(ANO),
     y = total_observacoes,
@@ -1182,12 +1182,12 @@ grafico_violino_cnes <- gerar_grafico_violino_cnes(
   xlab = "Ano",
   ylab = "Observações (Escala Logarítmica)",
   fill_colors = c(
-    "#00BFFF",
-    "#1E90FF",
-    "#4169E1",
-    "#6495ED",
-    "#0000FF",
-    "#0000CD"
+    "#00a881",
+    "#00a886",
+    "#008e72",
+    "#00755d",
+    "#005b49",
+    "#004235"
   )
 )
 
@@ -1200,8 +1200,8 @@ gerar_grafico_linha_cnes <- function(df,
                                      subtitle = NULL,
                                      xlab = "Ano",
                                      ylab = "Número de Hospitais",
-                                     line_color =       "#00008B",
-                                     point_color =      "#00008B",
+                                     line_color =       "#004235",
+                                     point_color =      "#004235",
                                      background_color = "#f9f9f9") {
   ggplot(df, aes(
     x = as.factor(ANO),
@@ -1254,8 +1254,8 @@ grafico_linha_cnes <- gerar_grafico_linha_cnes(
   subtitle = "Nº de Hospitais de 2014 a 2019",
   xlab = "Ano",
   ylab = "Total de Hospitais",
-  line_color =       "#00008B",
-  point_color =      "#87CEEB",
+  line_color =       "#004235",
+  point_color =      "#004235",
   background_color = "#f9f9f9"
 )
 
