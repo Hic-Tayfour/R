@@ -457,6 +457,63 @@ grafico_linha <- gerar_grafico_linha(
 
 grafico_linha
 
+# Estatísticas Descritivas 
+
+minf_media <- c(
+  mean(minf_grouped_clean$total_observacoes[minf_grouped_clean$ano == 2014], na.rm = TRUE),
+  mean(minf_grouped_clean$total_observacoes[minf_grouped_clean$ano == 2015], na.rm = TRUE),
+  mean(minf_grouped_clean$total_observacoes[minf_grouped_clean$ano == 2016], na.rm = TRUE),
+  mean(minf_grouped_clean$total_observacoes[minf_grouped_clean$ano == 2017], na.rm = TRUE),
+  mean(minf_grouped_clean$total_observacoes[minf_grouped_clean$ano == 2018], na.rm = TRUE),
+  mean(minf_grouped_clean$total_observacoes[minf_grouped_clean$ano == 2019], na.rm = TRUE
+  ))
+
+minf_min <- c(
+  min(minf_grouped_clean$total_observacoes[minf_grouped_clean$ano == 2014], na.rm = TRUE),
+  min(minf_grouped_clean$total_observacoes[minf_grouped_clean$ano == 2015], na.rm = TRUE),
+  min(minf_grouped_clean$total_observacoes[minf_grouped_clean$ano == 2016], na.rm = TRUE),
+  min(minf_grouped_clean$total_observacoes[minf_grouped_clean$ano == 2017], na.rm = TRUE),
+  min(minf_grouped_clean$total_observacoes[minf_grouped_clean$ano == 2018], na.rm = TRUE),
+  min(minf_grouped_clean$total_observacoes[minf_grouped_clean$ano == 2019], na.rm = TRUE
+  ))
+
+minf_max <- c(
+  max(minf_grouped_clean$total_observacoes[minf_grouped_clean$ano == 2014], na.rm = TRUE),
+  max(minf_grouped_clean$total_observacoes[minf_grouped_clean$ano == 2015], na.rm = TRUE),
+  max(minf_grouped_clean$total_observacoes[minf_grouped_clean$ano == 2016], na.rm = TRUE),
+  max(minf_grouped_clean$total_observacoes[minf_grouped_clean$ano == 2017], na.rm = TRUE),
+  max(minf_grouped_clean$total_observacoes[minf_grouped_clean$ano == 2018], na.rm = TRUE),
+  max(minf_grouped_clean$total_observacoes[minf_grouped_clean$ano == 2019], na.rm = TRUE
+  ))
+
+minf_sd <- c(
+  sd(minf_grouped_clean$total_observacoes[minf_grouped_clean$ano == 2014], na.rm = TRUE),
+  sd(minf_grouped_clean$total_observacoes[minf_grouped_clean$ano == 2015], na.rm = TRUE),
+  sd(minf_grouped_clean$total_observacoes[minf_grouped_clean$ano == 2016], na.rm = TRUE),
+  sd(minf_grouped_clean$total_observacoes[minf_grouped_clean$ano == 2017], na.rm = TRUE),
+  sd(minf_grouped_clean$total_observacoes[minf_grouped_clean$ano == 2018], na.rm = TRUE),
+  sd(minf_grouped_clean$total_observacoes[minf_grouped_clean$ano == 2019], na.rm = TRUE
+  ))
+
+título_minf <- "Estatísticas Descritivas das Ocorrências de Mortalidade Infantil"
+subtitulo_minf <- "Análise Descritiva das Ocorrências de Mortalidade Infantil por Ano"
+fonte_minf <- "Fonte: DataSUS"
+nomes_colunas_minf <- c("2014", "2015", "2016", "2017", "2018", "2019")
+nomes_linhas_minf <- c("Média", "Mínimo", "Máximo", "Desvio Padrão")
+valores_linhas_minf <- c(minf_media, minf_min, minf_max, minf_sd)
+
+tabela_formatada_minf <- criar_tabela_formatada(
+  titulo = título_minf,
+  subtitulo = subtitulo_minf,
+  fonte = fonte_minf,
+  nomes_colunas = nomes_colunas_minf,
+  nomes_linhas = nomes_linhas_minf,
+  valores_linhas = valores_linhas_minf
+)
+
+print(tabela_formatada_minf)
+
+
 # Dados de Natalidade ----
 
 # Agrupando as Observações por Microregião da Saúde , mes e ano
@@ -748,6 +805,62 @@ grafico_linha_natalidade <- gerar_grafico_linha_natalidade(
 
 grafico_linha_natalidade
 
+# Estatísticas Descritivas
+
+ninf_media <- c(
+  mean(ninf_grouped_clean$total_observacoes[ninf_grouped_clean$ano == 2014], na.rm = TRUE),
+  mean(ninf_grouped_clean$total_observacoes[ninf_grouped_clean$ano == 2015], na.rm = TRUE),
+  mean(ninf_grouped_clean$total_observacoes[ninf_grouped_clean$ano == 2016], na.rm = TRUE),
+  mean(ninf_grouped_clean$total_observacoes[ninf_grouped_clean$ano == 2017], na.rm = TRUE),
+  mean(ninf_grouped_clean$total_observacoes[ninf_grouped_clean$ano == 2018], na.rm = TRUE),
+  mean(ninf_grouped_clean$total_observacoes[ninf_grouped_clean$ano == 2019], na.rm = TRUE
+  ))
+
+nin_min <- c(
+  min(ninf_grouped_clean$total_observacoes[ninf_grouped_clean$ano == 2014], na.rm = TRUE),
+  min(ninf_grouped_clean$total_observacoes[ninf_grouped_clean$ano == 2015], na.rm = TRUE),
+  min(ninf_grouped_clean$total_observacoes[ninf_grouped_clean$ano == 2016], na.rm = TRUE),
+  min(ninf_grouped_clean$total_observacoes[ninf_grouped_clean$ano == 2017], na.rm = TRUE),
+  min(ninf_grouped_clean$total_observacoes[ninf_grouped_clean$ano == 2018], na.rm = TRUE),
+  min(ninf_grouped_clean$total_observacoes[ninf_grouped_clean$ano == 2019], na.rm = TRUE
+  ))
+
+ninf_max <- c(
+  max(ninf_grouped_clean$total_observacoes[ninf_grouped_clean$ano == 2014], na.rm = TRUE),
+  max(ninf_grouped_clean$total_observacoes[ninf_grouped_clean$ano == 2015], na.rm = TRUE),
+  max(ninf_grouped_clean$total_observacoes[ninf_grouped_clean$ano == 2016], na.rm = TRUE),
+  max(ninf_grouped_clean$total_observacoes[ninf_grouped_clean$ano == 2017], na.rm = TRUE),
+  max(ninf_grouped_clean$total_observacoes[ninf_grouped_clean$ano == 2018], na.rm = TRUE),
+  max(ninf_grouped_clean$total_observacoes[ninf_grouped_clean$ano == 2019], na.rm = TRUE
+  ))
+
+ninf_sd <- c(
+  sd(ninf_grouped_clean$total_observacoes[ninf_grouped_clean$ano == 2014], na.rm = TRUE),
+  sd(ninf_grouped_clean$total_observacoes[ninf_grouped_clean$ano == 2015], na.rm = TRUE),
+  sd(ninf_grouped_clean$total_observacoes[ninf_grouped_clean$ano == 2016], na.rm = TRUE),
+  sd(ninf_grouped_clean$total_observacoes[ninf_grouped_clean$ano == 2017], na.rm = TRUE),
+  sd(ninf_grouped_clean$total_observacoes[ninf_grouped_clean$ano == 2018], na.rm = TRUE),
+  sd(ninf_grouped_clean$total_observacoes[ninf_grouped_clean$ano == 2019], na.rm = TRUE
+  ))
+
+título_ninf <- "Estatísticas Descritivas das Ocorrências de Natalidade"
+subtitulo_ninf <- "Análise Descritiva das Ocorrências de Natalidade por Ano"
+fonte_ninf <- "Fonte: DataSUS"
+nomes_colunas_ninf <- c("2014", "2015", "2016", "2017", "2018", "2019")
+nomes_linhas_ninf <- c("Média", "Mínimo", "Máximo", "Desvio Padrão")
+valores_linhas_ninf <- c(ninf_media, nin_min, ninf_max, ninf_sd)
+
+tabela_formatada_ninf <- criar_tabela_formatada(
+  titulo = título_ninf,
+  subtitulo = subtitulo_ninf,
+  fonte = fonte_ninf,
+  nomes_colunas = nomes_colunas_ninf,
+  nomes_linhas = nomes_linhas_ninf,
+  valores_linhas = valores_linhas_ninf
+)
+
+print(tabela_formatada_ninf)
+
 # Dados Relativos entre Mortalidade e Natalidade ----
 
 # Juntando os dados de Mortalidade e Natalidade
@@ -959,6 +1072,62 @@ grafico_linha_razao_anual <- gerar_grafico_linha_razao_anual(
 )
 
 grafico_linha_razao_anual
+
+# Estatísticas Descritivas
+
+razao_media <- round(c(
+  mean(combined_df$razao_mortalidade_natalidade[combined_df$ano == 2014], na.rm = TRUE),
+  mean(combined_df$razao_mortalidade_natalidade[combined_df$ano == 2015], na.rm = TRUE),
+  mean(combined_df$razao_mortalidade_natalidade[combined_df$ano == 2016], na.rm = TRUE),
+  mean(combined_df$razao_mortalidade_natalidade[combined_df$ano == 2017], na.rm = TRUE),
+  mean(combined_df$razao_mortalidade_natalidade[combined_df$ano == 2018], na.rm = TRUE),
+  mean(combined_df$razao_mortalidade_natalidade[combined_df$ano == 2019], na.rm = TRUE
+  )),2)
+
+razao_min <- round(c(
+  min(combined_df$razao_mortalidade_natalidade[combined_df$ano == 2014], na.rm = TRUE),
+  min(combined_df$razao_mortalidade_natalidade[combined_df$ano == 2015], na.rm = TRUE),
+  min(combined_df$razao_mortalidade_natalidade[combined_df$ano == 2016], na.rm = TRUE),
+  min(combined_df$razao_mortalidade_natalidade[combined_df$ano == 2017], na.rm = TRUE),
+  min(combined_df$razao_mortalidade_natalidade[combined_df$ano == 2018], na.rm = TRUE),
+  min(combined_df$razao_mortalidade_natalidade[combined_df$ano == 2019], na.rm = TRUE
+  )),2)
+
+razao_max <- round(c(
+  max(combined_df$razao_mortalidade_natalidade[combined_df$ano == 2014], na.rm = TRUE),
+  max(combined_df$razao_mortalidade_natalidade[combined_df$ano == 2015], na.rm = TRUE),
+  max(combined_df$razao_mortalidade_natalidade[combined_df$ano == 2016], na.rm = TRUE),
+  max(combined_df$razao_mortalidade_natalidade[combined_df$ano == 2017], na.rm = TRUE),
+  max(combined_df$razao_mortalidade_natalidade[combined_df$ano == 2018], na.rm = TRUE),
+  max(combined_df$razao_mortalidade_natalidade[combined_df$ano == 2019], na.rm = TRUE
+  )),2)
+
+razao_sd <- round(c(
+  sd(combined_df$razao_mortalidade_natalidade[combined_df$ano == 2014], na.rm = TRUE),
+  sd(combined_df$razao_mortalidade_natalidade[combined_df$ano == 2015], na.rm = TRUE),
+  sd(combined_df$razao_mortalidade_natalidade[combined_df$ano == 2016], na.rm = TRUE),
+  sd(combined_df$razao_mortalidade_natalidade[combined_df$ano == 2017], na.rm = TRUE),
+  sd(combined_df$razao_mortalidade_natalidade[combined_df$ano == 2018], na.rm = TRUE),
+  sd(combined_df$razao_mortalidade_natalidade[combined_df$ano == 2019], na.rm = TRUE
+  )),2)
+
+título_razao <- "Estatísticas Descritivas da Razão Mortalidade/Natalidade"
+subtitulo_razao <- "Análise Descritiva da Razão Mortalidade/Natalidade por Ano"
+fonte_razao <- "Fonte: DataSUS"
+nomes_colunas_razao <- c("2014", "2015", "2016", "2017", "2018", "2019")
+nomes_linhas_razao <- c("Média", "Mínimo", "Máximo", "Desvio Padrão")
+valores_linhas_razao <- c(razao_media, razao_min, razao_max, razao_sd)
+
+tabela_formatada_razao <- criar_tabela_formatada(
+  titulo = título_razao,
+  subtitulo = subtitulo_razao,
+  fonte = fonte_razao,
+  nomes_colunas = nomes_colunas_razao,
+  nomes_linhas = nomes_linhas_razao,
+  valores_linhas = valores_linhas_razao
+)
+
+print(tabela_formatada_razao)
 
 # Dados de Estabelecimentos de Saúde ----
 
@@ -1263,6 +1432,116 @@ grafico_linha_cnes <- gerar_grafico_linha_cnes(
 )
 
 grafico_linha_cnes
+
+# Estatísticas Descritivas
+
+cnes_media <- c(
+  mean(cnes_grouped_year$total_observacoes[cnes_grouped_year$ANO == 2014], na.rm = TRUE),
+  mean(cnes_grouped_year$total_observacoes[cnes_grouped_year$ANO == 2015], na.rm = TRUE),
+  mean(cnes_grouped_year$total_observacoes[cnes_grouped_year$ANO == 2016], na.rm = TRUE),
+  mean(cnes_grouped_year$total_observacoes[cnes_grouped_year$ANO == 2017], na.rm = TRUE),
+  mean(cnes_grouped_year$total_observacoes[cnes_grouped_year$ANO == 2018], na.rm = TRUE),
+  mean(cnes_grouped_year$total_observacoes[cnes_grouped_year$ANO == 2019], na.rm = TRUE
+  ))
+
+cnes_min <- c(
+  min(cnes_grouped_year$total_observacoes[cnes_grouped_year$ANO == 2014], na.rm = TRUE),
+  min(cnes_grouped_year$total_observacoes[cnes_grouped_year$ANO == 2015], na.rm = TRUE),
+  min(cnes_grouped_year$total_observacoes[cnes_grouped_year$ANO == 2016], na.rm = TRUE),
+  min(cnes_grouped_year$total_observacoes[cnes_grouped_year$ANO == 2017], na.rm = TRUE),
+  min(cnes_grouped_year$total_observacoes[cnes_grouped_year$ANO == 2018], na.rm = TRUE),
+  min(cnes_grouped_year$total_observacoes[cnes_grouped_year$ANO == 2019], na.rm = TRUE
+  ))
+
+cnes_max <- c(
+  max(cnes_grouped_year$total_observacoes[cnes_grouped_year$ANO == 2014], na.rm = TRUE),
+  max(cnes_grouped_year$total_observacoes[cnes_grouped_year$ANO == 2015], na.rm = TRUE),
+  max(cnes_grouped_year$total_observacoes[cnes_grouped_year$ANO == 2016], na.rm = TRUE),
+  max(cnes_grouped_year$total_observacoes[cnes_grouped_year$ANO == 2017], na.rm = TRUE),
+  max(cnes_grouped_year$total_observacoes[cnes_grouped_year$ANO == 2018], na.rm = TRUE),
+  max(cnes_grouped_year$total_observacoes[cnes_grouped_year$ANO == 2019], na.rm = TRUE
+  ))
+
+cnes_sd <- c(
+  sd(cnes_grouped_year$total_observacoes[cnes_grouped_year$ANO == 2014], na.rm = TRUE),
+  sd(cnes_grouped_year$total_observacoes[cnes_grouped_year$ANO == 2015], na.rm = TRUE),
+  sd(cnes_grouped_year$total_observacoes[cnes_grouped_year$ANO == 2016], na.rm = TRUE),
+  sd(cnes_grouped_year$total_observacoes[cnes_grouped_year$ANO == 2017], na.rm = TRUE),
+  sd(cnes_grouped_year$total_observacoes[cnes_grouped_year$ANO == 2018], na.rm = TRUE),
+  sd(cnes_grouped_year$total_observacoes[cnes_grouped_year$ANO == 2019], na.rm = TRUE
+  ))
+
+
+título_cnes <- "Estatísticas Descritivas dos Estabelecimentos de Saúde"
+subtitulo_cnes <- "Análise Descritiva dos Hospitais por Ano"
+fonte_cnes <- "Fonte: DataSUS"
+nomes_colunas_cnes <- c("2014", "2015", "2016", "2017", "2018", "2019")
+nomes_linhas_cnes <- c("Média", "Mínimo", "Máximo", "Desvio Padrão")
+valores_linhas_cnes <- c(cnes_media, cnes_min, cnes_max, cnes_sd)
+
+tabela_formatada_cnes <- criar_tabela_formatada(
+  titulo = título_cnes,
+  subtitulo = subtitulo_cnes,
+  fonte = fonte_cnes,
+  nomes_colunas = nomes_colunas_cnes,
+  nomes_linhas = nomes_linhas_cnes,
+  valores_linhas = valores_linhas_cnes
+)
+
+print(tabela_formatada_cnes)
+
+# Estatísticas Descritivas do delta de Hospitais
+
+cnes_media_delta <- c(
+  mean(cnes_grouped_clean_delta$delta_hospitais[cnes_grouped_clean_delta$ANO == 2015], na.rm = TRUE),
+  mean(cnes_grouped_clean_delta$delta_hospitais[cnes_grouped_clean_delta$ANO == 2016], na.rm = TRUE),
+  mean(cnes_grouped_clean_delta$delta_hospitais[cnes_grouped_clean_delta$ANO == 2017], na.rm = TRUE),
+  mean(cnes_grouped_clean_delta$delta_hospitais[cnes_grouped_clean_delta$ANO == 2018], na.rm = TRUE),
+  mean(cnes_grouped_clean_delta$delta_hospitais[cnes_grouped_clean_delta$ANO == 2019], na.rm = TRUE)
+)
+
+
+cnes_min_delta <- c(
+  min(cnes_grouped_clean_delta$delta_hospitais[cnes_grouped_clean_delta$ANO == 2015], na.rm = TRUE),
+  min(cnes_grouped_clean_delta$delta_hospitais[cnes_grouped_clean_delta$ANO == 2016], na.rm = TRUE),
+  min(cnes_grouped_clean_delta$delta_hospitais[cnes_grouped_clean_delta$ANO == 2017], na.rm = TRUE),
+  min(cnes_grouped_clean_delta$delta_hospitais[cnes_grouped_clean_delta$ANO == 2018], na.rm = TRUE),
+  min(cnes_grouped_clean_delta$delta_hospitais[cnes_grouped_clean_delta$ANO == 2019], na.rm = TRUE)
+)
+
+cnes_max_delta <- c(
+  max(cnes_grouped_clean_delta$delta_hospitais[cnes_grouped_clean_delta$ANO == 2015], na.rm = TRUE),
+  max(cnes_grouped_clean_delta$delta_hospitais[cnes_grouped_clean_delta$ANO == 2016], na.rm = TRUE),
+  max(cnes_grouped_clean_delta$delta_hospitais[cnes_grouped_clean_delta$ANO == 2017], na.rm = TRUE),
+  max(cnes_grouped_clean_delta$delta_hospitais[cnes_grouped_clean_delta$ANO == 2018], na.rm = TRUE),
+  max(cnes_grouped_clean_delta$delta_hospitais[cnes_grouped_clean_delta$ANO == 2019], na.rm = TRUE)
+)
+
+cnes_sd_delta <- c(
+  sd(cnes_grouped_clean_delta$delta_hospitais[cnes_grouped_clean_delta$ANO == 2015], na.rm = TRUE),
+  sd(cnes_grouped_clean_delta$delta_hospitais[cnes_grouped_clean_delta$ANO == 2016], na.rm = TRUE),
+  sd(cnes_grouped_clean_delta$delta_hospitais[cnes_grouped_clean_delta$ANO == 2017], na.rm = TRUE),
+  sd(cnes_grouped_clean_delta$delta_hospitais[cnes_grouped_clean_delta$ANO == 2018], na.rm = TRUE),
+  sd(cnes_grouped_clean_delta$delta_hospitais[cnes_grouped_clean_delta$ANO == 2019], na.rm = TRUE)
+)
+
+título_cnes_delta <- "Estatísticas Descritivas da Criação de Estabelecimentos de Saúde"
+subtitulo_cnes_delta <- "Análise Descritiva da Criação de Hospitais por Ano"
+fonte_cnes_delta <- "Fonte: DataSUS"
+nomes_colunas_cnes_delta <- c("2015", "2016", "2017", "2018", "2019")
+nomes_linhas_cnes_delta <- c("Média", "Mínimo", "Máximo", "Desvio Padrão")
+valores_linhas_cnes_delta <- c(cnes_media_delta, cnes_min_delta, cnes_max_delta, cnes_sd_delta)
+
+tabela_formatada_cnes_delta <- criar_tabela_formatada(
+  titulo = título_cnes_delta,
+  subtitulo = subtitulo_cnes_delta,
+  fonte = fonte_cnes_delta,
+  nomes_colunas = nomes_colunas_cnes_delta,
+  nomes_linhas = nomes_linhas_cnes_delta,
+  valores_linhas = valores_linhas_cnes_delta
+)
+
+print(tabela_formatada_cnes_delta)
 
 # Análise de Regressão da Mortalidade Ínfantil, usando um Stagared DiD ----
 
