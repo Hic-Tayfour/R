@@ -903,9 +903,9 @@ gerar_grafico_linha_razao_anual <- function(df,
                                             subtitle = "Média da Razão Anual",
                                             xlab = "Ano",
                                             ylab = "Razão Mortalidade/Natalidade",
-                                            line_color =       "#",
+                                            line_color =       "#ff0000",
                                             point_color =      "#ff0000",
-                                            background_color = "#ff0000") {
+                                            background_color = "#f9f9f9") {
   df <- df %>%
     group_by(ano) %>%
     summarize(razao_media_anual = mean(razao_mortalidade_natalidade, na.rm = TRUE))
@@ -1265,33 +1265,12 @@ grafico_linha_cnes
 
 # Removendo os dados que não serão mais usados
 
-rm(
-  minf,
-  ninf,
-  cnes,
-  cnes_grouped_month,
-  cnes_grouped_year,
-  cnes_grouped_sf,
-  cnes_cropped,
-  cnes_cropped_coords,
-  cnes_grouped_clean_delta,
-  minf_grouped_month,
-  minf_grouped_year,
-  minf_grouped_sf,
-  minf_cropped,
-  minf_cropped_coords,
-  ninf_grouped_month,
-  ninf_grouped_year,
-  ninf_grouped_sf,
-  ninf_cropped,
-  ninf_cropped_coords,
-  geo,
-  geo_with_pib,
-  ppc,
-  brasil,
-  combined_df,
-  pib_per_capita_mean
-)
+# Lista de variáveis que você deseja manter
+variaveis_para_manter <- c("cnes_grouped_clean", "minf_grouped_clean", "ninf_grouped_clean")
+
+# Remove todas as variáveis exceto as que estão na lista
+rm(list = setdiff(ls(), variaveis_para_manter))
+
 
 # Ajustando o Dados do Cnes
 
