@@ -398,7 +398,7 @@ gerar_grafico_linha <- function(df,
                                 ylab = "Total de Ocorrências",
                                 line_color =       "#eb5c3f",
                                 point_color =      "#eb5c3f",
-                                background_color = "#f9f9f9") {
+                                background_color = "#FFFFFF") {
   ggplot(df, aes(
     x = as.factor(ano),
     y = total_observacoes,
@@ -452,7 +452,7 @@ grafico_linha <- gerar_grafico_linha(
   ylab = "Nº de Mortes",
   line_color =       "#eb5c3f",
   point_color =      "#eb5c3f",
-  background_color = "#f9f9f9"
+  background_color = "#FFFFFF"
 )
 
 grafico_linha
@@ -689,7 +689,7 @@ gerar_grafico_linha_natalidade <- function(df,
                                            ylab = "Total de Ocorrências",
                                            line_color =       "#77f07f",
                                            point_color =      "#77f07f",
-                                           background_color = "#f9f9f9") {
+                                           background_color = "#FFFFFF") {
   ggplot(df, aes(
     x = as.factor(ano),
     y = total_observacoes,
@@ -743,7 +743,7 @@ grafico_linha_natalidade <- gerar_grafico_linha_natalidade(
   ylab = "Nº de Nascimentos",
   line_color =       "#77f07f",
   point_color =      "#77f07f",
-  background_color = "#f9f9f9"
+  background_color = "#FFFFFF"
 )
 
 grafico_linha_natalidade
@@ -762,10 +762,11 @@ combined_df <- minf_grouped_clean %>%
 # Calculando a Taxa de Mortalidade Infantil
 
 combined_df <- combined_df %>%
-  mutate(razao_mortalidade_natalidade = total_observacoes_minf / total_observacoes_ninf)
+  mutate(razao_mortalidade_natalidade = (total_observacoes_minf / total_observacoes_ninf)*1000)
 
 combined_df <- combined_df %>%
-  filter(total_observacoes_ninf > 0)
+  filter(total_observacoes_ninf > 0) %>% 
+  filter(is.na(razao_mortalidade_natalidade) == FALSE)
 
 ## Gráficos Hexágono
 
@@ -782,7 +783,8 @@ gerar_grafico_hex_razao <- function(df,
             fill = "white",
             color = "black") +
     geom_hex(aes(x = LONGITUDE_minf, y = LATITUDE_minf, z = razao_mortalidade_natalidade),
-             bins = 60) +
+             bins = 60,
+             fun = function(x) mean(x, na.rm = TRUE)) +
     palette +
     labs(title = title %||% as.character(ano),
          subtitle = subtitle) +
@@ -794,8 +796,8 @@ gerar_grafico_hex_razao <- function(df,
           plot.subtitle = element_text(hjust = 0.5))
 }
 
-palette_razao <- scale_fill_gradient(low =  "#fdf542",
-                                     high = "#ff0000",
+palette_razao <- scale_fill_gradient(low =  "#c4005a",
+                                     high = "#84005a",
                                      name = "Razão M/N")
 
 anos <- 2014:2019
@@ -826,12 +828,12 @@ gerar_grafico_violino_razao <- function(df,
                                         subtitle = NULL,
                                         xlab = "Ano",
                                         ylab = "Razão Mortalidade/Natalidade",
-                                        fill_colors = c("#fdf540",
-                                                        "#fdf542",
-                                                        "#fbd808",
-                                                        "#ff9005",
-                                                        "#f9530b",
-                                                        "#ff0000")) {
+                                        fill_colors = c("#c4004a",
+                                                        "#c4005a",
+                                                        "#b4005a",
+                                                        "#a4005a",
+                                                        "#94005a",
+                                                        "#84005a")) {
   ggplot(df,
          aes(
            x = as.factor(ano),
@@ -856,7 +858,8 @@ gerar_grafico_violino_razao <- function(df,
       shape = 23,
       fill = "#708090"
     ) +
-    scale_y_continuous(limits = c(0, 0.05)) +
+    scale_y_log10(breaks = c(1, 10, 100, 1000),
+                  labels = c("1", "10", "100", "1000")) +
     labs(
       title = title,
       subtitle = subtitle,
@@ -883,14 +886,14 @@ grafico_violino_razao <- gerar_grafico_violino_razao(
   title = "Distribuição da Taxa de Mortalidade Infantil por Ano",
   subtitle = "Análise da Taxa de Mortalidade Infantil",
   xlab = "Ano",
-  ylab = "Taxa de Mortalidade Infantil",
+  ylab = "Taxa de Mortalidade Infantil (Escala Logarítmica)",
   fill_colors = c(
-    "#fdf540",
-    "#fdf542",
-    "#fbd808",
-    "#ff9005",
-    "#f9530b",
-    "#ff0000"
+    "#c4004a",
+    "#c4005a",
+    "#b4005a",
+    "#a4005a",
+    "#94005a",
+    "#84005a"
   )
 )
 
@@ -903,9 +906,9 @@ gerar_grafico_linha_razao_anual <- function(df,
                                             subtitle = "Média da Razão Anual",
                                             xlab = "Ano",
                                             ylab = "Razão Mortalidade/Natalidade",
-                                            line_color =       "#ff0000",
-                                            point_color =      "#ff0000",
-                                            background_color = "#f9f9f9") {
+                                            line_color =       "#84005a",
+                                            point_color =      "#84005a",
+                                            background_color = "#FFFFFF") {
   df <- df %>%
     group_by(ano) %>%
     summarize(razao_media_anual = mean(razao_mortalidade_natalidade, na.rm = TRUE))
@@ -1202,7 +1205,7 @@ gerar_grafico_linha_cnes <- function(df,
                                      ylab = "Número de Hospitais",
                                      line_color =       "#004235",
                                      point_color =      "#004235",
-                                     background_color = "#f9f9f9") {
+                                     background_color = "#FFFFFF") {
   ggplot(df, aes(
     x = as.factor(ANO),
     y = total_observacoes,
@@ -1256,7 +1259,7 @@ grafico_linha_cnes <- gerar_grafico_linha_cnes(
   ylab = "Total de Hospitais",
   line_color =       "#004235",
   point_color =      "#004235",
-  background_color = "#f9f9f9"
+  background_color = "#FFFFFF"
 )
 
 grafico_linha_cnes
