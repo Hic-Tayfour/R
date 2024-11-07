@@ -101,82 +101,118 @@ criar_tabela_formatada <- function(titulo,
   return(tabela)
 }
 
-# Loop a ser Usado para Obtenção dos dados
+# Baixando os dados do GitHub ----
 
-processar_dados_ano <- function(ano, geo) {
-  db_sim <- fetch_datasus(
-    year_start = ano,
-    year_end = ano,
-    information_system = "SIM-DOINF",
-    vars = c(
-      "SEXO",
-      "CODMUNNATU",
-      "LOCOCOR",
-      "IDADEMAE",
-      "ESCMAE",
-      "QTDFILVIVO",
-      "PARTO",
-      "DTOBITO"
-    )
-  ) %>%
-    process_sim() %>%
-    mutate(ANO = ano) %>%
-    processar_dados(geo, "CODMUNNATU")
-  
-  db_sinasc <- fetch_datasus(
-    year_start = ano,
-    year_end = ano,
-    information_system = "SINASC",
-    vars = c(
-      "SEXO",
-      "CODMUNRES",
-      "LOCNASC",
-      "IDADEMAE",
-      "ESCMAE",
-      "QTDFILVIVO",
-      "PARTO",
-      "DTNASC"
-    )
-  ) %>%
-    process_sim() %>%
-    mutate(ANO = ano) %>%
-    processar_dados(geo, "CODMUNRES")
-  
-  db_cnes <- map_dfr(1:12, function(mes) {
-    fetch_datasus(
-      year_start = ano,
-      year_end = ano,
-      month_start = mes,
-      month_end = mes,
-      information_system = "CNES-ST",
-      vars = c("CODUFMUN", "TP_UNID")
-    ) %>%
-      mutate(ANO = ano, MES = mes)
-  }) %>%
-    processar_dados(geo, "CODUFMUN")
-  
-  list(db_sim = db_sim,
-       db_sinasc = db_sinasc,
-       db_cnes = db_cnes)
+# Links ajustados para download direto do GitHub
+github_links <- c(
+  "https://github.com/Hic-Tayfour/DataBase-Repo/raw/main/MicroIV/minf.Rdata",
+  "https://github.com/Hic-Tayfour/DataBase-Repo/raw/main/MicroIV/ninf.Rdata",
+  "https://github.com/Hic-Tayfour/DataBase-Repo/raw/main/MicroIV/cnes.Rdata"
+)
+
+# Nome dos arquivos locais onde você quer salvar os arquivos RData
+local_files_rdata <- c("minf.Rdata", "ninf.Rdata", "cnes.Rdata")
+
+# Links para os arquivos .xls no GitHub
+cadmun_link <- "https://github.com/Hic-Tayfour/DataBase-Repo/raw/main/MicroIV/CADMUN.xls"
+pib_link <- "https://github.com/Hic-Tayfour/DataBase-Repo/raw/main/MicroIV/PIB%20Per%20Capita%20IBGE.xls"
+
+# Nome dos arquivos locais onde você quer salvar os arquivos .xls
+local_cadmun <- "CADMUN.xls"
+local_pib <- "PIB Per Capita IBGE.xls"
+
+# Loop para baixar os arquivos .Rdata
+for (i in seq_along(github_links)) {
+  download.file(github_links[i], destfile = local_files_rdata[i], mode = "wb")
+  load(local_files_rdata[i])  # Carregar os arquivos RData baixados
+  message(paste("Arquivo", local_files_rdata[i], "baixado e carregado com sucesso."))
 }
 
-resultados <- map(2014:2019, ~ processar_dados_ano(.x, geo))
+# Baixar o arquivo CADMUN.xls do GitHub
+download.file(cadmun_link, destfile = local_cadmun, mode = "wb")
+message("Arquivo CADMUN.xls baixado com sucesso.")
 
-# Separando os dados
+# Baixar o arquivo PIB Per Capita IBGE.xls do GitHub
+download.file(pib_link, destfile = local_pib, mode = "wb")
+message("Arquivo PIB Per Capita IBGE.xls baixado com sucesso.")
 
-minf <- map_dfr(resultados, "db_sim")
-ninf <- map_dfr(resultados, "db_sinasc")
-cnes <- map_dfr(resultados, "db_cnes")
 
-# Salvando os dados
+# Loop a ser Usado para Obtenção dos dados ----
 
-save(minf, file = "minf.Rdata")
-save(ninf, file = "ninf.Rdata")
-save(cnes, file = "cnes.Rdata")
-
-# Removendo os dados desnecessários
-
-rm(minf, ninf, cnes, resultados)
+# processar_dados_ano <- function(ano, geo) {
+#   db_sim <- fetch_datasus(
+#     year_start = ano,
+#     year_end = ano,
+#     information_system = "SIM-DOINF",
+#     vars = c(
+#       "SEXO",
+#       "CODMUNNATU",
+#       "LOCOCOR",
+#       "IDADEMAE",
+#       "ESCMAE",
+#       "QTDFILVIVO",
+#       "PARTO",
+#       "DTOBITO"
+#     )
+#   ) %>%
+#     process_sim() %>%
+#     mutate(ANO = ano) %>%
+#     processar_dados(geo, "CODMUNNATU")
+#   
+#   db_sinasc <- fetch_datasus(
+#     year_start = ano,
+#     year_end = ano,
+#     information_system = "SINASC",
+#     vars = c(
+#       "SEXO",
+#       "CODMUNRES",
+#       "LOCNASC",
+#       "IDADEMAE",
+#       "ESCMAE",
+#       "QTDFILVIVO",
+#       "PARTO",
+#       "DTNASC"
+#     )
+#   ) %>%
+#     process_sim() %>%
+#     mutate(ANO = ano) %>%
+#     processar_dados(geo, "CODMUNRES")
+#   
+#   db_cnes <- map_dfr(1:12, function(mes) {
+#     fetch_datasus(
+#       year_start = ano,
+#       year_end = ano,
+#       month_start = mes,
+#       month_end = mes,
+#       information_system = "CNES-ST",
+#       vars = c("CODUFMUN", "TP_UNID")
+#     ) %>%
+#       mutate(ANO = ano, MES = mes)
+#   }) %>%
+#     processar_dados(geo, "CODUFMUN")
+#   
+#   list(db_sim = db_sim,
+#        db_sinasc = db_sinasc,
+#        db_cnes = db_cnes)
+# }
+# 
+# resultados <- map(2014:2019, ~ processar_dados_ano(.x, geo))
+# 
+# # Separando os dados
+# 
+# minf <- map_dfr(resultados, "db_sim")
+# ninf <- map_dfr(resultados, "db_sinasc")
+# cnes <- map_dfr(resultados, "db_cnes")
+# 
+# # Salvando os dados
+# 
+# save(minf, file = "minf.Rdata")
+# save(ninf, file = "ninf.Rdata")
+# save(cnes, file = "cnes.Rdata")
+# 
+# # Removendo os dados desnecessários
+# 
+# rm(minf, ninf, cnes, resultados)
 
 # Carregando os Dados Finais Para o Estudo
 
@@ -305,8 +341,8 @@ combined_hex <- wrap_plots(hex_graficos, nrow = 2) +
     title = "Mortalidade Infantil nas MicroRegiões da Saúde (2014-2019)",
     subtitle = "Análise Geográfica das Ocorrências de Mortalidade Infantil",
     theme = theme(
-      plot.title = element_text(hjust = 0.5, size = 16, face = "bold"),
-      plot.subtitle = element_text(hjust = 0.5, size = 12)
+      plot.title = element_text(hjust = 0.5, size = 20, face = "bold"),
+      plot.subtitle = element_text(hjust = 0.5, size = 16)
     )
   )
 
@@ -360,9 +396,9 @@ gerar_grafico_violino <- function(df,
     scale_fill_manual(values = fill_colors) +
     theme_classic(base_size = 15) +
     theme(
-      plot.title = element_text(hjust = 0.5, face = "bold"),
-      plot.subtitle = element_text(hjust = 0.5),
-      axis.text.x = element_text(angle = 45, hjust = 1),
+      plot.title = element_text(hjust = 0.5, size = 20 ,face = "bold"),
+      plot.subtitle = element_text(hjust = 0.5, size = 16),
+      axis.text.x = element_text(angle = 0, hjust = 1, size = 15),
       legend.position = "none",
       panel.grid.major = element_blank(),
       panel.grid.minor = element_blank(),
@@ -419,6 +455,14 @@ gerar_grafico_linha <- function(df,
       fill = "white",
       stroke = 1.5
     ) +
+    stat_summary(
+      fun = sum,
+      geom = "text",
+      aes(label = ..y..),
+      vjust = -1.5,
+      color = point_color,
+      size = 5
+    ) +
     labs(
       title = title,
       subtitle = subtitle,
@@ -431,10 +475,11 @@ gerar_grafico_linha <- function(df,
       plot.title = element_text(
         hjust = 0.5,
         face = "bold",
-        size = 16
+        size = 20
       ),
-      plot.subtitle = element_text(hjust = 0.5, size = 12),
-      axis.text.x = element_text(angle = 45, hjust = 1),
+      plot.subtitle = element_text(hjust = 0.5, size = 16),
+      axis.text.x = element_text(angle = 0, size = 15, hjust = 1),
+      axis.text.y = element_text(size = 15),  
       panel.grid.major = element_blank(),
       panel.grid.minor = element_blank(),
       panel.background = element_rect(fill = background_color, color = NA),
@@ -456,6 +501,7 @@ grafico_linha <- gerar_grafico_linha(
 )
 
 grafico_linha
+
 
 # Estatísticas Descritivas
 
@@ -708,9 +754,9 @@ gerar_grafico_violino_natalidade <- function(df,
     scale_fill_manual(values = fill_colors) +
     theme_classic(base_size = 15) +
     theme(
-      plot.title = element_text(hjust = 0.5, face = "bold"),
-      plot.subtitle = element_text(hjust = 0.5),
-      axis.text.x = element_text(angle = 45, hjust = 1),
+      plot.title = element_text(hjust = 0.5, size = 20,face = "bold"),
+      plot.subtitle = element_text(hjust = 0.5, size = 16),
+      axis.text.x = element_text(angle = 0, size = 15 ,hjust = 1),
       legend.position = "none",
       panel.grid.major = element_blank(),
       panel.grid.minor = element_blank(),
@@ -767,6 +813,14 @@ gerar_grafico_linha_natalidade <- function(df,
       fill = "white",
       stroke = 1.5
     ) +
+    stat_summary(
+      fun = sum,
+      geom = "text",
+      aes(label = ..y..),
+      vjust = -0.8,
+      color = point_color,
+      size = 5
+      )+
     labs(
       title = title,
       subtitle = subtitle,
@@ -779,10 +833,10 @@ gerar_grafico_linha_natalidade <- function(df,
       plot.title = element_text(
         hjust = 0.5,
         face = "bold",
-        size = 16
+        size = 20
       ),
-      plot.subtitle = element_text(hjust = 0.5, size = 12),
-      axis.text.x = element_text(angle = 45, hjust = 1),
+      plot.subtitle = element_text(hjust = 0.5, size = 16),
+      axis.text.x = element_text(angle = 0, size = 15, hjust = 1),
       panel.grid.major = element_blank(),
       panel.grid.minor = element_blank(),
       panel.background = element_rect(fill = background_color, color = NA),
@@ -933,8 +987,8 @@ combined_hex_razao <- wrap_plots(hex_graficos_razao, nrow = 2) +
     title = "Taxa de Mortalidade Infantil nas MicroRegiões da Saúde (2014-2019)",
     subtitle = "Análise Geográfica da Taxa de Mortalidade Infantil",
     theme = theme(
-      plot.title = element_text(hjust = 0.5, size = 16, face = "bold"),
-      plot.subtitle = element_text(hjust = 0.5, size = 12)
+      plot.title = element_text(hjust = 0.5, size = 20, face = "bold"),
+      plot.subtitle = element_text(hjust = 0.5, size = 16)
     )
   )
 
@@ -989,9 +1043,9 @@ gerar_grafico_violino_razao <- function(df,
     scale_fill_manual(values = fill_colors) +
     theme_classic(base_size = 15) +
     theme(
-      plot.title = element_text(hjust = 0.5, face = "bold"),
-      plot.subtitle = element_text(hjust = 0.5),
-      axis.text.x = element_text(angle = 45, hjust = 1),
+      plot.title = element_text(hjust = 0.5, size = 20,face = "bold"),
+      plot.subtitle = element_text(hjust = 0.5, size = 15),
+      axis.text.x = element_text(angle = 0, size = 15, hjust = 1),
       legend.position = "none",
       panel.grid.major = element_blank(),
       panel.grid.minor = element_blank(),
@@ -1044,6 +1098,14 @@ gerar_grafico_linha_razao_anual <- function(df,
       fill = "white",
       stroke = 1.5
     ) +
+    stat_summary(
+      fun = sum,
+      geom = "text",
+      aes(label = round(after_stat(y), 2)),
+      vjust = -0.8,
+      color = point_color,
+      size = 5
+    ) +
     labs(
       title = title,
       subtitle = subtitle,
@@ -1056,10 +1118,10 @@ gerar_grafico_linha_razao_anual <- function(df,
       plot.title = element_text(
         hjust = 0.5,
         face = "bold",
-        size = 16
+        size = 20
       ),
-      plot.subtitle = element_text(hjust = 0.5, size = 12),
-      axis.text.x = element_text(angle = 45, hjust = 1),
+      plot.subtitle = element_text(hjust = 0.5, size = 16),
+      axis.text.x = element_text(angle = 0, size = 15,hjust = 1),
       panel.grid.major = element_blank(),
       panel.grid.minor = element_blank(),
       panel.background = element_rect(fill = background_color, color = NA),
@@ -1117,8 +1179,8 @@ razao_sd <- round(c(
   sd(combined_df$razao_mortalidade_natalidade[combined_df$ano == 2019], na.rm = TRUE)
 ), 2)
 
-título_razao <- "Estatísticas Descritivas da Razão Mortalidade/Natalidade"
-subtitulo_razao <- "Análise Descritiva da Razão Mortalidade/Natalidade por Ano"
+título_razao <- "Estatísticas Descritivas da Taxa de Mortalidade Infantil"
+subtitulo_razao <- "Análise Descritiva da Taxa de Mortalidade Infantil por Ano"
 fonte_razao <- "Fonte: DataSUS"
 nomes_colunas_razao <- c("2014", "2015", "2016", "2017", "2018", "2019")
 nomes_linhas_razao <- c("Média", "Mínimo", "Máximo", "Desvio Padrão")
@@ -1224,8 +1286,8 @@ combined_hex_cnes <- wrap_plots(hex_graficos_cnes, nrow = 2) +
     title = "Estabelecimentos de Saúde nas MicroRegiões da Saúde (2014-2019)",
     subtitle = "Análise Geográfica do Nº Hospitais",
     theme = theme(
-      plot.title = element_text(hjust = 0.5, size = 16, face = "bold"),
-      plot.subtitle = element_text(hjust = 0.5, size = 12)
+      plot.title = element_text(hjust = 0.5, size = 20, face = "bold"),
+      plot.subtitle = element_text(hjust = 0.5, size = 16)
     )
   )
 
@@ -1287,12 +1349,65 @@ combined_hex_cnes_delta <- wrap_plots(hex_graficos_cnes_delta, nrow = 2) +
     title = "Criação de Estabelecimentos de Saúde nas MicroRegiões da Saúde (2015-2019)",
     subtitle = "Análise Geográfica da Criação de Hospitais",
     theme = theme(
-      plot.title = element_text(hjust = 0.5, size = 16, face = "bold"),
-      plot.subtitle = element_text(hjust = 0.5, size = 12)
+      plot.title = element_text(hjust = 0.5, size = 20, face = "bold"),
+      plot.subtitle = element_text(hjust = 0.5, size = 16)
     )
   )
 
 combined_hex_cnes_delta
+
+
+## Gráfico de Barras da criação de Hospitais por ano
+
+contagem_microregioes <- cnes_grouped_clean_delta %>%
+  filter(delta_hospitais > 0) %>%  
+  group_by(ANO) %>%                
+  summarise(num_microregioes = n_distinct(MICROCOD))  
+
+# Função para gerar o gráfico de barras com o número de microregiões
+gerar_grafico_barras_cnes <- function(df,
+                                      title = "Criação de Estabelecimentos de Saúde por Ano",
+                                      subtitle = NULL,
+                                      xlab = "Ano",
+                                      ylab = "Número de Microregiões",
+                                      fill_color = "#00a886") {
+  ggplot(df, aes(
+    x = as.factor(ANO),
+    y = num_microregioes,
+    fill = as.factor(ANO)
+  )) +
+    geom_bar(stat = "identity", fill = fill_color) +
+    labs(
+      title = title,
+      subtitle = subtitle,
+      x = xlab,
+      y = ylab,
+      caption = "Fonte: DataSUS"
+    ) +
+    theme_classic(base_size = 15) +
+    theme(
+      plot.title = element_text(hjust = 0.5, size = 20,face = "bold"),
+      plot.subtitle = element_text(hjust = 0.5, size = 16),
+      axis.text.x = element_text(angle = 0, size = 15 ,hjust = 1),
+      legend.position = "none",
+      panel.grid.major = element_blank(),
+      panel.grid.minor = element_blank(),
+      panel.border = element_blank(),
+      axis.ticks = element_blank()
+    )
+}
+
+
+grafico_barras_cnes <- gerar_grafico_barras_cnes(
+  contagem_microregioes,
+  title = "Quantidade de Microregiões que Receberam Hospitais por Ano",
+  subtitle = "Número de microregiões com novos hospitais a cada ano",
+  xlab = "Ano",
+  ylab = "Número de Microregiões"
+)
+
+grafico_barras_cnes
+
 
 ## Gráficos de Violino
 
@@ -1342,9 +1457,9 @@ gerar_grafico_violino_cnes <- function(df,
     scale_fill_manual(values = fill_colors) +
     theme_classic(base_size = 15) +
     theme(
-      plot.title = element_text(hjust = 0.5, face = "bold"),
-      plot.subtitle = element_text(hjust = 0.5),
-      axis.text.x = element_text(angle = 45, hjust = 1),
+      plot.title = element_text(hjust = 0.5, size = 20, face = "bold"),
+      plot.subtitle = element_text(hjust = 0.5, size = 16),
+      axis.text.x = element_text(angle = 45, size = 15, hjust = 1),
       legend.position = "none",
       panel.grid.major = element_blank(),
       panel.grid.minor = element_blank(),
@@ -1400,6 +1515,14 @@ gerar_grafico_linha_cnes <- function(df,
       shape = 21,
       fill = "white",
       stroke = 1.5
+    ) +
+    stat_summary(
+      fun = sum,
+      geom = "text",
+      aes(label = round(after_stat(y), 2)),
+      vjust = -0.8,
+      color = point_color,
+      size = 5
     ) +
     labs(
       title = title,
@@ -1695,17 +1818,18 @@ ggplot(plot_data,
     "Antes do Tratamento" = "#00BFFF",
     "Após o Tratamento" =   "#0000CD"
   )) +
+  scale_x_continuous(limits = c(-4, 5), breaks = -4:4) +
   theme_minimal(base_size = 15) +
   ylim(-200, 400) +
   theme(
-    plot.title = element_text(face = "bold", hjust = 0.5),
-    plot.subtitle = element_text(hjust = 0.5, color = "gray40"),
+    plot.title = element_text(face = "bold", size = 20,hjust = 0.5),
+    plot.subtitle = element_text(hjust = 0.5, size = 20,color = "gray40"),
     axis.title = element_text(face = "bold"),
     axis.text = element_text(color = "gray40"),
     legend.title = element_blank(),
     legend.position = "bottom",
     panel.grid = element_blank()
-  )
+  ) 
 
 agg_plot_data <- data.frame(Tempo = efeito_aggregado$egt, Efeito = efeito_aggregado$att.egt)
 
@@ -1731,10 +1855,10 @@ ggplot(agg_plot_data, aes(x = factor(Tempo), y = Efeito, fill = Tratamento)) +
   geom_hline(yintercept = 0, color = "black") +
   theme_minimal(base_size = 15) +
   theme(
-    plot.title = element_text(face = "bold", hjust = 0.5),
+    plot.title = element_text(face = "bold", size = 20,hjust = 0.5),
     axis.title = element_text(face = "bold"),
     axis.text.x = element_text(
-      angle = 45,
+      angle = 0,
       hjust = 1,
       color = "gray40"
     ),
