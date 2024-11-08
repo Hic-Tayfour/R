@@ -27,6 +27,7 @@ library(fixest)      # Modelos econométricos com correção de heterocedasticid
 library(urca)        # Testes de raiz unitária e cointegração - https://cran.r-project.org/web/packages/urca/urca.pdf
 library(seasonal)    # Ajuste sazonal para séries temporais - https://cran.r-project.org/web/packages/seasonal/seasonal.pdf
 library(did)         # Análise de impacto com modelos de diferenças em diferenças - https://cran.r-project.org/web/packages/did/did.pdf
+library(vars)        # Modelagem séries temporais via vetores autoregressivos - https://cran.r-project.org/web/packages/vars/vars.pdf
 
 # Visualização de Dados
 library(ggplot2)     # Criação de gráficos (parte do tidyverse) - https://cran.r-project.org/web/packages/ggplot2/ggplot2.pdf
