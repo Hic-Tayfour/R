@@ -28,7 +28,10 @@ Aqui você encontrará meus trabalhos feitos na faculdade, sendo a maioria relac
   - [Trabalho Final](https://github.com/Hic-Tayfour/R/tree/main/College%20Works/Trabalho%20Final%20Micro%20IV)
 
 - **Modelagem Preditiva**:
-  - [APS 1 2024.2 (Modelagem Preditiva)](https://github.com/Hic-Tayfour/R/tree/main/College%20Works/APS%201%202024.2%20(Mod%20Pred))   
+  - [APS 1 2024.2 (Modelagem Preditiva)](https://github.com/Hic-Tayfour/R/tree/main/College%20Works/APS%201%202024.2%20(Mod%20Pred))
+
+- **Problemas em Economia**
+  - [PEE 2025.1](https://github.com/Hic-Tayfour/R/tree/main/College%20Works/PEE%202025.1) 
 
 Atenciosamente,  
 Hicham Tayfour
