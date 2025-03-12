@@ -14,6 +14,18 @@ library(gt)        # Tabelas Formatadas
 
 # 📃 Importando as Bases de Dados ----
 
+## Dados de CBI (Central Bank Independence)
+
+cbi <- read_excel("CBIDta.xlsx", sheet = "CBI data") %>% 
+  select(country, year, iso_a3, cbie_index) %>% 
+  mutate(pais = country ,
+         ano = 
+         sigla_FMI = iso_a3,
+         scbi =  cbie_index
+         ) %>% 
+  select(pais, sigla_FMI, scbi)
+
+
 ## BR Dados do Brasil ----
 "
 Aqui teremos dados Macroeconômicos sobre o Brasil , como por exemplo :
