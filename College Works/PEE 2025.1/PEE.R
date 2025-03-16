@@ -19,11 +19,11 @@ library(gt)        # Tabelas Formatadas
 cbi <- read_excel("CBIDta.xlsx", sheet = "CBI data") %>% 
   select(country, year, iso_a3, cbie_index) %>% 
   mutate(pais = country ,
-         ano = 
+         ano = year,
          sigla_FMI = iso_a3,
          scbi =  cbie_index
          ) %>% 
-  select(pais, sigla_FMI, scbi)
+  select(pais, ano, sigla_FMI, scbi)
 
 
 ## BR Dados do Brasil ----
@@ -159,6 +159,73 @@ Aqui teremos dados Macroeconômicos sobre o Chile , como por exemplo :
 7- Taxa de Juros Real 
 "
 
+### PIB Real Trimestral, Sazonalmente Ajustado
+
+pibt_chi <- tq_get("NAEXKP01CLQ661S", get = "economic.data", from = "1900-01-01") %>%
+  select(-symbol) %>%
+  mutate(data = as.Date(date), pibt = price) %>%
+  select(data, pibt)
+
+### PIB Real Anual
+
+piba_chi <- tq_get("NGDPRXDCCHL", get = "economic.data", from = "1900-01-01") %>%
+  select(-symbol) %>%
+  mutate(data = as.Date(date), piba = price) %>%
+  select(data, piba)
+
+### PIB Potencial (Filtro HP)
+
+hp_filtert_chi <- hpfilter(pibt_chi$pibt, freq = 1600)
+hp_filtera_chi <- hpfilter(piba_chi$piba, freq = 100)
+
+### Hiato do Produto - Trimestral
+
+pibt_chi <- pibt_chi %>%
+  mutate(
+    PIB_potencial = as.numeric(hp_filtert_chi$trend),
+    hiato_produto = ((pibt - PIB_potencial) / PIB_potencial) * 100
+  )
+
+### Hiato do Produto - Anual
+
+piba_chi <- piba_chi %>%
+  mutate(
+    PIB_potencial = as.numeric(hp_filtera_chi$trend),
+    hiato_produto = ((piba - PIB_potencial) / PIB_potencial) * 100
+  )
+
+### Inflação Mensal
+
+infm_chi <- tq_get("CHLCPIALLMINMEI", get = "economic.data", from = "1900-01-01") %>%
+  select(-symbol) %>%
+  mutate(data = as.Date(date), cpi = price) %>%
+  mutate(inflacao_mensal = (cpi/lag(cpi, 1) - 1)*100) %>%
+  select(data, inflacao_mensal)
+
+### Inflação Anual
+
+infa_chi <- tq_get("FPCPITOTLZGCHL", get = "economic.data", from = "1900-01-01") %>%
+  select(-symbol) %>%
+  mutate(data = as.Date(date), inflacaoa = price) %>%
+  select(data, inflacaoa)
+
+### Taxa de Juros Nominal (ex: Interbancária 3m)
+
+tj_chi <- tq_get("IR3TIB01CLM156N", get = "economic.data", from = "1900-01-01") %>%
+  select(-symbol) %>%
+  mutate(data = as.Date(date), juros_nom = price) %>%
+  select(data, juros_nom)
+
+### Taxa de Juros Real
+
+juros_reais_chi <- tj_chi %>%
+  left_join(
+    infm_chi %>% rename(inflacao_mensal_chi = inflacao_mensal),
+    by = "data"
+  ) %>%
+  mutate(
+    juros_real = juros_nom - inflacao_mensal_chi  # Ex-post simples
+  )
 ## ARG Dados da Peru ----
 "
 Aqui teremos dados Macroeconômicos sobre o Peru , como por exemplo :
@@ -184,6 +251,70 @@ Aqui teremos dados Macroeconômicos sobre o México , como por exemplo :
 6- Taxa de Juros Nominal
 7- Taxa de Juros Real 
 "
+
+### PIB Real Trimestral, Sazonalmente Ajustado
+
+pibt_mex <- tq_get("NGDPRSAXDCMXQ", get="economic.data", from="1900-01-01") %>%
+  select(-symbol) %>%
+  mutate(data = as.Date(date), pibt = price) %>%
+  select(data, pibt)
+
+### PIB Real Anual
+
+piba_mex <- tq_get("NGDPRXDCMXA", get="economic.data", from="1900-01-01") %>%
+  select(-symbol) %>%
+  mutate(data = as.Date(date), piba = price) %>%
+  select(data, piba)
+
+### PIB Potencial (Filtro HP)
+
+hp_filtert_mex <- hpfilter(pibt_mex$pibt, freq = 1600)
+hp_filtera_mex <- hpfilter(piba_mex$piba, freq = 100)
+
+### Hiato do Produto - Trimestral
+
+pibt_mex <- pibt_mex %>%
+  mutate(
+    PIB_potencial = as.numeric(hp_filtert_mex$trend),
+    hiato_produto = ((pibt - PIB_potencial) / PIB_potencial) * 100
+  )
+
+### Hiato do Produto - Anual
+piba_mex <- piba_mex %>%
+  mutate(
+    PIB_potencial = as.numeric(hp_filtera_mex$trend),
+    hiato_produto = ((piba - PIB_potencial) / PIB_potencial) * 100
+  )
+
+### Inflação Mensal
+
+infm_mex <- tq_get("MEXCPIALLMINMEI", get="economic.data", from="1900-01-01") %>%
+  select(-symbol) %>%
+  mutate(data = as.Date(date), cpi = price) %>%
+  mutate(inflacao_mensal = (cpi / lag(cpi, 1) - 1) * 100) %>%
+  select(data, inflacao_mensal)
+
+### Inflação Anual
+
+infa_mex <- tq_get("FPCPITOTLZGMEX", get="economic.data", from="1900-01-01") %>%
+  select(-symbol) %>%
+  mutate(data = as.Date(date), inflacaoa = price) %>%
+  select(data, inflacaoa)
+
+### Taxa de Juros Nominal
+
+tj_mex <- tq_get("IR3TIB01MXM156N", get="economic.data", from="1900-01-01") %>%
+  select(-symbol) %>%
+  mutate(data = as.Date(date), juros_nom = price) %>%
+  select(data, juros_nom)
+
+### Taxa de Juros Real
+
+juros_reais_mex <- tj_mex %>%
+  left_join(infm_mex, by = "data") %>%
+  mutate(
+    juros_real = juros_nom - inflacao_mensal
+  )
 
 ## CO Dados da Colômbia ----
 "
