@@ -8,710 +8,76 @@ library(ggthemes)  # Gráficos
 library(seasonal)  # Ajuste sazonal para séries temporais
 library(mFilter)   # Filtro HP 
 library(readxl)    # Leitura de arquivos excel
-library(sidrar)    # Baixar dados do IBGE    
+library(sidrar)    # Baixar dados do IBGE 
+library(zoo)       # Datas trimestrais
 library(gt)        # Tabelas Formatadas
 
 
-# 📃 Importando as Bases de Dados ----
+# 📃 Importando e Ajustando as Bases de Dados ----
 
-## Dados de CBI (Central Bank Independence)
+gdp <- read_xlsx("GDP.xlsx", 
+                 sheet = "Data") %>%
+  mutate(across(-c(Country, Scale, `Base Year`), as.character)) %>% 
+  pivot_longer(cols = -c(Country, Scale, `Base Year`), 
+               names_to = "Periodo", 
+               values_to = "GDP") %>%
+  mutate(Periodo = as.yearqtr(Periodo, format = "%YQ%q"),
+         GDP = as.numeric(GDP)) 
 
-cbi <- read_excel("CBIDta.xlsx", sheet = "CBI data") %>% 
-  select(country, year, iso_a3, cbie_index) %>% 
-  mutate(pais = country ,
-         ano = year,
-         sigla_FMI = iso_a3,
-         scbi =  cbie_index
-         ) %>% 
-  select(pais, ano, sigla_FMI, scbi)
+cbi <- read_xlsx("CBIDta.xlsx", sheet = "Data") %>%
+  select(country, iso_a3, year, cbie_index) %>%  
+  rename(Ano = year) %>%
+  mutate(Ano = as.numeric(Ano))
 
 
-## BR Dados do Brasil ----
-"
-Aqui teremos dados Macroeconômicos sobre o Brasil , como por exemplo :
-1- PIB Real Trimetsral , Sazonalmente Ajustado
-2- PIB Real Anual
-3- PIB Potêncial (Filtro HP)
-4- Hiato do Produto
-5- Inflação Mensal
-5- Inflação Anual 
-6- Taxa de Juros Nominal
-7- Taxa de Juros Real 
-"
-### PIB Real Trimestral, Sazonalmente Ajustado
+rate <- read_xlsx("CBRatePolicy(%).xlsx", 
+                  sheet = "Data") %>%
+  mutate(across(-c(Country, Scale, `Base Year`), as.character)) %>% 
+  pivot_longer(cols = -c(Country, Scale, `Base Year`), 
+               names_to = "Periodo", 
+               values_to = "Rate") %>%
+  mutate(Periodo = as.yearqtr(Periodo, format = "%YQ%q"),
+         Rate = as.numeric(Rate)) 
 
-pibt_br <- tq_get("NGDPRSAXDCBRQ", get = "economic.data", from = "1900-01-01") %>%
-  select(-symbol) %>%
-  mutate(data = as.Date(date), pibt = price) %>%
-  select(data, pibt)
 
-### PIB Real Anual
-
-piba_br <- tq_get("NGDPRXDCBRA", get = "economic.data", from = "1900-01-01") %>%
-  select(-symbol) %>%
-  mutate(data = as.Date(date), piba = price) %>%
-  select(data, piba)
-
-### PIB Potencial (Filtro HP)
-
-hp_filtert <- hpfilter(pibt_br$pibt, freq = 1600)  
-hp_filtera <- hpfilter(piba_br$piba, freq = 100)  
-
-### Hiato do Produto - Trimestral
-
-pibt_br <- pibt_br %>%
+cpi <- read_xlsx("CPI(%).xlsx", sheet = "Data") %>%
+  rename_with(~ gsub("Q([1-4]) (\\d{4})", "\\2Q\\1", .x), -Country) %>%  
+  pivot_longer(cols = -Country, names_to = "Periodo", values_to = "CPI") %>%
   mutate(
-    PIB_potencial = as.numeric(hp_filtert$trend),
-    hiato_produto = ((pibt - PIB_potencial) / PIB_potencial) * 100
+    Periodo = as.yearqtr(Periodo, format = "%YQ%q"),
+    CPI = as.numeric(CPI)
   )
 
-### Hiato do Produto - Anual
+data <- gdp %>%
+  select(Country, Periodo, GDP) %>% 
+  inner_join(cpi, by = c("Country", "Periodo")) %>%
+  inner_join(rate, by = c("Country", "Periodo"))%>%
+  select(Country, Periodo, GDP, CPI, Rate)
 
-piba_br <- piba_br %>%
-  mutate(
-    PIB_potencial = as.numeric(hp_filtera$trend),
-    hiato_produto = ((piba - PIB_potencial) / PIB_potencial) * 100
-  )
+cbi <- read_xlsx("CBIDta.xlsx", sheet = "Data") %>%
+  select(country, iso_a3, year, cbie_index) %>%  
+  rename(Ano = year) %>%
+  mutate(Ano = as.numeric(Ano)) %>%
+  crossing(Trimestre = c("Q1", "Q2", "Q3", "Q4")) %>%
+  mutate(Periodo = as.yearqtr(paste0(Ano, " ", Trimestre), format = "%Y Q%q")) %>%
+  select(country, iso_a3, Periodo, cbie_index)
 
-### Inflação Mensal
-
-infm_br <- get_sidra(api = "/t/1737/n1/all/v/63/p/all/d/v63%202") %>% 
-  select(Mês, Valor) %>%
-  rename(data = Mês, inflacaom = Valor) %>%
-  mutate(data = dmy(paste0("01 ", data)))
-
-### Inflação Anual
-
-infa_br <- tq_get("FPCPITOTLZGBRA", get = "economic.data", from = "1900-01-01") %>%
-  select(-symbol) %>%
-  mutate(data = as.Date(date), inflacaoa = price) %>%
-  select(data, inflacaoa)
-
-### Índice do IPCA
-
-ipca <- get_sidra(api = "/t/1737/n1/all/v/2265/p/all/d/v2265%202") %>%
-  select(data = `Mês (Código)`, ipca_indice = `Valor`) %>%
-  mutate(data = ymd(paste0(data, "-01"))) %>%
-  filter(year(data) >= 1999)
-
-### Metas de Inflação Brasil
-
-meta_inflacao <- tibble(
-  data_inicio = as.Date(c("1999-01-01", "2000-01-01", "2001-01-01", "2002-01-01",
-                          "2003-01-01", "2004-01-01", "2005-01-01", "2006-01-01",
-                          "2007-01-01", "2008-01-01", "2009-01-01", "2010-01-01",
-                          "2011-01-01", "2012-01-01", "2013-01-01", "2014-01-01",
-                          "2015-01-01", "2016-01-01", "2017-01-01", "2018-01-01",
-                          "2019-01-01", "2020-01-01", "2021-01-01", "2022-01-01",
-                          "2023-01-01", "2024-01-01", "2025-01-01")),
-  meta = c(8, 6, 4, 3.5, 4, 5.5, 4.5, 4.5, 4.5, 4.5, 4.5, 4.5, 
-           4.5, 4.5, 4.5, 4.5, 4.5, 4.5, 4.5, 4.5, 4.25, 4.0, 3.75, 
-           3.5, 3.25, 3, 3),
-  intervalo = c(2, 2, 2, 2, 2.5, 2.5, 2.5, 2, 2, 2, 2, 2, 2, 2, 
-                2, 2, 2, 2, 1.5, 1.5, 1.5, 1.5, 1.5, 1.5, 1.5, 1.5, 1.5)
-) %>%
-  mutate(
-    limite_sup = meta + intervalo,
-    limite_inf = meta - intervalo,
-    meta_star = ifelse(data_inicio == as.Date("2003-01-01"), 3.25,
-                       ifelse(data_inicio == as.Date("2004-01-01"), 3.75, NA_real_)),
-    intervalo_star = ifelse(data_inicio == as.Date("2003-01-01"), 2,
-                            ifelse(data_inicio == as.Date("2004-01-01"), 2.5, NA_real_)),
-    limite_sup_star = ifelse(!is.na(meta_star), meta_star + intervalo_star, NA_real_),
-    limite_inf_star = ifelse(!is.na(meta_star), meta_star - intervalo_star, NA_real_)
-  )
-
-
-### Unindo IPCA com Metas de Inflação
-
-ipca <- ipca %>%
-  mutate(ano = year(data)) %>%
-  left_join(meta_inflacao %>%
-              mutate(ano = year(data_inicio)), by = "ano") %>%
-  select(data, ipca_indice, meta, limite_sup, limite_inf, 
-         meta_star, limite_sup_star, limite_inf_star)
-
-### Taxa de Juros Nominal (Selic)
-
-selicm <- tq_get("IRSTCI01BRM156N", get = "economic.data", from = "1900-01-01") %>%
-  select(-symbol) %>%
-  mutate(data = as.Date(date), selicm = price) %>%
-  select(data, selicm)
-
-### Taxa de Juros Real
-
-juros_reais_br <- selicm %>%
-  left_join(infm_br, by = "data") %>%
-  mutate(
-    juros_real = (((1 + selicm / 100) / (1 + inflacaom / 100)) - 1 ) * 100
-  )
-
-## CHI Dados do Chile ----
-"
-Aqui teremos dados Macroeconômicos sobre o Chile , como por exemplo :
-1- PIB Real Trimetsral , Sazonalmente Ajustado
-2- PIB Real Anual
-3- PIB Potêncial (Filtro HP)
-4- Hiato do Produto
-5- Inflação Mensal
-5- Inflação Anual 
-6- Taxa de Juros Nominal
-7- Taxa de Juros Real 
-"
-
-### PIB Real Trimestral, Sazonalmente Ajustado
-
-pibt_chi <- tq_get("NAEXKP01CLQ661S", get = "economic.data", from = "1900-01-01") %>%
-  select(-symbol) %>%
-  mutate(data = as.Date(date), pibt = price) %>%
-  select(data, pibt)
-
-### PIB Real Anual
-
-piba_chi <- tq_get("NGDPRXDCCHL", get = "economic.data", from = "1900-01-01") %>%
-  select(-symbol) %>%
-  mutate(data = as.Date(date), piba = price) %>%
-  select(data, piba)
-
-### PIB Potencial (Filtro HP)
-
-hp_filtert_chi <- hpfilter(pibt_chi$pibt, freq = 1600)
-hp_filtera_chi <- hpfilter(piba_chi$piba, freq = 100)
-
-### Hiato do Produto - Trimestral
-
-pibt_chi <- pibt_chi %>%
-  mutate(
-    PIB_potencial = as.numeric(hp_filtert_chi$trend),
-    hiato_produto = ((pibt - PIB_potencial) / PIB_potencial) * 100
-  )
-
-### Hiato do Produto - Anual
-
-piba_chi <- piba_chi %>%
-  mutate(
-    PIB_potencial = as.numeric(hp_filtera_chi$trend),
-    hiato_produto = ((piba - PIB_potencial) / PIB_potencial) * 100
-  )
-
-### Inflação Mensal
-
-infm_chi <- tq_get("CHLCPIALLMINMEI", get = "economic.data", from = "1900-01-01") %>%
-  select(-symbol) %>%
-  mutate(data = as.Date(date), cpi = price) %>%
-  mutate(inflacao_mensal = (cpi/lag(cpi, 1) - 1)*100) %>%
-  select(data, inflacao_mensal)
-
-### Inflação Anual
-
-infa_chi <- tq_get("FPCPITOTLZGCHL", get = "economic.data", from = "1900-01-01") %>%
-  select(-symbol) %>%
-  mutate(data = as.Date(date), inflacaoa = price) %>%
-  select(data, inflacaoa)
-
-### Taxa de Juros Nominal (ex: Interbancária 3m)
-
-tj_chi <- tq_get("IR3TIB01CLM156N", get = "economic.data", from = "1900-01-01") %>%
-  select(-symbol) %>%
-  mutate(data = as.Date(date), juros_nom = price) %>%
-  select(data, juros_nom)
-
-### Taxa de Juros Real
-
-juros_reais_chi <- tj_chi %>%
+data_full <- gdp %>%
+  select(Country, Periodo, GDP) %>% 
+  inner_join(cpi, by = c("Country", "Periodo")) %>%
+  inner_join(rate, by = c("Country", "Periodo")) %>%
+  select(Country, Periodo, GDP, CPI, Rate) %>%
   left_join(
-    infm_chi %>% rename(inflacao_mensal_chi = inflacao_mensal),
-    by = "data"
+    cbi %>% 
+      select(country, iso_a3, Periodo, cbie_index) %>%
+      rename(Country = country),
+    by = c("Country", "Periodo")
   ) %>%
-  mutate(
-    juros_real = juros_nom - inflacao_mensal_chi  # Ex-post simples
-  )
-## ARG Dados da Peru ----
-"
-Aqui teremos dados Macroeconômicos sobre o Peru , como por exemplo :
-1- PIB Real Trimetsral , Sazonalmente Ajustado
-2- PIB Real Anual
-3- PIB Potêncial (Filtro HP)
-4- Hiato do Produto
-5- Inflação Mensal
-5- Inflação Anual 
-6- Taxa de Juros Nominal
-7- Taxa de Juros Real 
-"
+  select(Country, iso_a3, Periodo, GDP, CPI, Rate, cbie_index) %>% 
+  rename(
+    Cod = iso_a3,
+    Cbi = cbie_index,
+    CPI_PerCent = CPI,
+    Rate_PerCent = Rate
+  ) 
 
-## MEX Dados do México ----
-"
-Aqui teremos dados Macroeconômicos sobre o México , como por exemplo :
-1- PIB Real Trimetsral , Sazonalmente Ajustado
-2- PIB Real Anual
-3- PIB Potêncial (Filtro HP)
-4- Hiato do Produto
-5- Inflação Mensal
-5- Inflação Anual 
-6- Taxa de Juros Nominal
-7- Taxa de Juros Real 
-"
-
-### PIB Real Trimestral, Sazonalmente Ajustado
-
-pibt_mex <- tq_get("NGDPRSAXDCMXQ", get="economic.data", from="1900-01-01") %>%
-  select(-symbol) %>%
-  mutate(data = as.Date(date), pibt = price) %>%
-  select(data, pibt)
-
-### PIB Real Anual
-
-piba_mex <- tq_get("NGDPRXDCMXA", get="economic.data", from="1900-01-01") %>%
-  select(-symbol) %>%
-  mutate(data = as.Date(date), piba = price) %>%
-  select(data, piba)
-
-### PIB Potencial (Filtro HP)
-
-hp_filtert_mex <- hpfilter(pibt_mex$pibt, freq = 1600)
-hp_filtera_mex <- hpfilter(piba_mex$piba, freq = 100)
-
-### Hiato do Produto - Trimestral
-
-pibt_mex <- pibt_mex %>%
-  mutate(
-    PIB_potencial = as.numeric(hp_filtert_mex$trend),
-    hiato_produto = ((pibt - PIB_potencial) / PIB_potencial) * 100
-  )
-
-### Hiato do Produto - Anual
-piba_mex <- piba_mex %>%
-  mutate(
-    PIB_potencial = as.numeric(hp_filtera_mex$trend),
-    hiato_produto = ((piba - PIB_potencial) / PIB_potencial) * 100
-  )
-
-### Inflação Mensal
-
-infm_mex <- tq_get("MEXCPIALLMINMEI", get="economic.data", from="1900-01-01") %>%
-  select(-symbol) %>%
-  mutate(data = as.Date(date), cpi = price) %>%
-  mutate(inflacao_mensal = (cpi / lag(cpi, 1) - 1) * 100) %>%
-  select(data, inflacao_mensal)
-
-### Inflação Anual
-
-infa_mex <- tq_get("FPCPITOTLZGMEX", get="economic.data", from="1900-01-01") %>%
-  select(-symbol) %>%
-  mutate(data = as.Date(date), inflacaoa = price) %>%
-  select(data, inflacaoa)
-
-### Taxa de Juros Nominal
-
-tj_mex <- tq_get("IR3TIB01MXM156N", get="economic.data", from="1900-01-01") %>%
-  select(-symbol) %>%
-  mutate(data = as.Date(date), juros_nom = price) %>%
-  select(data, juros_nom)
-
-### Taxa de Juros Real
-
-juros_reais_mex <- tj_mex %>%
-  left_join(infm_mex, by = "data") %>%
-  mutate(
-    juros_real = juros_nom - inflacao_mensal
-  )
-
-## CO Dados da Colômbia ----
-"
-Aqui teremos dados Macroeconômicos sobre a Colômbia , como por exemplo :
-1- PIB Real Trimetsral , Sazonalmente Ajustado
-2- PIB Real Anual
-3- PIB Potêncial (Filtro HP)
-4- Hiato do Produto
-5- Inflação Mensal
-5- Inflação Anual 
-6- Taxa de Juros Nominal
-7- Taxa de Juros Real 
-"
-
-# 📈 Gráficos ----
-
-## Brasil 
-(((
-  ggplot(pibt_br, aes(x = data)) +
-    geom_line(aes(y = pibt, color = "PIB Real"), linewidth = 1.2) +
-    geom_line(aes(y = PIB_potencial, color = "PIB Potencial"), linewidth = 1.2) +
-    labs(
-      title = "Evolução do PIB Real, PIB Potencial e Hiato do Produto",
-      subtitle = "Brasil - Série Temporal Trimestral (1996 - 2024)",
-      y = "PIB (milhões R$)",
-      x = NULL
-    ) +
-    scale_color_manual(
-      name = "Legenda",
-      values = c(
-        "PIB Real" = "#1F4E79",
-        "PIB Potencial" = "#81B1D6"
-      )
-    ) +
-    scale_x_date(
-      limits = c(min(pibt_br$data, na.rm = TRUE), max(pibt_br$data, na.rm = TRUE)),
-      date_labels = "%Y",
-      date_breaks = "2 years"
-    ) +
-    theme_minimal(base_size = 14) +
-    theme(
-      legend.position = "top",
-      legend.title = element_blank(),
-      plot.title = element_text(face = "bold", size = 16, hjust = 0.5),
-      plot.subtitle = element_text(size = 14, hjust = 0.5),
-      axis.text.x = element_blank(),
-      axis.ticks.x = element_blank(),
-      panel.grid.major.x = element_blank(),
-      panel.grid.minor = element_blank(),
-      panel.grid.major.y = element_line(color = "#d3c7ba"),
-      axis.line.x = element_blank(),
-      axis.line.y = element_line(color = "#b0a392")
-    )
-  
-)
-) / (
-  ggplot(pibt_br, aes(x = data, y = hiato_produto)) +
-    geom_line(color = "#2A9D8F", size = 1.2) +
-    labs(y = "Hiato (%)", x = "Ano") +
-    scale_y_continuous(limits = c(-max(abs(
-      range(pibt_br$hiato_produto, na.rm = TRUE)
-    )), max(abs(
-      range(pibt_br$hiato_produto, na.rm = TRUE)
-    )))) +
-    scale_x_date(
-      limits = c(min(pibt_br$data, na.rm = TRUE), max(pibt_br$data, na.rm = TRUE)),
-      date_labels = "%Y",
-      date_breaks = "2 years"
-    ) +
-    theme_minimal(base_size = 14) +
-    theme(
-      plot.title = element_text(face = "bold", size = 14, hjust = 0.5),
-      axis.text.x = element_text(
-        size = 12,
-        angle = 0,
-        hjust = 0.5
-      ),
-      panel.grid.major.x = element_blank(),
-      panel.grid.minor = element_blank(),
-      panel.grid.major.y = element_line(color = "#d3c7ba"),
-      axis.line = element_line(color = "#b0a392")
-    )
-)
-+
-  plot_annotation(
-    caption = "Fonte: IBGE | Gráfico Próprio",
-    theme = theme(plot.caption = element_text(
-      size = 12,
-      hjust = 0,
-      margin = margin(t = 10)
-    ))
-  )
-)
-
-# Evolução do PIB Real, PIB Potencial e Hiato do Produto Anual
-
-((
-  ggplot(piba_br, aes(x = data)) +
-    geom_line(aes(y = piba, color = "PIB Real"), linewidth = 1.2) +
-    geom_line(aes(y = PIB_potencial, color = "PIB Potencial"), linewidth = 1.2) +
-    labs(
-      title = "Evolução do PIB Real, PIB Potencial e Hiato do Produto",
-      subtitle = "Brasil - Série Temporal Anual (1996 - 2024)",
-      y = "PIB (milhões R$)",
-      x = NULL
-    ) +
-    scale_color_manual(
-      name = "Legenda",
-      values = c(
-        "PIB Real" = "#1F4E79",
-        "PIB Potencial" = "#81B1D6"
-      )
-    ) +
-    scale_x_date(
-      limits = c(min(piba_br$data, na.rm = TRUE), max(piba_br$data, na.rm = TRUE)),
-      date_labels = "%Y",
-      date_breaks = "2 years"
-    ) +
-    theme_minimal(base_size = 14) +
-    theme(
-      legend.position = "top",
-      legend.title = element_blank(),
-      plot.title = element_text(face = "bold", size = 16, hjust = 0.5),
-      plot.subtitle = element_text(size = 14, hjust = 0.5),
-      axis.text.x = element_blank(),
-      axis.ticks.x = element_blank(),
-      panel.grid.major.x = element_blank(),
-      panel.grid.minor = element_blank(),
-      panel.grid.major.y = element_line(color = "#d3c7ba"),
-      axis.line.x = element_blank(),
-      axis.line.y = element_line(color = "#b0a392")
-    )
-  
-) / (
-  ggplot(piba_br, aes(x = data, y = hiato_produto)) +
-    geom_line(color = "#2A9D8F", size = 1.2) +
-    labs(y = "Hiato (%)", x = "Ano") +
-    scale_y_continuous(limits = c(-max(abs(
-      range(piba_br$hiato_produto, na.rm = TRUE)
-    )), max(abs(
-      range(piba_br$hiato_produto, na.rm = TRUE)
-    )))) +
-    scale_x_date(
-      limits = c(min(piba_br$data, na.rm = TRUE), max(piba_br$data, na.rm = TRUE)),
-      date_labels = "%Y",
-      date_breaks = "2 years"
-    ) +
-    theme_minimal(base_size = 14) +
-    theme(
-      plot.title = element_text(face = "bold", size = 14, hjust = 0.5),
-      axis.text.x = element_text(
-        size = 12,
-        angle = 0,
-        hjust = 0.5
-      ),
-      panel.grid.major.x = element_blank(),
-      panel.grid.minor = element_blank(),
-      panel.grid.major.y = element_line(color = "#d3c7ba"),
-      axis.line = element_line(color = "#b0a392")
-    )
-)
-) +
-  plot_annotation(
-    caption = "Fonte: IBGE | Gráfico Próprio",
-    theme = theme(
-      plot.caption = element_text(size = 12, hjust = 0, margin = margin(t = 10))
-    )
-  )
-
-# Taxa Selic, Juros Reais e Inflação Mensal
-
-((
-  ggplot(juros_reais_br, aes(x = data)) +
-    geom_line(aes(y = selicm, color = "Taxa Selic"), linewidth = 1.2) +
-    geom_line(aes(y = juros_real, color = "Juros Reais"), linewidth = 1.2) +
-    labs(
-      title = "Evolução da Taxa Selic, Juros Reais e Inflação Mensal",
-      subtitle = "Brasil - Série Temporal",
-      y = "Percentual (%)",
-      x = NULL
-    ) +
-    scale_color_manual(values = c(
-      "Taxa Selic" = "#1F4E79",
-      "Juros Reais" = "#2A9D8F"
-    )) +
-    scale_x_date(
-      limits = c(
-        min(juros_reais_br$data, na.rm = TRUE),
-        max(juros_reais_br$data, na.rm = TRUE)
-      ),
-      date_labels = "%Y",
-      date_breaks = "2 years"
-    ) +
-    theme_minimal(base_size = 14) +
-    theme(
-      legend.position = "top",
-      legend.title = element_blank(),
-      legend.spacing.x = unit(0.5, "cm"),
-      plot.title = element_text(face = "bold", size = 16, hjust = 0.5),
-      plot.subtitle = element_text(
-        size = 14,
-        hjust = 0.5,
-        margin = margin(b = 10)
-      ),
-      axis.text.x = element_blank(),
-      axis.ticks.x = element_blank(),
-      panel.grid.major.x = element_blank(),
-      panel.grid.minor = element_blank(),
-      panel.grid.major.y = element_line(color = "#d3c7ba"),
-      axis.line.x = element_blank(),
-      axis.line.y = element_line(color = "#b0a392")
-    )
-  
-) / (
-  ggplot(juros_reais_br, aes(x = data, y = inflacaom)) +
-    geom_line(color = "#81B1D6", size = 1.2) +
-    labs(y = "Inflação (%)", x = "Ano") +
-    scale_x_date(
-      limits = c(
-        min(juros_reais_br$data, na.rm = TRUE),
-        max(juros_reais_br$data, na.rm = TRUE)
-      ),
-      date_labels = "%Y",
-      date_breaks = "2 years"
-    ) +
-    theme_minimal(base_size = 14) +
-    theme(
-      plot.title = element_blank(),
-      plot.subtitle = element_blank(),
-      axis.text.x = element_text(
-        size = 12,
-        angle = 0,
-        hjust = 0.5
-      ),
-      panel.grid.major.x = element_blank(),
-      panel.grid.minor = element_blank(),
-      panel.grid.major.y = element_line(color = "#d3c7ba"),
-      axis.line = element_line(color = "#b0a392")
-    )
-)
-) +
-  plot_annotation(
-    caption = "Fonte: IBGE | Banco Central | Gráfico Próprio",
-    theme = theme(
-      plot.caption = element_text(size = 12, hjust = 0, margin = margin(t = 10))
-    )
-  )
-
-# Inflação Anual vs Meta de Inflação no Brasil
-
-ggplot(data = ipca, aes(x = data)) +
-  geom_line(aes(y = ipca_indice, color = "Inflação"), linewidth = 1.5) +
-  geom_line(aes(y = meta, color = "Meta"),
-            linetype = "dashed",
-            linewidth = 1.5) +
-  geom_line(
-    aes(y = limite_sup, color = "Intervalo de Tolerância"),
-    linetype = "dotted",
-    linewidth = 1
-  ) +
-  geom_line(
-    aes(y = limite_inf, color = "Intervalo de Tolerância"),
-    linetype = "dotted",
-    linewidth = 1
-  ) +
-  
-  geom_line(aes(y = meta_star, color = "Meta*"),
-            linetype = "dashed",
-            linewidth = 1.5) +
-  geom_line(
-    aes(y = limite_sup_star, color = "Intervalo de Tolerância*"),
-    linetype = "dotted",
-    linewidth = 1
-  ) +
-  geom_line(
-    aes(y = limite_inf_star, color = "Intervalo de Tolerância*"),
-    linetype = "dotted",
-    linewidth = 1
-  ) +
-  
-  scale_x_date(
-    limits = c(min(ipca$data, na.rm = TRUE), max(ipca$data, na.rm = TRUE)),
-    date_labels = "%Y",
-    date_breaks = "1 year"
-  ) +
-  
-  scale_color_manual(
-    values = c(
-      "Inflação" = "#1F4E79",
-      "Meta" = "#81B1D6",
-      "Intervalo de Tolerância" = "#2A9D8F",
-      "Meta*" = "red",
-      "Intervalo de Tolerância*" = "brown"
-    )
-  ) +
-  
-  labs(
-    title = "Inflação Anual vs Meta de Inflação no Brasil",
-    subtitle = "Valores anuais comparados à meta do Banco Central",
-    color = "",
-    x = "",
-    y = "Inflação Anual (%)",
-    caption = "Fonte: IBGE | Banco Central | Gráfico Próprio"
-  ) +
-  theme_minimal(base_size = 15) +
-  theme(
-    panel.grid.major.x = element_blank(),
-    panel.grid.minor = element_blank(),
-    panel.grid.major.y = element_line(color = "#d3c7ba"),
-    plot.title = element_text(
-      face = "bold",
-      size = 18,
-      hjust = 0.5,
-      margin = margin(b = 8)
-    ),
-    plot.subtitle = element_text(
-      size = 14,
-      hjust = 0.5,
-      margin = margin(b = 15)
-    ),
-    axis.text.x = element_text(angle = 0, hjust = 0.5),
-    axis.line = element_line(color = "#b0a392"),
-    plot.caption = element_text(
-      size = 12,
-      hjust = 0,
-      margin = margin(t = 10)
-    ),
-    axis.title.x = element_text(size = 14),
-    axis.title.y = element_text(size = 14),
-    legend.position = "top",
-    legend.direction = "horizontal",
-    legend.text = element_text(size = 12),
-    legend.margin = margin(t = -5),
-    plot.margin = margin(
-      t = 20,
-      r = 10,
-      b = 10,
-      l = 10
-    )
-  )
-
-# Inflação e Hiato Anual
-
-dados_combinados <- inner_join(piba_br,
-                               infa_br,
-                               by = "data")
-
-((
-  ggplot(dados_combinados, aes(x = hiato_produto, y = inflacaoa)) +
-    geom_point(
-      color = "#1F4E79",
-      size = 3,
-      alpha = 0.8
-    ) +
-    geom_smooth(
-      method = "lm",
-      color = "black",
-      se = FALSE,
-      linetype = "dashed"
-    ) +
-    labs(title = "Relação entre Inflação e Hiato do Produto",
-         subtitle = "",
-         x = "Hiato do Produto (%)",
-         y = "Inflação (%)") +
-    theme_minimal(base_size = 14) +
-    theme(
-      plot.title = element_text(face = "bold", size = 18, hjust = 0.5, margin = margin(b = 8)),
-      plot.subtitle = element_text(size = 14, hjust = 0.5, margin = margin(b = 15)),
-      panel.grid.major.x = element_blank(),
-      panel.grid.minor = element_blank(),
-      panel.grid.major.y = element_line(color = "#d3c7ba"),
-      axis.line = element_line(color = "#b0a392")
-    )
-) / (
-  ggplot(dados_combinados, aes(x = data)) +
-    geom_line(aes(y = inflacaoa, color = "Série da Inflação"), size = 1.5) +
-    geom_line(aes(y = hiato_produto, color = "Série do Hiato"), size = 1.5) +
-    labs(x = "Ano", y = "Percentual (%)") +
-    scale_color_manual(
-      values = c(
-        "Série da Inflação" = "#2A9D8F",
-        "Série do Hiato" = "#81B1D6"
-      )
-    ) +
-    scale_x_date(date_labels = "%Y", date_breaks = "5 years") +
-    theme_minimal(base_size = 14) +
-    theme(
-      legend.position = "top",
-      legend.title = element_blank(),
-      panel.grid.major.x = element_blank(),
-      panel.grid.minor = element_blank(),
-      panel.grid.major.y = element_line(color = "#d3c7ba"),
-      axis.line = element_line(color = "#b0a392")
-    )
-)
-) +
-  plot_annotation(
-    caption = "Fonte: IBGE | Banco Central | Gráfico Próprio",
-    theme = theme(plot.caption = element_text(size = 12, hjust = 0, margin = margin(t = 10)))
-  )
