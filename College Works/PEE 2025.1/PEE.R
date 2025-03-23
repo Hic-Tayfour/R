@@ -1,5 +1,6 @@
 # 📚 Importando as Bibliotecas Necessárias ----
 
+library(CGPfunctions) # Gráficos
 library(countrycode)  # Nomeação de Países
 library(tidyverse)    # Tratamento, Manipulação e Visualização de Dados
 library(tidyquant)    # Dados Financeiros
@@ -8,9 +9,13 @@ library(patchwork)    # Gráficos
 library(ggthemes)     # Gráficos
 library(seasonal)     # Ajuste sazonal para séries temporais
 library(imf.data)     # Dados do IMF
+library(gtExtras)     # Gráficos
 library(mFilter)      # Filtro HP 
+library(ggtext)       # Gráfico
 library(readxl)       # Leitura de arquivos excel
 library(sidrar)       # Baixar dados do IBGE
+library(scales)       # Gráficos
+library(gt)           # Tabelas 
 library(zoo)          # Datas trimestrais
 library(WDI)          # Baixar dados direto do World Development Indicators
 library(gt)           # Tabelas Formatadas
@@ -118,48 +123,618 @@ data_wide <- ifs$get_series(
   freq         = "A",         
   ref_area     = NULL,        
   indicator    = "FPOLM_PA",  
-  start_period = "1960",      
-  end_period   = "2025"       
+  start_period = "1960",
+  end_period   = "2025"
 )
 
-data_long <- data_wide %>%
+rate <- data_wide %>%
   pivot_longer(
     cols = -TIME_PERIOD,
     names_to = "col_indicator",
     values_to = "taxa_juros"
-  )
-
-data_long <- data_long %>%
-  filter(!is.na(country))
-
-data_long <- data_long %>%
+  ) %>%
+  mutate(
+    iso2c = sub("^A\\.(.*?)\\.FPOLM_PA$", "\\1", col_indicator),
+    year  = as.numeric(TIME_PERIOD)
+  ) %>%
   mutate(
     iso2c = case_when(
-      iso2c == "7A" ~ "EA",  
-      iso2c == "U2" ~ "EA",  
-      TRUE          ~ iso2c
+      iso2c %in% c("7A", "U2") ~ "EA",  
+      TRUE ~ iso2c
     )
   ) %>%
   mutate(
     iso3c   = countrycode(iso2c, origin = "iso2c", destination = "iso3c"),
     country = countrycode(iso2c, origin = "iso2c", destination = "country.name")
-  )
-
-data_long <- data_long %>%
-  filter(!is.na(country))
-
-rate <- data_long %>%
-  select(
-    country,
-    iso2c,
-    iso3c,
-    year,
-    taxa_juros
-  )
+  ) %>%
+  filter(!is.na(country)) %>%
+  select(country, iso2c, iso3c, year, taxa_juros)
 
 data <- cbi %>%
   inner_join(cpi  %>% select(-country), by = c("iso3c", "year")) %>%
   inner_join(debt %>% select(-country), by = c("iso3c", "year")) %>%
   inner_join(gdp  %>% select(-country), by = c("iso3c", "year")) %>%
   inner_join(rate %>% select(-country), by = c("iso3c", "year")) %>%
-  filter(year >= 1990) 
+  filter(year >= 1990) %>% 
+  select(-c(iso2c.y, iso2c.x.x, iso2c.y.y))
+
+# Gráficos ----
+
+ggplot() +
+  geom_ribbon(
+    data = data %>%
+      group_by(year) %>%
+      summarise(
+        mean_cbie = mean(cbie_index, na.rm = TRUE),
+        sd_cbie   = sd(cbie_index, na.rm = TRUE)
+      ),
+    aes(
+      x = year,
+      ymin = mean_cbie - sd_cbie,
+      ymax = mean_cbie + sd_cbie
+    ),
+    fill = "#2A9D8F",
+    alpha = 0.2
+  ) +
+  geom_line(
+    data = data %>%
+      group_by(year) %>%
+      summarise(mean_cbie = mean(cbie_index, na.rm = TRUE)),
+    aes(x = year, y = mean_cbie),
+    color = "#1F4E79",
+    size = 1
+  ) +
+  geom_line(
+    data = data %>%
+      group_by(year) %>%
+      summarise(
+        mean_cbie = mean(cbie_index, na.rm = TRUE),
+        sd_cbie   = sd(cbie_index, na.rm = TRUE)
+      ),
+    aes(x = year, y = mean_cbie + sd_cbie),
+    color = "#81B1D6",
+    linetype = "dotted",
+    size = 0.8
+  ) +
+  geom_line(
+    data = data %>%
+      group_by(year) %>%
+      summarise(
+        mean_cbie = mean(cbie_index, na.rm = TRUE),
+        sd_cbie   = sd(cbie_index, na.rm = TRUE)
+      ),
+    aes(x = year, y = mean_cbie - sd_cbie),
+    color = "#81B1D6",
+    linetype = "dotted",
+    size = 0.8
+  ) +
+  geom_point(
+    data = data %>%
+      group_by(year) %>%
+      mutate(
+        mean_cbie   = mean(cbie_index, na.rm = TRUE),
+        sd_cbie     = sd(cbie_index, na.rm = TRUE),
+        distance_up = cbie_index - (mean_cbie + sd_cbie)
+      ) %>%
+      filter(cbie_index > mean_cbie + sd_cbie) %>%
+      slice_max(distance_up, with_ties = FALSE) %>%
+      ungroup(),
+    aes(x = year, y = cbie_index),
+    color = "darkgreen",
+    size = 3
+  ) +
+  geom_text(
+    data = data %>%
+      group_by(year) %>%
+      mutate(
+        mean_cbie   = mean(cbie_index, na.rm = TRUE),
+        sd_cbie     = sd(cbie_index, na.rm = TRUE),
+        distance_up = cbie_index - (mean_cbie + sd_cbie)
+      ) %>%
+      filter(cbie_index > mean_cbie + sd_cbie) %>%
+      slice_max(distance_up, with_ties = FALSE) %>%
+      ungroup(),
+    aes(x = year, y = cbie_index, label = iso3c),
+    color = "darkgreen",
+    vjust = -0.8,
+    size = 3
+  ) +
+  geom_point(
+    data = data %>%
+      group_by(year) %>%
+      mutate(
+        mean_cbie     = mean(cbie_index, na.rm = TRUE),
+        sd_cbie       = sd(cbie_index, na.rm = TRUE),
+        distance_down = (mean_cbie - sd_cbie) - cbie_index
+      ) %>%
+      filter(cbie_index < mean_cbie - sd_cbie) %>%
+      slice_max(distance_down, with_ties = FALSE) %>%
+      ungroup(),
+    aes(x = year, y = cbie_index),
+    color = "red",
+    size = 3
+  ) +
+  geom_text(
+    data = data %>%
+      group_by(year) %>%
+      mutate(
+        mean_cbie     = mean(cbie_index, na.rm = TRUE),
+        sd_cbie       = sd(cbie_index, na.rm = TRUE),
+        distance_down = (mean_cbie - sd_cbie) - cbie_index
+      ) %>%
+      filter(cbie_index < mean_cbie - sd_cbie) %>%
+      slice_max(distance_down, with_ties = FALSE) %>%
+      ungroup(),
+    aes(x = year, y = cbie_index, label = iso3c),
+    color = "red",
+    vjust = 1.5,
+    size = 3
+  ) +
+  scale_x_continuous(breaks = sort(unique(data$year)), expand = expansion(mult = c(0.01, 0.01))) +
+  scale_y_continuous(
+    limits = c(0, 1),
+    breaks = seq(0, 1, 0.2),
+    expand = expansion(mult = c(0, 0))
+  ) +
+  labs(
+    title    = "Evolução Anual do CBI",
+    subtitle = "Linhas pontilhadas de 1 desvio-padrão, com os outliers",
+    x        = "Ano",
+    y        = "Índice de Independência do BC (CBI)",
+    caption  = expression(bold("Fonte: ") ~ "https://cbidata.org/")
+  ) +
+  theme(
+    plot.background    = element_rect(fill = "white", color = NA),
+    panel.background   = element_rect(fill = "white", color = NA),
+    panel.grid.major.y = element_line(color = "grey80"),
+    panel.grid.major.x = element_blank(),
+    panel.grid.minor   = element_blank(),
+    axis.line.x.bottom = element_line(color = "black"),
+    axis.line.y.left   = element_line(color = "black"),
+    axis.ticks         = element_line(color = "black"),
+    plot.title         = element_text(face = "bold", size = 16, hjust = 0),
+    plot.subtitle      = element_text(
+      size = 12,
+      hjust = 0,
+      margin = margin(b = 10)
+    ),
+    axis.title         = element_text(face = "bold", size = 12),
+    axis.text          = element_text(size = 10, color = "black"),
+    plot.caption       = element_text(
+      hjust = 0,
+      size = 10,
+      color = "black"
+    ),
+    plot.margin        = margin(15, 25, 15, 25)
+  )
+
+ggplot() +
+  geom_ribbon(
+    data = data %>%
+      group_by(year) %>%
+      summarise(
+        mean_inflation = mean(inflation, na.rm = TRUE),
+        sd_inflation   = sd(inflation, na.rm = TRUE)
+      ),
+    aes(
+      x = year,
+      ymin = mean_inflation - sd_inflation,
+      ymax = mean_inflation + sd_inflation
+    ),
+    fill = "#2A9D8F",
+    alpha = 0.2
+  ) +
+  geom_line(
+    data = data %>%
+      group_by(year) %>%
+      summarise(mean_inflation = mean(inflation, na.rm = TRUE)),
+    aes(x = year, y = mean_inflation),
+    color = "#1F4E79",
+    size = 1
+  ) +
+  geom_line(
+    data = data %>%
+      group_by(year) %>%
+      summarise(
+        mean_inflation = mean(inflation, na.rm = TRUE),
+        sd_inflation   = sd(inflation, na.rm = TRUE)
+      ),
+    aes(x = year, y = mean_inflation + sd_inflation),
+    color = "#81B1D6",
+    linetype = "dotted",
+    size = 0.8
+  ) +
+  geom_line(
+    data = data %>%
+      group_by(year) %>%
+      summarise(
+        mean_inflation = mean(inflation, na.rm = TRUE),
+        sd_inflation   = sd(inflation, na.rm = TRUE)
+      ),
+    aes(x = year, y = mean_inflation - sd_inflation),
+    color = "#81B1D6",
+    linetype = "dotted",
+    size = 0.8
+  ) +
+  geom_point(
+    data = data %>%
+      group_by(year) %>%
+      mutate(
+        mean_inflation = mean(inflation, na.rm = TRUE),
+        sd_inflation   = sd(inflation, na.rm = TRUE),
+        distance_up = inflation - (mean_inflation + sd_inflation)
+      ) %>%
+      filter(inflation > mean_inflation + sd_inflation) %>%
+      slice_max(distance_up, with_ties = FALSE) %>%
+      ungroup(),
+    aes(x = year, y = inflation),
+    color = "darkgreen",
+    size = 3
+  ) +
+  geom_text(
+    data = data %>%
+      group_by(year) %>%
+      mutate(
+        mean_inflation = mean(inflation, na.rm = TRUE),
+        sd_inflation   = sd(inflation, na.rm = TRUE),
+        distance_up = inflation - (mean_inflation + sd_inflation)
+      ) %>%
+      filter(inflation > mean_inflation + sd_inflation) %>%
+      slice_max(distance_up, with_ties = FALSE) %>%
+      ungroup(),
+    aes(x = year, y = inflation, label = iso3c),
+    color = "darkgreen",
+    vjust = -0.8,
+    size = 3
+  ) +
+  geom_point(
+    data = data %>%
+      group_by(year) %>%
+      mutate(
+        mean_inflation = mean(inflation, na.rm = TRUE),
+        sd_inflation   = sd(inflation, na.rm = TRUE),
+        distance_down = (mean_inflation - sd_inflation) - inflation
+      ) %>%
+      filter(inflation < mean_inflation - sd_inflation) %>%
+      slice_max(distance_down, with_ties = FALSE) %>%
+      ungroup(),
+    aes(x = year, y = inflation),
+    color = "red",
+    size = 3
+  ) +
+  geom_text(
+    data = data %>%
+      group_by(year) %>%
+      mutate(
+        mean_inflation = mean(inflation, na.rm = TRUE),
+        sd_inflation   = sd(inflation, na.rm = TRUE),
+        distance_down = (mean_inflation - sd_inflation) - inflation
+      ) %>%
+      filter(inflation < mean_inflation - sd_inflation) %>%
+      slice_max(distance_down, with_ties = FALSE) %>%
+      ungroup(),
+    aes(x = year, y = inflation, label = iso3c),
+    color = "red",
+    vjust = 1.5,
+    size = 3
+  ) +
+  scale_x_continuous(
+    breaks = sort(unique(data$year)),
+    expand = expansion(mult = c(0.01, 0.01))
+  ) +
+  scale_y_continuous(
+    expand = expansion(mult = c(0.02, 0.1))
+  ) +
+  labs(
+    title    = "Evolução Anual da Inflação",
+    subtitle = "Linhas pontilhadas de 1 desvio-padrão, com os outliers",
+    x        = "Ano",
+    y        = "Inflação (%)",
+    caption  = expression(bold("Fonte: ") ~ "https://cbidata.org/")
+  ) +
+  theme(
+    plot.background    = element_rect(fill = "white", color = NA),
+    panel.background   = element_rect(fill = "white", color = NA),
+    panel.grid.major.y = element_line(color = "grey80"),
+    panel.grid.major.x = element_blank(),
+    panel.grid.minor   = element_blank(),
+    axis.line.x.bottom = element_line(color = "black"),
+    axis.line.y.left   = element_line(color = "black"),
+    axis.ticks         = element_line(color = "black"),
+    plot.title         = element_text(face = "bold", size = 16, hjust = 0),
+    plot.subtitle      = element_text(size = 12, hjust = 0, margin = margin(b = 10)),
+    axis.title         = element_text(face = "bold", size = 12),
+    axis.text          = element_text(size = 10, color = "black"),
+    plot.caption       = element_text(hjust = 0, size = 10, color = "black"),
+    plot.margin        = margin(15, 25, 15, 25)
+  )
+
+ggplot() +
+  geom_ribbon(
+    data = data %>%
+      group_by(year) %>%
+      summarise(
+        mean_inflation = mean(inflation, na.rm = TRUE),
+        sd_inflation   = sd(inflation, na.rm = TRUE)
+      ),
+    aes(
+      x = year,
+      ymin = mean_inflation - sd_inflation,
+      ymax = mean_inflation + sd_inflation
+    ),
+    fill = "#2A9D8F",
+    alpha = 0.2
+  ) +
+  geom_line(
+    data = data %>%
+      group_by(year) %>%
+      summarise(mean_inflation = mean(inflation, na.rm = TRUE)),
+    aes(x = year, y = mean_inflation),
+    color = "#1F4E79",
+    size = 1
+  ) +
+  geom_line(
+    data = data %>%
+      group_by(year) %>%
+      summarise(
+        mean_inflation = mean(inflation, na.rm = TRUE),
+        sd_inflation   = sd(inflation, na.rm = TRUE)
+      ),
+    aes(x = year, y = mean_inflation + sd_inflation),
+    color = "#81B1D6",
+    linetype = "dotted",
+    size = 0.8
+  ) +
+  geom_line(
+    data = data %>%
+      group_by(year) %>%
+      summarise(
+        mean_inflation = mean(inflation, na.rm = TRUE),
+        sd_inflation   = sd(inflation, na.rm = TRUE)
+      ),
+    aes(x = year, y = mean_inflation - sd_inflation),
+    color = "#81B1D6",
+    linetype = "dotted",
+    size = 0.8
+  ) +
+  geom_point(
+    data = data %>%
+      group_by(year) %>%
+      mutate(
+        mean_inflation = mean(inflation, na.rm = TRUE),
+        sd_inflation   = sd(inflation, na.rm = TRUE),
+        distance_up = inflation - (mean_inflation + sd_inflation)
+      ) %>%
+      filter(inflation > mean_inflation + sd_inflation) %>%
+      slice_max(distance_up, with_ties = FALSE) %>%
+      ungroup(),
+    aes(x = year, y = inflation),
+    color = "darkgreen",
+    size = 3
+  ) +
+  geom_text(
+    data = data %>%
+      group_by(year) %>%
+      mutate(
+        mean_inflation = mean(inflation, na.rm = TRUE),
+        sd_inflation   = sd(inflation, na.rm = TRUE),
+        distance_up = inflation - (mean_inflation + sd_inflation)
+      ) %>%
+      filter(inflation > mean_inflation + sd_inflation) %>%
+      slice_max(distance_up, with_ties = FALSE) %>%
+      ungroup(),
+    aes(x = year, y = inflation, label = iso3c),
+    color = "darkgreen",
+    vjust = -0.8,
+    size = 3
+  ) +
+  geom_point(
+    data = data %>%
+      group_by(year) %>%
+      mutate(
+        mean_inflation = mean(inflation, na.rm = TRUE),
+        sd_inflation   = sd(inflation, na.rm = TRUE),
+        distance_down = (mean_inflation - sd_inflation) - inflation
+      ) %>%
+      filter(inflation < mean_inflation - sd_inflation) %>%
+      slice_max(distance_down, with_ties = FALSE) %>%
+      ungroup(),
+    aes(x = year, y = inflation),
+    color = "red",
+    size = 3
+  ) +
+  geom_text(
+    data = data %>%
+      group_by(year) %>%
+      mutate(
+        mean_inflation = mean(inflation, na.rm = TRUE),
+        sd_inflation   = sd(inflation, na.rm = TRUE),
+        distance_down = (mean_inflation - sd_inflation) - inflation
+      ) %>%
+      filter(inflation < mean_inflation - sd_inflation) %>%
+      slice_max(distance_down, with_ties = FALSE) %>%
+      ungroup(),
+    aes(x = year, y = inflation, label = iso3c),
+    color = "red",
+    vjust = 1.5,
+    size = 3
+  ) +
+  scale_x_continuous(
+    breaks = sort(unique(data$year)),
+    expand = expansion(mult = c(0.01, 0.01))
+  ) +
+  scale_y_continuous(
+    expand = expansion(mult = c(0.02, 0.1))
+  ) +
+  labs(
+    title    = "Evolução Anual da Inflação",
+    subtitle = "Linhas pontilhadas de 1 desvio-padrão, com os outliers",
+    x        = "Ano",
+    y        = "Inflação (%)",
+    caption  = expression(bold("Fonte: ") ~ "https://data.worldbank.org/indicator/FP.CPI.TOTL.ZG")
+  ) +
+  theme(
+    plot.background    = element_rect(fill = "white", color = NA),
+    panel.background   = element_rect(fill = "white", color = NA),
+    panel.grid.major.y = element_line(color = "grey80"),
+    panel.grid.major.x = element_blank(),
+    panel.grid.minor   = element_blank(),
+    axis.line.x.bottom = element_line(color = "black"),
+    axis.line.y.left   = element_line(color = "black"),
+    axis.ticks         = element_line(color = "black"),
+    plot.title         = element_text(face = "bold", size = 16, hjust = 0),
+    plot.subtitle      = element_text(size = 12, hjust = 0, margin = margin(b = 10)),
+    axis.title         = element_text(face = "bold", size = 12),
+    axis.text          = element_text(size = 10, color = "black"),
+    plot.caption       = element_text(hjust = 0, size = 10, color = "black"),
+    plot.margin        = margin(15, 25, 15, 25)
+  )
+
+ggplot() +
+  geom_ribbon(
+    data = data %>%
+      filter(year > 2000) %>%
+      group_by(year) %>%
+      summarise(
+        mean_inflation = mean(inflation, na.rm = TRUE),
+        sd_inflation   = sd(inflation, na.rm = TRUE)
+      ),
+    aes(
+      x = year,
+      ymin = mean_inflation - sd_inflation,
+      ymax = mean_inflation + sd_inflation
+    ),
+    fill = "#2A9D8F",
+    alpha = 0.2
+  ) +
+  geom_line(
+    data = data %>%
+      filter(year > 2000) %>%
+      group_by(year) %>%
+      summarise(mean_inflation = mean(inflation, na.rm = TRUE)),
+    aes(x = year, y = mean_inflation),
+    color = "#1F4E79",
+    size = 1
+  ) +
+  geom_line(
+    data = data %>%
+      filter(year > 2000) %>%
+      group_by(year) %>%
+      summarise(
+        mean_inflation = mean(inflation, na.rm = TRUE),
+        sd_inflation   = sd(inflation, na.rm = TRUE)
+      ),
+    aes(x = year, y = mean_inflation + sd_inflation),
+    color = "#81B1D6",
+    linetype = "dotted",
+    size = 0.8
+  ) +
+  geom_line(
+    data = data %>%
+      filter(year > 2000) %>%
+      group_by(year) %>%
+      summarise(
+        mean_inflation = mean(inflation, na.rm = TRUE),
+        sd_inflation   = sd(inflation, na.rm = TRUE)
+      ),
+    aes(x = year, y = mean_inflation - sd_inflation),
+    color = "#81B1D6",
+    linetype = "dotted",
+    size = 0.8
+  ) +
+  geom_point(
+    data = data %>%
+      filter(year > 2000) %>%
+      group_by(year) %>%
+      mutate(
+        mean_inflation = mean(inflation, na.rm = TRUE),
+        sd_inflation   = sd(inflation, na.rm = TRUE),
+        distance_up = inflation - (mean_inflation + sd_inflation)
+      ) %>%
+      filter(inflation > mean_inflation + sd_inflation) %>%
+      slice_max(distance_up, with_ties = FALSE) %>%
+      ungroup(),
+    aes(x = year, y = inflation),
+    color = "darkgreen",
+    size = 3
+  ) +
+  geom_text(
+    data = data %>%
+      filter(year > 2000) %>%
+      group_by(year) %>%
+      mutate(
+        mean_inflation = mean(inflation, na.rm = TRUE),
+        sd_inflation   = sd(inflation, na.rm = TRUE),
+        distance_up = inflation - (mean_inflation + sd_inflation)
+      ) %>%
+      filter(inflation > mean_inflation + sd_inflation) %>%
+      slice_max(distance_up, with_ties = FALSE) %>%
+      ungroup(),
+    aes(x = year, y = inflation, label = iso3c),
+    color = "darkgreen",
+    vjust = -0.8,
+    size = 3
+  ) +
+  geom_point(
+    data = data %>%
+      filter(year > 2000) %>%
+      group_by(year) %>%
+      mutate(
+        mean_inflation = mean(inflation, na.rm = TRUE),
+        sd_inflation   = sd(inflation, na.rm = TRUE),
+        distance_down = (mean_inflation - sd_inflation) - inflation
+      ) %>%
+      filter(inflation < mean_inflation - sd_inflation) %>%
+      slice_max(distance_down, with_ties = FALSE) %>%
+      ungroup(),
+    aes(x = year, y = inflation),
+    color = "red",
+    size = 3
+  ) +
+  geom_text(
+    data = data %>%
+      filter(year > 2000) %>%
+      group_by(year) %>%
+      mutate(
+        mean_inflation = mean(inflation, na.rm = TRUE),
+        sd_inflation   = sd(inflation, na.rm = TRUE),
+        distance_down = (mean_inflation - sd_inflation) - inflation
+      ) %>%
+      filter(inflation < mean_inflation - sd_inflation) %>%
+      slice_max(distance_down, with_ties = FALSE) %>%
+      ungroup(),
+    aes(x = year, y = inflation, label = iso3c),
+    color = "red",
+    vjust = 1.5,
+    size = 3
+  ) +
+  scale_x_continuous(
+    breaks = sort(unique(data %>% filter(year > 2000) %>% pull(year))),
+    expand = expansion(mult = c(0.01, 0.01))
+  ) +
+  scale_y_continuous(
+    expand = expansion(mult = c(0.02, 0.1))
+  ) +
+  labs(
+    title    = "Evolução Anual da Inflação",
+    subtitle = "Linhas pontilhadas de 1 desvio-padrão, com os outliers",
+    x        = "Ano",
+    y        = "Inflação (%)",
+    caption  = expression(bold("Fonte: ") ~ "https://data.worldbank.org/indicator/FP.CPI.TOTL.ZG")
+  ) +
+  theme(
+    plot.background    = element_rect(fill = "white", color = NA),
+    panel.background   = element_rect(fill = "white", color = NA),
+    panel.grid.major.y = element_line(color = "grey80"),
+    panel.grid.major.x = element_blank(),
+    panel.grid.minor   = element_blank(),
+    axis.line.x.bottom = element_line(color = "black"),
+    axis.line.y.left   = element_line(color = "black"),
+    axis.ticks         = element_line(color = "black"),
+    plot.title         = element_text(face = "bold", size = 16, hjust = 0),
+    plot.subtitle      = element_text(size = 12, hjust = 0, margin = margin(b = 10)),
+    axis.title         = element_text(face = "bold", size = 12),
+    axis.text          = element_text(size = 10, color = "black"),
+    plot.caption       = element_text(hjust = 0, size = 10, color = "black"),
+    plot.margin        = margin(15, 25, 15, 25)
+  )
