@@ -150,13 +150,59 @@ rate <- data_wide %>%
   filter(!is.na(country)) %>%
   select(country, iso2c, iso3c, year, taxa_juros)
 
+target <- data.frame(
+  Pais = c("New Zealand", "Canada", "United Kingdom", "Sweden", "Australia",
+           "Finland", "Spain", "Israel", "Czech Republic", "South Korea",
+           "Poland", "Brazil", "Chile", "Colombia", "South Africa", "Thailand",
+           "Mexico", "Hungary", "Norway", "Iceland", "Peru", "Philippines",
+           "Guatemala", "Indonesia", "Romania", "Slovakia", "Armenia", "Turkey",
+           "Ghana", "Georgia", "Serbia", "United States", "Japan", "Russia",
+           "Kazakhstan", "Ukraine", "India", "Argentina"),
+  AnoAdocao = c(1990, 1991, 1992, 1993, 1993,
+                1993, 1995, 1997, 1997, 1998,
+                1998, 1999, 1999, 1999, 2000, 2000,
+                2001, 2001, 2001, 2001, 2002, 2002,
+                2005, 2005, 2005, 2005, 2006, 2006,
+                2007, 2009, 2009, 2012, 2013, 2014,
+                2015, 2015, 2016, 2016),
+  SegueAtualmente = c("sim", "sim", "sim", "sim", "sim",
+                      "não", "não", "sim", "sim", "sim",
+                      "sim", "sim", "sim", "sim", "sim", "sim",
+                      "sim", "sim", "sim", "sim", "sim", "sim",
+                      "sim", "sim", "não", "sim", "sim", "sim",
+                      "sim", "sim", "sim", "sim", "sim", "sim",
+                      "sim", "sim", "sim", "não")
+)
+
+
 data <- cbi %>%
   inner_join(cpi  %>% select(-country), by = c("iso3c", "year")) %>%
   inner_join(debt %>% select(-country), by = c("iso3c", "year")) %>%
   inner_join(gdp  %>% select(-country), by = c("iso3c", "year")) %>%
   inner_join(rate %>% select(-country), by = c("iso3c", "year")) %>%
   filter(year >= 1990) %>% 
-  select(-c(iso2c.y, iso2c.x.x, iso2c.y.y))
+  select(-c(iso2c.y, iso2c.x.x, iso2c.y.y)) %>% 
+  group_by(country) %>%      
+  arrange(year) %>%           
+  mutate(pib_pot = hpfilter(pib, freq = 6.25)$trend) %>%  
+  ungroup() %>% 
+  mutate(hiato_pct = ((pib - pib_pot) / pib_pot) * 100) %>% 
+  mutate(real_rate = ((1 + as.numeric(taxa_juros)) / (1 + inflation)) - 1) %>% 
+  arrange(country, year) %>% 
+  select(
+    country,
+    iso3c,
+    iso2c.x,
+    year,
+    pib,
+    inflation,
+    taxa_juros,
+    cbie_index,
+    divida,
+    pib_pot,
+    hiato_pct,
+    real_rate
+  )
 
 # Gráficos ----
 
