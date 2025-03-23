@@ -151,27 +151,27 @@ rate <- data_wide %>%
   select(country, iso2c, iso3c, year, taxa_juros)
 
 target <- data.frame(
-  Pais = c("New Zealand", "Canada", "United Kingdom", "Sweden", "Australia",
-           "Finland", "Spain", "Israel", "Czech Republic", "South Korea",
-           "Poland", "Brazil", "Chile", "Colombia", "South Africa", "Thailand",
-           "Mexico", "Hungary", "Norway", "Iceland", "Peru", "Philippines",
-           "Guatemala", "Indonesia", "Romania", "Slovakia", "Armenia", "Turkey",
-           "Ghana", "Georgia", "Serbia", "United States", "Japan", "Russia",
-           "Kazakhstan", "Ukraine", "India", "Argentina"),
-  AnoAdocao = c(1990, 1991, 1992, 1993, 1993,
-                1993, 1995, 1997, 1997, 1998,
-                1998, 1999, 1999, 1999, 2000, 2000,
-                2001, 2001, 2001, 2001, 2002, 2002,
-                2005, 2005, 2005, 2005, 2006, 2006,
-                2007, 2009, 2009, 2012, 2013, 2014,
-                2015, 2015, 2016, 2016),
-  SegueAtualmente = c("sim", "sim", "sim", "sim", "sim",
-                      "não", "não", "sim", "sim", "sim",
+  Pais = c("New Zealand", "Canada", "Chile", "Israel", "United Kingdom", "Sweden",
+           "Finland", "Australia", "Spain", "Czech Republic", "Poland", "Brazil",
+           "Colombia", "South Africa", "Thailand", "South Korea", "Mexico",
+           "Iceland", "Norway", "Hungary", "Peru", "Philippines", "Guatemala",
+           "Indonesia", "Romania", "Turkey", "Serbia", "Ghana", "Uruguay",
+           "Albania", "Georgia", "Armenia", "Japan", "India", "Russia",
+           "Moldova", "Paraguay", "Uganda", "Dominican Republic", "Kazakhstan"),
+  AnoAdocao = c(1989, 1991, 1991, 1991, 1992, 1993,
+                1993, 1993, 1994, 1997, 1998, 1999,
+                1999, 2000, 2000, 2001, 2001,
+                2001, 2001, 2001, 2002, 2002, 2005,
+                2005, 2005, 2006, 2007, 2007,
+                2009, 2009, 2009, 2013, 2015, 2014,
+                2010, 2011, 2011, 2012, 2015),
+  SegueAtualmente = c("sim", "sim", "sim", "sim", "sim", "sim",
+                      "não", "sim", "não", "sim", "sim", "sim",
+                      "sim", "sim", "sim", "sim", "sim",
                       "sim", "sim", "sim", "sim", "sim", "sim",
+                      "sim", "não", "sim", "sim", "sim",
                       "sim", "sim", "sim", "sim", "sim", "sim",
-                      "sim", "sim", "não", "sim", "sim", "sim",
-                      "sim", "sim", "sim", "sim", "sim", "sim",
-                      "sim", "sim", "sim", "não")
+                      "sim", "sim", "sim", "sim", "sim")
 )
 
 
