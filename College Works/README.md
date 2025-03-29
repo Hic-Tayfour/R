@@ -25,7 +25,7 @@ Aqui você encontrará meus trabalhos feitos na faculdade, sendo a maioria relac
   - [APS 1 2024.2](https://github.com/Hic-Tayfour/R/tree/main/College%20Works/APS%201%202024.2)
   - [APS 2 2024.2](https://github.com/Hic-Tayfour/R/tree/main/College%20Works/APS%202%202024.2)
   - [APS 3 2024.2](https://github.com/Hic-Tayfour/R/tree/main/College%20Works/APS%203%202024.2)
-  - [Trabalho Final](https://github.com/Hic-Tayfour/R/tree/main/College%20Works/Trabalho%20Final%20Micro%20IV)
+  - [Trabalho Final](https://github.com/Hic-Tayfour/R/tree/main/College%20Works/Trabalho%20Final%20Micro%20IV%202024.2)
 
 - **Modelagem Preditiva**:
   - [APS 1 2024.2 (Modelagem Preditiva)](https://github.com/Hic-Tayfour/R/tree/main/College%20Works/APS%201%202024.2%20(Mod%20Pred))
