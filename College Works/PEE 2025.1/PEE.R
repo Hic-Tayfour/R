@@ -1,6 +1,6 @@
 # 📚 Importando as Bibliotecas Necessárias ----
 
-library(rnaturalearth)#
+library(rnaturalearth)# Conjunto de dados e mapas de países
 library(CGPfunctions) # Gráficos
 library(countrycode)  # Nomeação de Países
 library(tidyverse)    # Tratamento, Manipulação e Visualização de Dados
@@ -19,7 +19,7 @@ library(scales)       # Gráficos
 library(zoo)          # Datas trimestrais
 library(WDI)          # Baixar dados direto do World Development Indicators
 library(gt)           # Tabelas Formatadas
-library(sf)           # 
+library(sf)           # Manipulação de dados espaciais 
 
 # 📃 Importando e Ajustando as Bases de Dados ----
 
