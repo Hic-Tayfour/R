@@ -37,9 +37,7 @@ As três bases foram unificadas via `merge()` pelas variáveis `state` e `year`.
   - **Efeitos Aleatórios (random)**
 - Regressão estimada:
 
-  $$
-  \text{ln\_property\_rate}_{it} = \beta_0 + \beta_1 \cdot \text{RTC}_{it} + \beta_2 \cdot \ln(\text{incarc\_rate}_{it}) + \beta_3 \cdot \text{unemployment}_{it} + \beta_4 \cdot \text{density}_{it} + \epsilon_{it}
-  $$
+  $$\text{ln\_property\_rate}_{it} = \beta_0 + \beta_1 \cdot \text{RTC}_{it} + \beta_2 \cdot \ln(\text{incarc\_rate}_{it}) + \beta_3 \cdot \text{unemployment}_{it} + \beta_4 \cdot \text{density}_{it} + \epsilon_{it}$$
 
 - Resultados organizados com `stargazer()`.
 
