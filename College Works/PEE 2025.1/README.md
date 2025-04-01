@@ -95,8 +95,3 @@ A análise envolve:
 
 Atenciosamente,  
 **Hicham Munir Tayfour**  
-Grupo 7 — Problemas em Economia
-
----
-
-Se quiser, posso gerar essa estrutura em `.tex` para integrar diretamente ao seu relatório. Deseja isso?
