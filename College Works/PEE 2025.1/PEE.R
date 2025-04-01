@@ -6,7 +6,8 @@ library(countrycode)  # Nomeação de Países
 library(tidyverse)    # Tratamento, Manipulação e Visualização de Dados
 library(tidyquant)    # Dados Financeiros
 library(gridExtra)    # Gráficos
-library(patchwork)    # Gráficos 
+library(patchwork)    # Gráficos
+library(labelled)     # Rótulos
 library(ggthemes)     # Gráficos
 library(seasonal)     # Ajuste sazonal para séries temporais
 library(imf.data)     # Dados do IMF
@@ -117,6 +118,16 @@ cbi <- read_xlsx("CBIDta.xlsx", sheet = "Data") %>%
   rename(iso3c = iso_a3) %>%
   select(country, iso3c, year, cbie_index)
 
+inf_for <- read_xlsx("InflationForecast(FMI).xlsx") %>% 
+  select(Country, Code, Year, `Inflation forecast`) %>%
+  rename(inflation_forecast = `Inflation forecast`,
+         country = Country,
+         code = Code,
+         year = Year) %>%
+  mutate(iso3c = countrycode(sourcevar = country,
+                             origin = "country.name",
+                             destination = "iso3c"))
+
 ifs <- load_datasets("IFS")
 
 data_wide <- ifs$get_series(
@@ -195,6 +206,7 @@ data <- cbi %>%
   inner_join(debt %>% select(-country), by = c("iso3c", "year")) %>%
   inner_join(gdp  %>% select(-country), by = c("iso3c", "year")) %>%
   inner_join(rate %>% select(-country), by = c("iso3c", "year")) %>%
+  inner_join(inf_for %>% select(-country), by = c("iso3c", "year")) %>%
   filter(year >= 1990) %>% 
   select(-c(iso2c.y, iso2c.x.x, iso2c.y.y)) %>% 
   group_by(country) %>%      
@@ -211,12 +223,24 @@ data <- cbi %>%
     year,
     pib,
     inflation,
+    inflation_forecast,
     taxa_juros,
     cbie_index,
     divida,
     pib_pot,
     hiato_pct,
     real_rate
+  ) %>%
+  set_variable_labels(
+    pib = "GDP (constant 2015 US$)",
+    inflation = "Inflação (%)",
+    inflation_forecast = "Expectativa de Inflação (%)",
+    taxa_juros = "Taxa de juros nominal (%)(BC)",
+    cbie_index = "Índice de independência do Banco Central",
+    divida = "Dívida governamental (% do PIB)",
+    pib_pot = "PIB potencial (filtro HP)",
+    hiato_pct = "Hiato do produto (%)",
+    real_rate = "Taxa de juros real (%)"
   )
 
 # Gráficos ----
@@ -978,4 +1002,49 @@ ne_countries(scale = "medium", returnclass = "sf") %>%
         margin = margin(t = 10)
       )
     )
+  )
+
+library(tidyverse)
+
+data %>%
+  mutate(across(
+    c(pib, inflation, inflation_forecast, taxa_juros, cbie_index, divida, pib_pot, hiato_pct, real_rate),
+    ~ as.numeric(.x)
+  )) %>%
+  select(iso3c, pib, inflation, inflation_forecast, taxa_juros, cbie_index, divida, pib_pot, hiato_pct, real_rate) %>%
+  pivot_longer(
+    cols = -iso3c,
+    names_to = "variavel",
+    values_to = "valor"
+  ) %>%
+  filter(!is.na(valor)) %>%
+  count(iso3c, variavel, name = "n_obs") %>%
+  ggplot(aes(x = fct_reorder(iso3c, -n_obs, .fun = sum), y = n_obs, fill = variavel)) +
+  geom_bar(stat = "identity", color = "white", width = 0.85) +
+  scale_fill_manual(
+    values = c(
+      "#4DACD6","#4FAE62","#F6C54D","#E37D46","#C02D45","#8ecae6","#219ebc","#023047","#ffb703"),
+    name = "Variável"
+  ) +
+  labs(
+    title = "Cobertura de Dados por País e Variável",
+    subtitle = "Número de observações não ausentes por país e por variável",
+    x = "País (ISO3C)",
+    y = "Nº de Observações",
+    caption = expression(bold("Fonte: ") ~ "WDI + CBIE + FMI")
+  ) +
+  theme_classic(base_size = 12) +
+  theme(
+    axis.text.x = element_text(angle = 60, hjust = 1, size = 9),
+    axis.title.x = element_text(face = "bold", margin = margin(t = 10)),
+    axis.title.y = element_text(face = "bold", margin = margin(r = 10)),
+    axis.text.y = element_text(size = 10),
+    plot.title = element_text(face = "bold", size = 16, hjust = 0),
+    plot.subtitle = element_text(size = 12, hjust = 0, margin = margin(b = 10)),
+    plot.caption = element_text(hjust = 0, size = 10, color = "black"),
+    legend.position = "left",
+    legend.title = element_text(face = "bold"),
+    legend.text = element_text(size = 10),
+    panel.grid.major.y = element_line(color = "grey80"),
+    panel.grid.major.x = element_blank()
   )
