@@ -5,20 +5,25 @@ library(CGPfunctions) # Gráficos
 library(countrycode)  # Nomeação de Países
 library(tidyverse)    # Tratamento, Manipulação e Visualização de Dados
 library(tidyquant)    # Dados Financeiros
-library(gridExtra)    # Gráficos
-library(patchwork)    # Gráficos
+library(gridExtra)    # Gráficos 
+library(patchwork)    # Gráficos Organizados
+library(gganimate)    # Gráficos Animados
 library(labelled)     # Rótulos
 library(ggthemes)     # Gráficos
 library(seasonal)     # Ajuste sazonal para séries temporais
 library(imf.data)     # Dados do IMF
 library(gtExtras)     # Gráficos
+library(ggstream)     # Gráficos
+library(viridis)      # Gráficos
 library(mFilter)      # Filtro HP 
 library(ggtext)       # Gráfico
 library(readxl)       # Leitura de arquivos excel
 library(sidrar)       # Baixar dados do IBGE
 library(scales)       # Gráficos
+library(broom)        # Gráficos
 library(zoo)          # Datas trimestrais
 library(WDI)          # Baixar dados direto do World Development Indicators
+library(plm)          # Dados em painel
 library(gt)           # Tabelas Formatadas
 library(sf)           # Manipulação de dados espaciais 
 
@@ -82,9 +87,9 @@ gdp <- WDI(
   end = NULL,
   extra = TRUE
 ) %>%
-  filter(!country %in% agrupamentos) %>% 
-  select(country, iso2c, iso3c, year, NY.GDP.MKTP.KD) %>% 
-  rename(pib = NY.GDP.MKTP.KD) %>% 
+  filter(!country %in% agrupamentos) %>%
+  select(country, iso2c, iso3c, year, NY.GDP.MKTP.KD) %>%
+  rename(pib = NY.GDP.MKTP.KD) %>%
   arrange(country, year)
 
 cpi <- WDI(
@@ -94,9 +99,9 @@ cpi <- WDI(
   end = NULL,
   extra = TRUE
 ) %>%
-  filter(!country %in% agrupamentos)%>% 
-  select(country, iso2c, iso3c, year, NY.GDP.DEFL.KD.ZG) %>% 
-  rename(inflation = NY.GDP.DEFL.KD.ZG) %>% 
+  filter(!country %in% agrupamentos) %>%
+  select(country, iso2c, iso3c, year, NY.GDP.DEFL.KD.ZG) %>%
+  rename(inflation = NY.GDP.DEFL.KD.ZG) %>%
   arrange(country, year)
 
 debt <- WDI(
@@ -106,54 +111,51 @@ debt <- WDI(
   end = NULL,
   extra = TRUE
 ) %>%
-  filter(!country %in% agrupamentos) %>% 
-  select(country, iso2c, iso3c, year, GC.DOD.TOTL.GD.ZS) %>% 
-  rename(divida = GC.DOD.TOTL.GD.ZS) %>% 
+  filter(!country %in% agrupamentos) %>%
+  select(country, iso2c, iso3c, year, GC.DOD.TOTL.GD.ZS) %>%
+  rename(divida = GC.DOD.TOTL.GD.ZS) %>%
   arrange(country, year)
 
 cbi <- read_xlsx("CBIDta.xlsx", sheet = "Data") %>%
-  select(country, iso_a3, year, cbie_index) %>%  
-  mutate(year = as.numeric(year)) %>% 
+  select(country, iso_a3, year, cbie_index) %>%
+  mutate(year = as.numeric(year)) %>%
   arrange(country, year) %>%
   rename(iso3c = iso_a3) %>%
   select(country, iso3c, year, cbie_index)
 
-inf_for <- read_xlsx("InflationForecast(FMI).xlsx") %>% 
+inf_for <- read_xlsx("InflationForecast(FMI).xlsx") %>%
   select(Country, Code, Year, `Inflation forecast`) %>%
-  rename(inflation_forecast = `Inflation forecast`,
-         country = Country,
-         code = Code,
-         year = Year) %>%
-  mutate(iso3c = countrycode(sourcevar = country,
-                             origin = "country.name",
-                             destination = "iso3c"))
+  rename(
+    inflation_forecast = `Inflation forecast`,
+    country = Country,
+    code = Code,
+    year = Year
+  ) %>%
+  mutate(iso3c = countrycode(
+    sourcevar = country,
+    origin = "country.name",
+    destination = "iso3c"
+  ))
 
 ifs <- load_datasets("IFS")
 
 data_wide <- ifs$get_series(
-  freq         = "A",         
-  ref_area     = NULL,        
-  indicator    = "FPOLM_PA",  
+  freq         = "A",
+  ref_area     = NULL,
+  indicator    = "FPOLM_PA",
   start_period = "1960",
   end_period   = "2025"
 )
 
 rate <- data_wide %>%
-  pivot_longer(
-    cols = -TIME_PERIOD,
-    names_to = "col_indicator",
-    values_to = "taxa_juros"
-  ) %>%
+  pivot_longer(cols = -TIME_PERIOD,
+               names_to = "col_indicator",
+               values_to = "taxa_juros") %>%
   mutate(
     iso2c = sub("^A\\.(.*?)\\.FPOLM_PA$", "\\1", col_indicator),
     year  = as.numeric(TIME_PERIOD)
   ) %>%
-  mutate(
-    iso2c = case_when(
-      iso2c %in% c("7A", "U2") ~ "EA",  
-      TRUE ~ iso2c
-    )
-  ) %>%
+  mutate(iso2c = case_when(iso2c %in% c("7A", "U2") ~ "EA", TRUE ~ iso2c)) %>%
   mutate(
     iso3c   = countrycode(iso2c, origin = "iso2c", destination = "iso3c"),
     country = countrycode(iso2c, origin = "iso2c", destination = "country.name")
@@ -200,26 +202,29 @@ acemoglu_classification <- data.frame(
              "High", "Medium")
 )
 
-
 data <- cbi %>%
   inner_join(cpi  %>% select(-country), by = c("iso3c", "year")) %>%
   inner_join(debt %>% select(-country), by = c("iso3c", "year")) %>%
   inner_join(gdp  %>% select(-country), by = c("iso3c", "year")) %>%
   inner_join(rate %>% select(-country), by = c("iso3c", "year")) %>%
   inner_join(inf_for %>% select(-country), by = c("iso3c", "year")) %>%
-  filter(year >= 1990) %>% 
-  select(-c(iso2c.y, iso2c.x.x, iso2c.y.y)) %>% 
-  group_by(country) %>%      
-  arrange(year) %>%           
-  mutate(pib_pot = hpfilter(pib, freq = 6.25)$trend) %>%  
-  ungroup() %>% 
-  mutate(hiato_pct = ((pib - pib_pot) / pib_pot) * 100) %>% 
-  mutate(real_rate = ((1 + as.numeric(taxa_juros)) / (1 + inflation)) - 1) %>% 
-  arrange(country, year) %>% 
+  filter(year >= 2000) %>%
+  select(-c(iso2c.y, iso2c.x.x, iso2c.y.y)) %>%
+  rename(iso2c = iso2c.x) %>%
+  group_by(country) %>%
+  arrange(year) %>%
+  mutate(
+    taxa_juros = as.numeric(taxa_juros),
+    pib_pot   = hpfilter(pib, freq = 6.25)$trend,
+    hiato_pct = ((pib - pib_pot) / pib_pot) * 100,
+    real_rate = ((1 + as.numeric(taxa_juros)) / (1 + inflation)) - 1
+  ) %>%
+  ungroup() %>%
+  arrange(country, year) %>%
   select(
     country,
     iso3c,
-    iso2c.x,
+    iso2c,
     year,
     pib,
     inflation,
@@ -232,18 +237,182 @@ data <- cbi %>%
     real_rate
   ) %>%
   set_variable_labels(
-    pib = "GDP (constant 2015 US$)",
-    inflation = "Inflação (%)",
+    pib                = "GDP (constant 2015 US$)",
+    inflation          = "Inflação (%)",
     inflation_forecast = "Expectativa de Inflação (%)",
-    taxa_juros = "Taxa de juros nominal (%)(BC)",
-    cbie_index = "Índice de independência do Banco Central",
-    divida = "Dívida governamental (% do PIB)",
-    pib_pot = "PIB potencial (filtro HP)",
-    hiato_pct = "Hiato do produto (%)",
-    real_rate = "Taxa de juros real (%)"
+    taxa_juros         = "Taxa de juros nominal (%)(BC)",
+    cbie_index         = "Índice de independência do Banco Central",
+    divida             = "Dívida governamental (% do PIB)",
+    pib_pot            = "PIB potencial (filtro HP)",
+    hiato_pct          = "Hiato do produto (%)",
+    real_rate          = "Taxa de juros real (%)"
   )
 
 # Gráficos ----
+
+## 📊 Gráfico de Cobertura de Dados ----
+
+data %>%
+  mutate(across(
+    c(
+      pib,
+      inflation,
+      inflation_forecast,
+      taxa_juros,
+      cbie_index,
+      divida,
+      pib_pot,
+      hiato_pct,
+      real_rate
+    ),
+    ~ as.numeric(.x)
+  )) %>%
+  select(
+    iso3c,
+    pib,
+    inflation,
+    inflation_forecast,
+    taxa_juros,
+    cbie_index,
+    divida,
+    pib_pot,
+    hiato_pct,
+    real_rate
+  ) %>%
+  pivot_longer(cols = -iso3c,
+               names_to = "variavel",
+               values_to = "valor") %>%
+  filter(!is.na(valor)) %>%
+  count(iso3c, variavel, name = "n_obs") %>%
+  ggplot(aes(
+    x = fct_reorder(iso3c, -n_obs, .fun = sum),
+    y = n_obs,
+    fill = variavel
+  )) +
+  geom_bar(stat = "identity",
+           color = "white",
+           width = 0.85) +
+  scale_fill_manual(
+    values = c(
+      "#4DACD6",
+      "#4FAE62",
+      "#F6C54D",
+      "#E37D46",
+      "#C02D45",
+      "#8ecae6",
+      "#219ebc",
+      "#023047",
+      "#ffb703"
+    ),
+    name = "Variável"
+  ) +
+  labs(
+    title = "Cobertura de Dados por País e Variável",
+    subtitle = "Número de observações não ausentes por país e por variável",
+    x = "País",
+    y = "Nº de Observações",
+    caption = expression(bold("Fonte: ") ~ "WDI + CBIE + FMI")
+  ) +
+  theme_classic(base_size = 12) +
+  theme(
+    axis.text.x = element_text(
+      angle = 60,
+      hjust = 1,
+      size = 9
+    ),
+    axis.title.x = element_text(face = "bold", margin = margin(t = 10)),
+    axis.title.y = element_text(face = "bold", margin = margin(r = 10)),
+    axis.text.y = element_text(size = 10),
+    plot.title = element_text(face = "bold", size = 16, hjust = 0),
+    plot.subtitle = element_text(
+      size = 12,
+      hjust = 0,
+      margin = margin(b = 10)
+    ),
+    plot.caption = element_text(
+      hjust = 0,
+      size = 10,
+      color = "black"
+    ),
+    legend.position = "left",
+    legend.title = element_text(face = "bold"),
+    legend.text = element_text(size = 10),
+    panel.grid.major.y = element_line(color = "grey80"),
+    panel.grid.major.x = element_blank()
+  )
+
+## 📊 Gráfico da Inflação Mundo ----
+
+world <- ne_countries(scale = "medium", returnclass = "sf") %>%
+  filter(name != "Antarctica") %>%
+  select(iso_a3, geometry)
+
+grade_mapa <- expand_grid(iso_a3 = world$iso_a3, year = 2000:2023) %>%
+  left_join(world, by = "iso_a3") %>%
+  st_as_sf() %>%
+  left_join(data %>% filter(year >= 2000, year <= 2023),
+            by = c("iso_a3" = "iso3c", "year" = "year"))
+
+paleta_inflacao <- scale_fill_viridis_c(
+  option = "plasma",
+  direction = -1,
+  name = "Inflação (%)",
+  limits = c(-10, 100),
+  breaks = c(-10, 0, 5, 10, 25, 50, 100),
+  oob = squish,
+  na.value = "white"
+)
+
+p <- ggplot(grade_mapa) +
+  geom_sf(aes(fill = inflation),
+          color = "grey40",
+          size = 0.2) +
+  paleta_inflacao +
+  coord_sf(expand = FALSE) +
+  labs(title = "Inflação Global por País",
+       subtitle = "Variação percentual anual — Ano: {current_frame}",
+       caption = "Fonte: WDI + Natural Earth") +
+  theme_void(base_size = 11) +
+  theme(
+    plot.title    = element_text(face = "bold", size = 18, hjust = 0),
+    plot.subtitle = element_text(
+      size = 13,
+      hjust = 0,
+      margin = margin(b = 10)
+    ),
+    plot.caption  = element_text(
+      size = 10,
+      hjust = 0,
+      color = "black",
+      margin = margin(t = 10)
+    ),
+    legend.position = "right",
+    legend.title = element_text(face = "bold", size = 11),
+    legend.text  = element_text(size = 9),
+    plot.title.position = "plot",
+    plot.caption.position = "plot",
+    plot.margin = margin(
+      t = 60,
+      r = 20,
+      b = 40,
+      l = 20
+    )
+  ) +
+  transition_manual(year)
+
+anim_save(
+  "mapa_inflacao.gif",
+  animation = animate(
+    p,
+    fps = 2,
+    width = 1600,
+    height = 1000,
+    res = 150,
+    renderer = gifski_renderer()
+  )
+)
+
+## 📊 Gráfico da Evolução do CBI----
 
 ggplot() +
   geom_ribbon(
@@ -393,146 +562,8 @@ ggplot() +
     plot.margin        = margin(15, 25, 15, 25)
   )
 
-ggplot() +
-  geom_ribbon(
-    data = data %>%
-      group_by(year) %>%
-      summarise(
-        mean_inflation = mean(inflation, na.rm = TRUE),
-        sd_inflation   = sd(inflation, na.rm = TRUE)
-      ),
-    aes(
-      x = year,
-      ymin = mean_inflation - sd_inflation,
-      ymax = mean_inflation + sd_inflation
-    ),
-    fill = "#2A9D8F",
-    alpha = 0.2
-  ) +
-  geom_line(
-    data = data %>%
-      group_by(year) %>%
-      summarise(mean_inflation = mean(inflation, na.rm = TRUE)),
-    aes(x = year, y = mean_inflation),
-    color = "#1F4E79",
-    size = 1
-  ) +
-  geom_line(
-    data = data %>%
-      group_by(year) %>%
-      summarise(
-        mean_inflation = mean(inflation, na.rm = TRUE),
-        sd_inflation   = sd(inflation, na.rm = TRUE)
-      ),
-    aes(x = year, y = mean_inflation + sd_inflation),
-    color = "#81B1D6",
-    linetype = "dotted",
-    size = 0.8
-  ) +
-  geom_line(
-    data = data %>%
-      group_by(year) %>%
-      summarise(
-        mean_inflation = mean(inflation, na.rm = TRUE),
-        sd_inflation   = sd(inflation, na.rm = TRUE)
-      ),
-    aes(x = year, y = mean_inflation - sd_inflation),
-    color = "#81B1D6",
-    linetype = "dotted",
-    size = 0.8
-  ) +
-  geom_point(
-    data = data %>%
-      group_by(year) %>%
-      mutate(
-        mean_inflation = mean(inflation, na.rm = TRUE),
-        sd_inflation   = sd(inflation, na.rm = TRUE),
-        distance_up = inflation - (mean_inflation + sd_inflation)
-      ) %>%
-      filter(inflation > mean_inflation + sd_inflation) %>%
-      slice_max(distance_up, with_ties = FALSE) %>%
-      ungroup(),
-    aes(x = year, y = inflation),
-    color = "darkgreen",
-    size = 3
-  ) +
-  geom_text(
-    data = data %>%
-      group_by(year) %>%
-      mutate(
-        mean_inflation = mean(inflation, na.rm = TRUE),
-        sd_inflation   = sd(inflation, na.rm = TRUE),
-        distance_up = inflation - (mean_inflation + sd_inflation)
-      ) %>%
-      filter(inflation > mean_inflation + sd_inflation) %>%
-      slice_max(distance_up, with_ties = FALSE) %>%
-      ungroup(),
-    aes(x = year, y = inflation, label = iso3c),
-    color = "darkgreen",
-    vjust = -0.8,
-    size = 3
-  ) +
-  geom_point(
-    data = data %>%
-      group_by(year) %>%
-      mutate(
-        mean_inflation = mean(inflation, na.rm = TRUE),
-        sd_inflation   = sd(inflation, na.rm = TRUE),
-        distance_down = (mean_inflation - sd_inflation) - inflation
-      ) %>%
-      filter(inflation < mean_inflation - sd_inflation) %>%
-      slice_max(distance_down, with_ties = FALSE) %>%
-      ungroup(),
-    aes(x = year, y = inflation),
-    color = "red",
-    size = 3
-  ) +
-  geom_text(
-    data = data %>%
-      group_by(year) %>%
-      mutate(
-        mean_inflation = mean(inflation, na.rm = TRUE),
-        sd_inflation   = sd(inflation, na.rm = TRUE),
-        distance_down = (mean_inflation - sd_inflation) - inflation
-      ) %>%
-      filter(inflation < mean_inflation - sd_inflation) %>%
-      slice_max(distance_down, with_ties = FALSE) %>%
-      ungroup(),
-    aes(x = year, y = inflation, label = iso3c),
-    color = "red",
-    vjust = 1.5,
-    size = 3
-  ) +
-  scale_x_continuous(
-    breaks = sort(unique(data$year)),
-    expand = expansion(mult = c(0.01, 0.01))
-  ) +
-  scale_y_continuous(
-    expand = expansion(mult = c(0.02, 0.1))
-  ) +
-  labs(
-    title    = "Evolução Anual da Inflação",
-    subtitle = "Linhas pontilhadas de 1 desvio-padrão, com os outliers",
-    x        = "Ano",
-    y        = "Inflação (%)",
-    caption  = expression(bold("Fonte: ") ~ "https://data.worldbank.org/indicator/FP.CPI.TOTL.ZG")
-  ) +
-  theme(
-    plot.background    = element_rect(fill = "white", color = NA),
-    panel.background   = element_rect(fill = "white", color = NA),
-    panel.grid.major.y = element_line(color = "grey80"),
-    panel.grid.major.x = element_blank(),
-    panel.grid.minor   = element_blank(),
-    axis.line.x.bottom = element_line(color = "black"),
-    axis.line.y.left   = element_line(color = "black"),
-    axis.ticks         = element_line(color = "black"),
-    plot.title         = element_text(face = "bold", size = 16, hjust = 0),
-    plot.subtitle      = element_text(size = 12, hjust = 0, margin = margin(b = 10)),
-    axis.title         = element_text(face = "bold", size = 12),
-    axis.text          = element_text(size = 10, color = "black"),
-    plot.caption       = element_text(hjust = 0, size = 10, color = "black"),
-    plot.margin        = margin(15, 25, 15, 25)
-  )
+
+## 📊 Gráfico da Inflação anual ----
 
 ggplot() +
   geom_ribbon(
@@ -683,6 +714,8 @@ ggplot() +
     plot.margin        = margin(15, 25, 15, 25)
   )
 
+## 📊 Gráfico da Inflação anual (2000-Hoje; Países com Metas de inflação) ----
+
 ggplot() +
   geom_ribbon(
     data = data %>%
@@ -819,40 +852,385 @@ ggplot() +
     plot.margin        = margin(15, 25, 15, 25)
   )
 
+## 📊 Gráfico do PIB de Acordo com as Classificações do Acemoglu ----
+
 data %>%
-  filter(
-    year >= 2000,
-    country %in% (acemoglu_classification %>% pull(Pais))
-  ) %>%
   left_join(acemoglu_classification, by = c("country" = "Pais")) %>%
-  ggplot(aes(x = Classe, y = inflation)) +
-  geom_boxplot(
-    fill = "#1F4E79", alpha = 0.7, outlier.color = "red",
-    width = 0.6
+  filter(Classe == "High", !is.na(pib)) %>%
+  group_by(year, country) %>%
+  summarise(pib_total = sum(pib, na.rm = TRUE), .groups = "drop") %>%
+  mutate(country = fct_reorder(country, pib_total, .fun = sum)) %>%
+  ggplot(aes(x = year, y = pib_total, fill = country)) +
+  geom_area(color = "white",
+            size = 0.1,
+            alpha = 0.95) +
+  scale_fill_manual(
+    values = c(
+      "#4DACD6",
+      "#4FAE62",
+      "#F6C54D",
+      "#E37D46",
+      "#C02D45",
+      "#8ecae6",
+      "#219ebc",
+      "#023047",
+      "#ffb703"
+    )
   ) +
+  scale_y_continuous(labels = label_number(scale_cut = cut_short_scale())) +
   labs(
-    title = "Distribuição da Inflação por Classe Institucional",
-    subtitle = "Segundo a classificação de Acemoglu et al.",
-    x = "Classe Institucional",
-    y = "Inflação (%)",
-    caption = expression(bold("Fonte: ") ~ "WDI + Acemoglu et al. (2008)")
+    title = "PIB Agregado dos Países com Instituições 'High'",
+    subtitle = "Evolução do PIB (USD correntes) — 2000 a 2025",
+    caption = expression(bold("Fonte: ") ~ "WDI + FMI + Classificação Acemoglu"),
+    x = NULL,
+    y = NULL
   ) +
+  theme_classic(base_size = 12) +
   theme(
-    plot.background    = element_rect(fill = "white", color = NA),
-    panel.background   = element_rect(fill = "white", color = NA),
+    axis.text.x = element_text(size = 10),
+    axis.text.y = element_text(size = 10),
+    axis.title.x = element_text(face = "bold", margin = margin(t = 10)),
+    axis.title.y = element_text(face = "bold", margin = margin(r = 10)),
+    plot.title = element_text(face = "bold", size = 16, hjust = 0),
+    plot.subtitle = element_text(
+      size = 12,
+      hjust = 0,
+      margin = margin(b = 10)
+    ),
+    plot.caption = element_text(
+      hjust = 0,
+      size = 10,
+      color = "black"
+    ),
+    legend.position = "top",
+    legend.title = element_blank(),
+    legend.text = element_text(size = 10),
     panel.grid.major.y = element_line(color = "grey80"),
-    panel.grid.major.x = element_blank(),
-    panel.grid.minor   = element_blank(),
-    axis.line.x.bottom = element_line(color = "black"),
-    axis.line.y.left   = element_line(color = "black"),
-    axis.ticks         = element_line(color = "black"),
-    plot.title         = element_text(face = "bold", size = 16, hjust = 0),
-    plot.subtitle      = element_text(size = 12, hjust = 0, margin = margin(b = 10)),
-    axis.title         = element_text(face = "bold", size = 12),
-    axis.text          = element_text(size = 10, color = "black"),
-    plot.caption       = element_text(hjust = 0, size = 10, color = "black"),
-    plot.margin        = margin(15, 25, 15, 25)
+    panel.grid.major.x = element_blank()
   )
+
+data %>%
+  left_join(acemoglu_classification, by = c("country" = "Pais")) %>%
+  filter(Classe == "Medium", !is.na(pib)) %>%
+  group_by(year, country) %>%
+  summarise(pib_total = sum(pib, na.rm = TRUE), .groups = "drop") %>%
+  mutate(country = fct_reorder(country, pib_total, .fun = sum)) %>%
+  ggplot(aes(x = year, y = pib_total, fill = country)) +
+  geom_area(color = "white",
+            size = 0.1,
+            alpha = 0.95) +
+  scale_fill_manual(
+    values = c(
+      "#4DACD6",
+      "#4FAE62",
+      "#F6C54D",
+      "#E37D46",
+      "#C02D45",
+      "#8ecae6",
+      "#219ebc",
+      "#023047",
+      "#ffb703",
+      "#9b5de5"
+    )
+  ) +
+  scale_y_continuous(labels = label_number(scale_cut = cut_short_scale())) +
+  labs(
+    title = "PIB Agregado dos Países com Instituições 'Medium'",
+    subtitle = "Evolução do PIB (USD correntes) — 2000 a 2025",
+    caption = expression(bold("Fonte: ") ~ "WDI + FMI + Classificação Acemoglu"),
+    x = NULL,
+    y = NULL
+  ) +
+  theme_classic(base_size = 12) +
+  theme(
+    axis.text.x = element_text(size = 10),
+    axis.text.y = element_text(size = 10),
+    axis.title.x = element_text(face = "bold", margin = margin(t = 10)),
+    axis.title.y = element_text(face = "bold", margin = margin(r = 10)),
+    plot.title = element_text(face = "bold", size = 16, hjust = 0),
+    plot.subtitle = element_text(
+      size = 12,
+      hjust = 0,
+      margin = margin(b = 10)
+    ),
+    plot.caption = element_text(
+      hjust = 0,
+      size = 10,
+      color = "black"
+    ),
+    legend.position = "top",
+    legend.title = element_blank(),
+    legend.text = element_text(size = 10),
+    panel.grid.major.y = element_line(color = "grey80"),
+    panel.grid.major.x = element_blank()
+  )
+
+data %>%
+  left_join(acemoglu_classification, by = c("country" = "Pais")) %>%
+  filter(Classe == "Low", !is.na(pib)) %>%
+  group_by(year, country) %>%
+  summarise(pib_total = sum(pib, na.rm = TRUE), .groups = "drop") %>%
+  mutate(country = fct_reorder(country, pib_total, .fun = sum)) %>%
+  ggplot(aes(x = year, y = pib_total, fill = country)) +
+  geom_area(color = "white",
+            size = 0.1,
+            alpha = 0.95) +
+  scale_fill_manual(
+    values = c(
+      "#4DACD6",
+      "#4FAE62",
+      "#F6C54D",
+      "#E37D46",
+      "#C02D45",
+      "#8ecae6",
+      "#219ebc",
+      "#023047",
+      "#ffb703",
+      "#9b5de5"
+    )
+  ) +
+  scale_y_continuous(labels = label_number(scale_cut = cut_short_scale())) +
+  labs(
+    title = "PIB Agregado dos Países com Instituições 'Low'",
+    subtitle = "Evolução do PIB (USD correntes) — 2000 a 2025",
+    caption = expression(bold("Fonte: ") ~ "WDI + FMI + Classificação Acemoglu"),
+    x = NULL,
+    y = NULL
+  ) +
+  theme_classic(base_size = 12) +
+  theme(
+    axis.text.x = element_text(size = 10),
+    axis.text.y = element_text(size = 10),
+    axis.title.x = element_text(face = "bold", margin = margin(t = 10)),
+    axis.title.y = element_text(face = "bold", margin = margin(r = 10)),
+    plot.title = element_text(face = "bold", size = 16, hjust = 0),
+    plot.subtitle = element_text(
+      size = 12,
+      hjust = 0,
+      margin = margin(b = 10)
+    ),
+    plot.caption = element_text(
+      hjust = 0,
+      size = 10,
+      color = "black"
+    ),
+    legend.position = "top",
+    legend.title = element_blank(),
+    legend.text = element_text(size = 10),
+    panel.grid.major.y = element_line(color = "grey80"),
+    panel.grid.major.x = element_blank()
+  )
+
+
+## 📊 Gráfico da Resposta da Inflação à Taxa Real de Juros ----
+
+data %>%
+  left_join(acemoglu_classification, by = c("country" = "Pais")) %>%
+  group_by(country) %>%
+  mutate(
+    inflacao_a_frente = lead(inflation, 1),
+    delta_inflacao = inflacao_a_frente - inflation
+  ) %>%
+  ungroup() %>%
+  filter(
+    Classe == "High",
+    !is.na(real_rate),
+    !is.na(delta_inflacao),
+    !is.na(cbie_index)
+  ) %>%
+  ggplot(aes(x = real_rate, y = delta_inflacao, color = cbie_index)) +
+  geom_point(alpha = 0.5, size = 2) +
+  geom_smooth(method = "lm", se = FALSE, linewidth = 1.2) +
+  scale_color_viridis_c(option = "plasma", name = "Independência BC") +
+  labs(
+    title = "Classe 'High': Resposta da Inflação à Taxa Real",
+    subtitle = "Δ Inflação (t+1 - t) vs. Taxa Real de Juros",
+    x = "Taxa Real de Juros (%)",
+    y = "Δ Inflação (%)",
+    caption = expression(bold("Fonte: ") ~ "WDI + FMI + Classificação Acemoglu")
+  ) +
+  theme_classic(base_size = 12) +
+  theme(
+    plot.title = element_text(face = "bold", size = 16, hjust = 0),
+    plot.subtitle = element_text(size = 12, hjust = 0, margin = margin(b = 10)),
+    plot.caption = element_text(size = 10, hjust = 0),
+    legend.position = "bottom",
+    legend.title = element_text(face = "bold"),
+    legend.text = element_text(size = 10),
+    panel.grid.major.y = element_line(color = "grey80"),
+    panel.grid.major.x = element_blank()
+  )
+
+data %>%
+  left_join(acemoglu_classification, by = c("country" = "Pais")) %>%
+  group_by(country) %>%
+  mutate(
+    inflacao_a_frente = lead(inflation, 1),
+    delta_inflacao = inflacao_a_frente - inflation
+  ) %>%
+  ungroup() %>%
+  filter(
+    Classe == "Medium",
+    !is.na(real_rate),
+    !is.na(delta_inflacao),
+    !is.na(cbie_index)
+  ) %>%
+  ggplot(aes(x = real_rate, y = delta_inflacao, color = cbie_index)) +
+  geom_point(alpha = 0.5, size = 2) +
+  geom_smooth(method = "lm", se = FALSE, linewidth = 1.2) +
+  scale_color_viridis_c(option = "plasma", name = "Independência BC") +
+  labs(
+    title = "Classe 'Medium': Resposta da Inflação à Taxa Real",
+    subtitle = "Δ Inflação (t+1 - t) vs. Taxa Real de Juros",
+    x = "Taxa Real de Juros (%)",
+    y = "Δ Inflação (%)",
+    caption = expression(bold("Fonte: ") ~ "WDI + FMI + Classificação Acemoglu")
+  ) +
+  theme_classic(base_size = 12) +
+  theme(
+    plot.title = element_text(face = "bold", size = 16, hjust = 0),
+    plot.subtitle = element_text(size = 12, hjust = 0, margin = margin(b = 10)),
+    plot.caption = element_text(size = 10, hjust = 0),
+    legend.position = "bottom",
+    legend.title = element_text(face = "bold"),
+    legend.text = element_text(size = 10),
+    panel.grid.major.y = element_line(color = "grey80"),
+    panel.grid.major.x = element_blank()
+  )
+
+data %>%
+  left_join(acemoglu_classification, by = c("country" = "Pais")) %>%
+  group_by(country) %>%
+  mutate(
+    inflacao_a_frente = lead(inflation, 1),
+    delta_inflacao = inflacao_a_frente - inflation
+  ) %>%
+  ungroup() %>%
+  filter(
+    Classe == "Low",
+    !is.na(real_rate),
+    !is.na(delta_inflacao),
+    !is.na(cbie_index)
+  ) %>%
+  ggplot(aes(x = real_rate, y = delta_inflacao, color = cbie_index)) +
+  geom_point(alpha = 0.5, size = 2) +
+  geom_smooth(method = "lm", se = FALSE, linewidth = 1.2) +
+  scale_color_viridis_c(option = "plasma", name = "Independência BC") +
+  labs(
+    title = "Classe 'Low': Resposta da Inflação à Taxa Real",
+    subtitle = "Δ Inflação (t+1 - t) vs. Taxa Real de Juros",
+    x = "Taxa Real de Juros (%)",
+    y = "Δ Inflação (%)",
+    caption = expression(bold("Fonte: ") ~ "WDI + FMI + Classificação Acemoglu")
+  ) +
+  theme_classic(base_size = 12) +
+  theme(
+    plot.title = element_text(face = "bold", size = 16, hjust = 0),
+    plot.subtitle = element_text(size = 12, hjust = 0, margin = margin(b = 10)),
+    plot.caption = element_text(size = 10, hjust = 0),
+    legend.position = "bottom",
+    legend.title = element_text(face = "bold"),
+    legend.text = element_text(size = 10),
+    panel.grid.major.y = element_line(color = "grey80"),
+    panel.grid.major.x = element_blank()
+  )
+
+
+## 📊 Gráfico da Inflação contra a Inflação Esperada (com ou sem regime de meta)----
+
+data %>%
+  left_join(target, by = c("country" = "Pais")) %>%
+  filter(
+    !is.na(AnoAdocao),
+    SegueAtualmente == "sim",
+    year >= AnoAdocao,
+    !is.na(inflation),
+    !is.na(inflation_forecast),
+    inflation > 0,
+    inflation_forecast > 0
+  ) %>%
+  ggplot(aes(x = inflation_forecast, y = inflation)) +
+  geom_point(alpha = 0.5, size = 2, color = "#43aa8b") +
+  geom_smooth(method = "lm", se = FALSE, color = "#005f73", linewidth = 1.2) +
+  geom_abline(slope = 1, intercept = 0, linetype = "dashed", color = "grey50") +
+  labs(
+    title = "Países que Seguem Regime de Metas",
+    subtitle = "Inflação Observada vs. Esperada",
+    x = "Inflação Esperada (%)",
+    y = "Inflação Observada (%)",
+    caption = expression(bold("Fonte: ") ~ "WDI + FMI + Targeting Dataset")
+  ) +
+  theme_classic(base_size = 12) +
+  theme(
+    plot.title = element_text(face = "bold", size = 16, hjust = 0),
+    plot.subtitle = element_text(size = 12, hjust = 0, margin = margin(b = 10)),
+    plot.caption = element_text(size = 10, hjust = 0),
+    panel.grid.major.y = element_line(color = "grey80"),
+    panel.grid.major.x = element_blank()
+  )
+
+data %>%
+  left_join(target, by = c("country" = "Pais")) %>%
+  filter(
+    !is.na(AnoAdocao),
+    SegueAtualmente != "sim",
+    year >= AnoAdocao,
+    !is.na(inflation),
+    !is.na(inflation_forecast),
+    inflation > 0,
+    inflation_forecast > 0
+  ) %>%
+  ggplot(aes(x = inflation_forecast, y = inflation)) +
+  geom_point(alpha = 0.5, size = 2, color = "#f9c74f") +
+  geom_smooth(method = "lm", se = FALSE, linewidth = 1.2, color = "#f9844a") +
+  geom_abline(intercept = 0, slope = 1, linetype = "dashed", color = "grey40") +
+  labs(
+    title = "Inflação Esperada vs. Observada — Países que Saíram do Regime",
+    subtitle = "Apenas anos com regime ainda vigente à época",
+    x = "Inflação Esperada (%)",
+    y = "Inflação Observada (%)",
+    caption = expression(bold("Fonte: ") ~ "WDI + Surveys + Targeting dataset")
+  ) +
+  theme_classic(base_size = 12) +
+  theme(
+    plot.title = element_text(face = "bold", size = 16, hjust = 0),
+    plot.subtitle = element_text(size = 12, hjust = 0, margin = margin(b = 10)),
+    plot.caption = element_text(size = 10, hjust = 0),
+    panel.grid.major.y = element_line(color = "grey80"),
+    panel.grid.major.x = element_blank()
+  )
+
+data %>%
+  left_join(target, by = c("country" = "Pais")) %>%
+  filter(
+    is.na(AnoAdocao),
+    !is.na(inflation),
+    !is.na(inflation_forecast),
+    inflation > 0,
+    inflation_forecast > 0
+  ) %>%
+  ggplot(aes(x = inflation_forecast, y = inflation)) +
+  geom_point(alpha = 0.5, size = 2, color = "#f94144") +
+  geom_smooth(method = "lm", se = FALSE, linewidth = 1.2, color = "#d1495b") +
+  geom_abline(intercept = 0, slope = 1, linetype = "dashed", color = "grey40") +
+  labs(
+    title = "Inflação Esperada vs. Observada — Países sem Regime de Metas",
+    subtitle = "Inclui todos os anos disponíveis",
+    x = "Inflação Esperada (%)",
+    y = "Inflação Observada (%)",
+    caption = expression(bold("Fonte: ") ~ "WDI + Surveys")
+  ) +
+  theme_classic(base_size = 12) +
+  theme(
+    plot.title = element_text(face = "bold", size = 16, hjust = 0),
+    plot.subtitle = element_text(size = 12, hjust = 0, margin = margin(b = 10)),
+    plot.caption = element_text(size = 10, hjust = 0),
+    panel.grid.major.y = element_line(color = "grey80"),
+    panel.grid.major.x = element_blank()
+  )
+
+
+## 📊 Gráfico da média do CBIE dados países que seguem ou não as metas de inflação----
 
 data %>%
   filter(
@@ -894,157 +1272,38 @@ data %>%
     plot.margin        = margin(15, 25, 15, 25)
   )
 
-data %>%
-  filter(
-    country %in% (acemoglu_classification %>% pull(Pais)),
-    !is.na(real_rate), !is.na(inflation)
-  ) %>%
-  left_join(acemoglu_classification, by = c("country" = "Pais")) %>%
-  group_by(country, Classe) %>%
-  filter(n() >= 5) %>%
-  summarise(
-    cor_tj_infl = cor(real_rate, inflation, use = "complete.obs"),
-    .groups = "drop"
-  ) %>%
-  ggplot(aes(x = Classe, y = cor_tj_infl, fill = Classe)) +
-  geom_violin(
-    scale = "width", alpha = 0.5, color = "black", trim = FALSE
-  ) +
-  geom_jitter(
-    width = 0.1, size = 2, alpha = 0.6, color = "black"
-  ) +
-  scale_fill_manual(values = c("Low" = "#E76F51", "Medium" = "#F4A261", "High" = "#2A9D8F")) +
-  labs(
-    title = "Potência da Política Monetária por Classe Institucional",
-    subtitle = "Correlação entre juros reais e inflação (quanto menor, maior potência)",
-    x = "Classe Institucional",
-    y = "Correlação",
-    caption = expression(bold("Fonte: ") ~ "WDI + CBIE + Acemoglu")
-  ) +
-  theme(
-    plot.background    = element_rect(fill = "white", color = NA),
-    panel.background   = element_rect(fill = "white", color = NA),
-    panel.grid.major.y = element_line(color = "grey80"),
-    panel.grid.major.x = element_blank(),
-    panel.grid.minor   = element_blank(),
-    axis.line.x.bottom = element_line(color = "black"),
-    axis.line.y.left   = element_line(color = "black"),
-    axis.ticks         = element_line(color = "black"),
-    plot.title         = element_text(face = "bold", size = 16, hjust = 0),
-    plot.subtitle      = element_text(size = 12, hjust = 0, margin = margin(b = 10)),
-    axis.title         = element_text(face = "bold", size = 12),
-    axis.text          = element_text(size = 10, color = "black"),
-    legend.position    = "none",
-    plot.caption       = element_text(hjust = 0, size = 10, color = "black"),
-    plot.margin        = margin(15, 25, 15, 25)
-  )
+# Modelo Economtérico ----
 
+data_panel <- pdata.frame(data, index = c("country", "year"))
 
-ne_countries(scale = "medium", returnclass = "sf") %>%
-  filter(name != "Antarctica") %>%
-  left_join(
-    data %>%
-      group_by(iso3c) %>%
-      summarise(
-        media_cbie = mean(cbie_index, na.rm = TRUE),
-        .groups = "drop"
-      ),
-    by = c("iso_a3" = "iso3c")
-  ) %>%
-  ggplot() +
-  geom_sf(aes(fill = media_cbie),
-          color = "grey40",
-          size = 0.2) +
-  scale_fill_viridis_c(
-    option = "plasma",
-    direction = -1,
-    name = "CBIE Médio",
-    na.value = "white",
-    limits = c(0.3, 0.85),
-    breaks = seq(0.3, 0.85, 0.1),
-    oob = scales::squish
-  ) +
-  coord_sf(expand = FALSE) +
-  labs(title    = NULL,
-       subtitle = NULL,
-       caption  = NULL) +
-  theme_void(base_size = 11) +
-  theme(
-    legend.position    = "right",
-    legend.title       = element_text(face = "bold", size = 11),
-    legend.text        = element_text(size = 9),
-    
-    plot.title.position = "plot",
-    plot.caption.position = "plot",
-    
-    plot.margin = margin(
-      t = 60,
-      r = 20,
-      b = 40,
-      l = 20
-    )
-  ) +
-  patchwork::plot_annotation(
-    title    = "Independência Média do Banco Central",
-    subtitle = "Média do índice CBIE entre 1990 e 2023",
-    caption  = expression(bold("Fonte: ") ~ "CBIE (Arnone et al.) + Natural Earth"),
-    theme = theme(
-      plot.title    = element_text(face = "bold", size = 18, hjust = 0),
-      plot.subtitle = element_text(
-        size = 13,
-        hjust = 0,
-        margin = margin(b = 10)
-      ),
-      plot.caption  = element_text(
-        hjust = 0,
-        size = 10,
-        color = "black",
-        margin = margin(t = 10)
-      )
-    )
-  )
+gmm_model <- pgmm(
+  formula = inflation ~ lag(inflation, 1) + real_rate*cbie_index + hiato_pct
+    | lag(inflation, 2:3) + real_rate + cbie_index + hiato_pct,
+  data            = data_panel,
+  effect          = "individual",
+  model           = "twosteps",
+  transformation  = "d"
+)
 
-library(tidyverse)
+summary(gmm_model)
 
-data %>%
-  mutate(across(
-    c(pib, inflation, inflation_forecast, taxa_juros, cbie_index, divida, pib_pot, hiato_pct, real_rate),
-    ~ as.numeric(.x)
-  )) %>%
-  select(iso3c, pib, inflation, inflation_forecast, taxa_juros, cbie_index, divida, pib_pot, hiato_pct, real_rate) %>%
-  pivot_longer(
-    cols = -iso3c,
-    names_to = "variavel",
-    values_to = "valor"
-  ) %>%
-  filter(!is.na(valor)) %>%
-  count(iso3c, variavel, name = "n_obs") %>%
-  ggplot(aes(x = fct_reorder(iso3c, -n_obs, .fun = sum), y = n_obs, fill = variavel)) +
-  geom_bar(stat = "identity", color = "white", width = 0.85) +
-  scale_fill_manual(
-    values = c(
-      "#4DACD6","#4FAE62","#F6C54D","#E37D46","#C02D45","#8ecae6","#219ebc","#023047","#ffb703"),
-    name = "Variável"
-  ) +
-  labs(
-    title = "Cobertura de Dados por País e Variável",
-    subtitle = "Número de observações não ausentes por país e por variável",
-    x = "País (ISO3C)",
-    y = "Nº de Observações",
-    caption = expression(bold("Fonte: ") ~ "WDI + CBIE + FMI")
-  ) +
-  theme_classic(base_size = 12) +
-  theme(
-    axis.text.x = element_text(angle = 60, hjust = 1, size = 9),
-    axis.title.x = element_text(face = "bold", margin = margin(t = 10)),
-    axis.title.y = element_text(face = "bold", margin = margin(r = 10)),
-    axis.text.y = element_text(size = 10),
-    plot.title = element_text(face = "bold", size = 16, hjust = 0),
-    plot.subtitle = element_text(size = 12, hjust = 0, margin = margin(b = 10)),
-    plot.caption = element_text(hjust = 0, size = 10, color = "black"),
-    legend.position = "left",
-    legend.title = element_text(face = "bold"),
-    legend.text = element_text(size = 10),
-    panel.grid.major.y = element_line(color = "grey80"),
-    panel.grid.major.x = element_blank()
-  )
+gmm_model <- pgmm(
+  formula = inflation ~ lag(inflation, 1) + real_rate * cbie_index + hiato_pct
+  | lag(inflation, 2:3) + lag(real_rate, 2:3) + cbie_index + hiato_pct,
+  data           = data_panel,
+  effect         = "individual",
+  model          = "twosteps",
+  transformation = "d"
+)
+
+summary(gmm_model, robust = TRUE)
+
+gmm_model_onestep <- pgmm(
+  formula = inflation ~ lag(inflation, 1) + real_rate*cbie_index + hiato_pct
+  | lag(inflation, 2) + lag(real_rate, 2) + cbie_index + hiato_pct,
+  data           = data_panel,
+  effect         = "individual",
+  model          = "onestep",
+  transformation = "d"
+)
+summary(gmm_model_onestep, robust = TRUE)
