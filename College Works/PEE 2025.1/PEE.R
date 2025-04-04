@@ -246,7 +246,8 @@ data <- cbi %>%
     pib_pot            = "PIB potencial (filtro HP)",
     hiato_pct          = "Hiato do produto (%)",
     real_rate          = "Taxa de juros real (%)"
-  )
+  ) %>% 
+  mutate(across(where(~ inherits(.x, "matrix")), as.numeric))
 
 # Gráficos ----
 
@@ -1028,7 +1029,7 @@ data %>%
   left_join(acemoglu_classification, by = c("country" = "Pais")) %>%
   group_by(country) %>%
   mutate(
-    inflacao_a_frente = lead(inflation, 1),
+    inflacao_a_frente = dplyr::lead(inflation, 1),
     delta_inflacao = inflacao_a_frente - inflation
   ) %>%
   ungroup() %>%
@@ -1065,7 +1066,7 @@ data %>%
   left_join(acemoglu_classification, by = c("country" = "Pais")) %>%
   group_by(country) %>%
   mutate(
-    inflacao_a_frente = lead(inflation, 1),
+    inflacao_a_frente = dplyr::lead(inflation, 1),
     delta_inflacao = inflacao_a_frente - inflation
   ) %>%
   ungroup() %>%
@@ -1102,7 +1103,7 @@ data %>%
   left_join(acemoglu_classification, by = c("country" = "Pais")) %>%
   group_by(country) %>%
   mutate(
-    inflacao_a_frente = lead(inflation, 1),
+    inflacao_a_frente = dplyr::lead(inflation, 1),
     delta_inflacao = inflacao_a_frente - inflation
   ) %>%
   ungroup() %>%
