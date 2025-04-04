@@ -134,7 +134,7 @@ agrupamentos <- c(
 )
 ```
 
-# 📊 Importação e Tratamento das Variáveis Econômicas
+## 📊 Importação e Tratamento das Variáveis Econômicas
 
 ```{r download-dados, message=FALSE, warning=FALSE}
 
@@ -161,7 +161,7 @@ debt <- WDI("all", "GC.DOD.TOTL.GD.ZS", 1960) %>%
 
 ```
 
-# 📁 Bases Complementares: Independência do BC e Expectativas
+## 📁 Bases Complementares: Independência do BC e Expectativas
 
 ```{r download-bases-complementares, message=FALSE, warning=FALSE}
 # Índice de independência do Banco Central (base CBIE)
@@ -184,7 +184,7 @@ inf_for <- readxl::read_xlsx("InflationForecast(FMI).xlsx") %>%
   mutate(iso3c = countrycode::countrycode(country, "country.name", "iso3c"))
 ```
 
-# 💰 Taxa de Juros de Política Monetária (FMI - IFS)
+## 💰 Taxa de Juros de Política Monetária (FMI - IFS)
 
 ```{r download-juros, message=FALSE, warning=FALSE}
 
@@ -214,7 +214,7 @@ rate <- data_wide %>%
   select(country, iso2c, iso3c, year, taxa_juros)
 ```
 
-# Base de dados "Própria"
+## Base de dados "Própria"
 
 ```{r download-proria, message=FALSE, warning=FALSE}
 
@@ -297,7 +297,8 @@ data <- cbi %>%
     pib_pot            = "PIB potencial (filtro HP)",
     hiato_pct          = "Hiato do produto (%)",
     real_rate          = "Taxa de juros real (%)"
-  )
+  ) %>% 
+  mutate(across(where(~ inherits(.x, "matrix")), as.numeric))
 ```
 
 # 🔎 Visualização Inicial da Base Final
@@ -1131,7 +1132,7 @@ data %>%
   left_join(acemoglu_classification, by = c("country" = "Pais")) %>%
   group_by(country) %>%
   mutate(
-    inflacao_a_frente = lead(inflation, 1),
+    inflacao_a_frente = dplyr::lead(inflation, 1),
     delta_inflacao = inflacao_a_frente - inflation
   ) %>%
   ungroup() %>%
@@ -1173,7 +1174,7 @@ data %>%
   left_join(acemoglu_classification, by = c("country" = "Pais")) %>%
   group_by(country) %>%
   mutate(
-    inflacao_a_frente = lead(inflation, 1),
+    inflacao_a_frente = dplyr::lead(inflation, 1),
     delta_inflacao = inflacao_a_frente - inflation
   ) %>%
   ungroup() %>%
@@ -1215,7 +1216,7 @@ data %>%
   left_join(acemoglu_classification, by = c("country" = "Pais")) %>%
   group_by(country) %>%
   mutate(
-    inflacao_a_frente = lead(inflation, 1),
+    inflacao_a_frente = dplyr::lead(inflation, 1),
     delta_inflacao = inflacao_a_frente - inflation
   ) %>%
   ungroup() %>%
