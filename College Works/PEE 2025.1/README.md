@@ -91,7 +91,7 @@ A análise envolve:
    - Gerar os gráficos e tabelas descritivas
 3. Interpretar os resultados com base nos modelos teóricos e evidências empíricas
 
-4. Progrma executado [aqui](https://raw.githack.com/Hic-Tayfour/R/main/College%20Works/PEE%202025.1/PEE.html)
+4. Progrma executado [aqui](https://raw.githack.com/Hic-Tayfour/R/refs/heads/main/College%20Works/PEE%202025.1/PEE.html)
 ---
 
 Atenciosamente,  
