@@ -1,4 +1,4 @@
-# 📊 RStudio - Estudos e Projetos em R
+# ⌨️ RStudio - Estudos e Projetos em R
 
 Olá! Seja bem-vindo(a) 😊
 
