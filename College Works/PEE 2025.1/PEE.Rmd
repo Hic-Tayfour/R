@@ -1,44 +1,55 @@
 ---
 title: |
-  <br><br>
-  <strong>INSPER – INSTITUTO DE ENSINO E PESQUISA</strong>  
-  <em>Curso de Economia</em>  
-  <br><br>
-  <strong>Problemas em Economia</strong>  
-  <br>
-  <strong>Tema:</strong> A Relação entre a Independência do Banco Central e a Potência da Política Monetária  
-  <br><br>
+  <div style="text-align: center; margin-top: 30px;">
+    <h1 style="font-size: 24px;"><strong>INSPER – INSTITUTO DE ENSINO E PESQUISA</strong></h1>
+    <h2 style="font-style: italic; font-size: 20px;">Curso de Economia</h2>
+    <div style="margin-top: 30px;"></div>
+    <h3 style="font-size: 20px;">Problemas em Economia</h3>
+    <p style="font-size: 18px;"><strong>Tema:</strong> A Relação entre a Independência do Banco Central e a Potência da Política Monetária</p>
+  </div>
 
 subtitle: |
-  <strong>Professores:</strong>  
-  Juliana Inhasz  
-  Sérgio Ricardo Martins  
-  Paulo Jose Mencacci Costa (Prof. Auxiliar)
+  <div style="text-align: center; margin-top: 30px;">
+    <p style="font-size: 16px;"><strong>Professores:</strong></p>
+    <p style="font-size: 15px;">Juliana Inhasz<br>
+    Sérgio Ricardo Martins<br>
+    Paulo Jose Mencacci Costa (Prof. Auxiliar)</p>
+  </div>
 
 author: |
-  <strong>Integrantes:</strong>  
-  Caio Santa Rosa Christovam – <a href="mailto:caiosrc@al.insper.edu.br">caiosrc@al.insper.edu.br</a>  
-  Érika Kaori Fuzisaka – <a href="mailto:erikakf1@al.insper.edu.br">erikakf1@al.insper.edu.br</a>  
-  Hicham Munir Tayfour – <a href="mailto:hichamt@al.insper.edu.br">hichamt@al.insper.edu.br</a>  
-  Lucas Batista Ferreira – <a href="mailto:lucasbf1@al.insper.edu.br">lucasbf1@al.insper.edu.br</a>  
-  Maria Antonia Pereira Guimarães – <a href="mailto:mariaapg1@al.insper.edu.br">mariaapg1@al.insper.edu.br</a>  
-  Maria Eduarda Marques Pereira – <a href="mailto:mariaemp@al.insper.edu.br">mariaemp@al.insper.edu.br</a>  
-  Maria Morais Garcia Leal – <a href="mailto:mariamgl@al.insper.edu.br">mariamgl@al.insper.edu.br</a>
+  <div style="text-align: center; margin-top: 30px;">
+    <p style="font-size: 16px;"><strong>Integrantes:</strong></p>
+    <p style="font-size: 14px;">
+      Caio Santa Rosa Christovam – <a href="mailto:caiosrc@al.insper.edu.br">caiosrc@al.insper.edu.br</a><br>
+      Érika Kaori Fuzisaka – <a href="mailto:erikakf1@al.insper.edu.br">erikakf1@al.insper.edu.br</a><br>
+      Hicham Munir Tayfour – <a href="mailto:hichamt@al.insper.edu.br">hichamt@al.insper.edu.br</a><br>
+      Lucas Batista Ferreira – <a href="mailto:lucasbf1@al.insper.edu.br">lucasbf1@al.insper.edu.br</a><br>
+      Maria Antonia Pereira Guimarães – <a href="mailto:mariaapg1@al.insper.edu.br">mariaapg1@al.insper.edu.br</a><br>
+      Maria Eduarda Marques Pereira – <a href="mailto:mariaemp@al.insper.edu.br">mariaemp@al.insper.edu.br</a><br>
+      Maria Morais Garcia Leal – <a href="mailto:mariamgl@al.insper.edu.br">mariamgl@al.insper.edu.br</a>
+    </p>
+  </div>
 
-date: "São Paulo – Fevereiro de 2025"
+date: |
+  <div style="text-align: center; margin-top: 20px;">
+    <p><strong>São Paulo – Fevereiro de 2025</strong></p>
+  </div>
 
-output: 
+output:
   html_document:
-    toc: True
-    number_sections: True
+    toc: true
+    toc_float: true
+    number_sections: true
     theme: flatly
     highlight: tango
     df_print: paged
-    toc_float: True
+
 fontsize: 12pt
 encoding: UTF-8
 lang: pt-BR
 ---
+
+------------------------------------------------------------------------
 
 # Hipótese de Pesquisa
 
@@ -48,9 +59,20 @@ Este estudo busca avaliar empiricamente a seguinte hipótese:
 
 Mais especificamente, assume-se que bancos centrais com maior autonomia institucional possuem maior credibilidade e capacidade de ancorar expectativas, o que se reflete em uma resposta mais efetiva da inflação à política monetária.
 
-Para testar essa hipótese, será conduzida uma análise empírica baseada em dados internacionais, com foco na relação entre: - O **grau de independência do Banco Central** (medido por um índice padronizado ou por classificação categórica), e - A **potência da política monetária**, avaliada por meio da resposta da inflação a variações na taxa de juros real.
+Para testar essa hipótese, será conduzida uma análise empírica baseada em dados internacionais, com foco na relação entre:
+
+-   O **grau de independência do Banco Central** (medido por um índice padronizado ou por classificação categórica), e
+
+-   A **potência da política monetária**, avaliada por meio da resposta da inflação a variações na taxa de juros real.
 
 Modelos econométricos e análises descritivas complementares serão utilizados para investigar essa relação ao longo do tempo e entre diferentes grupos de países (por regime monetário e instituições).
+
+# ⚙️ Configuração do Ambiente
+
+```{r config}
+knitr::opts_chunk$set(fig.width=15, fig.height=10)
+
+```
 
 # 📦 Carregando Pacotes
 
@@ -482,13 +504,12 @@ data %>%
 # p
 ```
 
-
 ```{r incluir-mapa-inflacao, echo=FALSE, out.width="100%", fig.align='center'}
 knitr::include_graphics("mapa_inflacao.gif")
 
 ```
 
-## 📊 Gráfico da Evolução do CBI 
+## 📊 Gráfico da Evolução do CBI
 
 ```{r grafico-cbi, message=FALSE, warning=FALSE}
 
@@ -641,7 +662,6 @@ ggplot() +
   )
 
 ```
-
 
 ## 📊 Gráfico da Inflação anual
 
@@ -940,7 +960,7 @@ ggplot() +
 
 ## 📊 Gráfico do PIB de Acordo com as Classificações do Acemoglu
 
-### 📊 Gráfico do PIB Países High 
+### 📊 Gráfico do PIB Países High
 
 ```{r grafico-pib-high, message=FALSE, warning=FALSE}
 
@@ -1401,5 +1421,198 @@ data %>%
     plot.caption       = element_text(hjust = 0, size = 10, color = "black"),
     plot.margin        = margin(15, 25, 15, 25)
   )
+
+```
+
+# 🧮 Estimação do Modelo GMM
+
+$$
+\begin{aligned}
+\text{inflação}_{it} &= \alpha_1 \cdot \text{inflação}_{it-1} + \alpha_2 \cdot \text{real\_rate}_{it} + \alpha_3 \cdot \text{cbie\_index}_{it} \\
+&\quad + \alpha_4 \cdot \text{hiato}_{it} + \alpha_5 \cdot (\text{real\_rate}_{it} \times \text{cbie\_index}_{it}) \\
+&\quad + \alpha_6 \cdot \text{inflation\_forecast}_{it} + \mu_i + \nu_{it}
+\end{aligned}
+$$
+
+## 📊 Preprando os dados para o GMM
+
+```{r gmm-preparacao, message=FALSE, warning=FALSE}
+
+painel <- pdata.frame(data, index = c("country", "year"))
+
+```
+
+## 📊 Estimando o modelo GMM
+
+```{r gmm-estimacao, message=FALSE, warning=FALSE}
+
+modelo_gmm <- pgmm(
+  formula = inflation ~ lag(inflation, 1) + real_rate * cbie_index + hiato_pct + inflation_forecast
+  | lag(inflation, 2:3) + lag(real_rate, 2:3) + lag(inflation_forecast, 2:3) + cbie_index + hiato_pct,
+  data           = painel,
+  effect         = "individual",
+  model          = "twosteps",
+  transformation = "d"
+)
+
+```
+
+### 📊 Resumo do modelo GMM
+
+```{r gmm-resumo, message=FALSE, warning=FALSE}
+
+coefs_gmm <- summary(modelo_gmm, robust = TRUE)$coefficients 
+
+as.data.frame(coefs_gmm) %>% rownames_to_column("Variável") %>% rename(
+  `Estimativa` = Estimate,
+  `Erro Padrão` = `Std. Error`,
+  `Estatística z` = `z-value`,
+  `p-valor` = `Pr(>|z|)`
+) %>% mutate(
+  Signif = case_when(
+    `p-valor` <= 0.001 ~ "***",
+    `p-valor` <= 0.01 ~ "**",
+    `p-valor` <= 0.05 ~ "*",
+    `p-valor` <= 0.1 ~ ".",
+    TRUE ~ ""
+  )
+) %>% gt() %>% tab_header(
+  title = md("**Estimativas do Modelo GMM — Painel Completo**"),
+  subtitle = "Modelo com efeitos individuais e diferenciação em primeiras diferenças"
+) %>% fmt_number(columns = where(is.numeric), decimals = 3) %>% cols_label(
+  Variável = "Variável",
+  `Estimativa` = "Coef.",
+  `Erro Padrão` = "Erro Padrão",
+  `Estatística z` = "z-valor",
+  `p-valor` = "p-valor",
+  Signif = " "
+) %>% tab_source_note(md("*Nota: `***` 0.1% | `**` 1% | `*` 5% | `.` 10%*"))
+
+```
+
+### 📊 Estimando o modelo GMM para as classes de Acemoglu
+
+####  Preprando os dados para avaliar as classes
+
+```{r gmm-preparacao-classes, message=FALSE, warning=FALSE}
+
+painel <- left_join(painel, acemoglu_classification, by = c("country" = "Pais"))
+
+```
+
+#### 📊 Estimando o modelo GMM para a classe High
+
+```{r gmm-estimacao-high, message=FALSE, warning=FALSE}
+
+gmm_high <- pgmm(
+  formula = inflation ~ lag(inflation, 1) + real_rate * cbie_index + hiato_pct + inflation_forecast
+  | lag(inflation, 2:3) + lag(real_rate, 2:3) + lag(inflation_forecast, 2:3) + cbie_index + hiato_pct,
+  data = subset(painel, Classe == "High"),
+  effect = "individual",
+  model = "twosteps",
+  transformation = "d"
+)
+
+```
+
+##### 📊 Resumo do modelo GMM para a classe High
+
+```{r gmm-resumo-high, message=FALSE, warning=FALSE}
+
+coefs_gmm_high <- summary(gmm_high, robust = TRUE)$coefficients
+
+as.data.frame(coefs_gmm_high) %>% rownames_to_column("Variável") %>% rename(
+  `Estimativa` = Estimate,
+  `Erro Padrão` = `Std. Error`,
+  `Estatística z` = `z-value`,
+  `p-valor` = `Pr(>|z|)`
+) %>% mutate(
+  Signif = case_when(
+    `p-valor` <= 0.001 ~ "***",
+    `p-valor` <= 0.01 ~ "**",
+    `p-valor` <= 0.05 ~ "*",
+    `p-valor` <= 0.1 ~ ".",
+    TRUE ~ ""
+  )
+) %>% gt() %>% tab_header(
+  title = md("**Estimativas do Modelo GMM — Classe High**"),
+  subtitle = "Modelo com efeitos individuais e diferenciação em primeiras diferenças"
+) %>% fmt_number(columns = where(is.numeric), decimals = 3) %>% cols_label(
+  Variável = "Variável",
+  `Estimativa` = "Coef.",
+  `Erro Padrão` = "Erro Padrão",
+  `Estatística z` = "z-valor",
+  `p-valor` = "p-valor",
+  Signif = " "
+) %>% tab_source_note(md("*Nota: `***` 0.1% | `**` 1% | `*` 5% | `.` 10%*"))
+
+```
+
+#### 📊 Estimando o modelo GMM para a classe Medium
+
+```{r gmm-estimacao-medium, message=FALSE, warning=FALSE}
+
+gmm_medium <- pgmm(
+  formula = inflation ~ lag(inflation, 1) + real_rate * cbie_index + hiato_pct + inflation_forecast
+  | lag(inflation, 2:3) + lag(real_rate, 2:3) + lag(inflation_forecast, 2:3) + cbie_index + hiato_pct,
+  data = subset(painel, Classe == "Medium"),
+  effect = "individual",
+  model = "twosteps",
+  transformation = "d"
+)
+
+```
+
+
+##### 📊 Resumo do modelo GMM para a classe Medium
+
+```{r gmm-resumo-medium, message=FALSE, warning=FALSE}
+
+coefs_gmm_medium <- summary(gmm_medium, robust = TRUE)$coefficients
+
+as.data.frame(coefs_gmm_medium) %>% rownames_to_column("Variável") %>% rename(
+  `Estimativa` = Estimate,
+  `Erro Padrão` = `Std. Error`,
+  `Estatística z` = `z-value`,
+  `p-valor` = `Pr(>|z|)`
+) %>% mutate(
+  Signif = case_when(
+    `p-valor` <= 0.001 ~ "***",
+    `p-valor` <= 0.01 ~ "**",
+    `p-valor` <= 0.05 ~ "*",
+    `p-valor` <= 0.1 ~ ".",
+    TRUE ~ ""
+  )
+) %>% gt() %>% tab_header(
+  title = md("**Estimativas do Modelo GMM — Classe Medium**"),
+  subtitle = "Modelo com efeitos individuais e diferenciação em primeiras diferenças"
+) %>% fmt_number(columns = where(is.numeric), decimals = 3) %>% cols_label(
+  Variável = "Variável",
+  `Estimativa` = "Coef.",
+  `Erro Padrão` = "Erro Padrão",
+  `Estatística z` = "z-valor",
+  `p-valor` = "p-valor",
+  Signif = " "
+) %>% tab_source_note(md("*Nota: `***` 0.1% | `**` 1% | `*` 5% | `.` 10%*"))
+
+```
+
+#### 📊 Estimando o modelo Efeitos Fixoa para a classe Low
+
+```{r fixest-estimacao-low, message=FALSE, warning=FALSE}
+
+modelo_low_fe <- fixest::feols(
+  inflation ~ lag(inflation, 1) + real_rate * cbie_index + hiato_pct + inflation_forecast | country + year,
+  data = subset(painel, Classe == "Low"),
+  cluster = "country"
+)
+
+```
+
+##### 📊 Resumo do modelo Efeito Fixo para a classe Low
+
+```{r fixest-resumo-low, message=FALSE, warning=FALSE}
+
+summary(modelo_low_fe)
 
 ```
