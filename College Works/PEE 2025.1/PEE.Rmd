@@ -117,6 +117,7 @@ library(labelled)
 # Tabelas Profissionais
 library(gt)
 library(gtExtras)
+library(stargazer)
 
 ```
 
@@ -168,11 +169,18 @@ gdp <- WDI("all", "NY.GDP.MKTP.KD", 1960) %>%
   arrange(country, year)
 
 # Inflação (deflator do PIB)
-cpi <- WDI("all", "NY.GDP.DEFL.KD.ZG", 1960) %>%
+cpi <- WDI(
+  country = "all",
+  indicator = "FP.CPI.TOTL.ZG",
+  start = 1960,
+  end = NULL,
+  extra = TRUE
+) %>%
   filter(!country %in% agrupamentos) %>%
-  select(country, iso2c, iso3c, year, NY.GDP.DEFL.KD.ZG) %>%
-  rename(inflation = NY.GDP.DEFL.KD.ZG) %>%
+  select(country, iso2c, iso3c, year, FP.CPI.TOTL.ZG) %>%
+  rename(inflation = FP.CPI.TOTL.ZG) %>%
   arrange(country, year)
+
 
 # Dívida governamental (% do PIB)
 debt <- WDI("all", "GC.DOD.TOTL.GD.ZS", 1960) %>%
@@ -265,18 +273,24 @@ target <- data.frame(
 )
 
 acemoglu_classification <- data.frame(
-  Pais = c("Argentina", "Australia", "Austria", "Brazil", "Chile", 
-           "Denmark", "Finland", "France", "Greece", "Guatemala", 
-           "India", "Indonesia", "Korea", "Malaysia", "Mexico",
-           "Mongolia", "Netherlands", "Norway", "Paraguay","Philippines",
-           "Portugal", "Spain", "Sweden", "Switzerland", "Turkey", "United Kingdom",
-           "Uruguay"),
-  Classe = c("Medium", "High", "High", "Medium", "Medium", 
-             "High", "High", "Medium", "Medium", "Low", 
-             "Medium", "Low", "Medium", "Medium", "Medium",
-             "Medium", "High", "High", "Low", "Medium",
-             "Medium", "Medium", "High", "High", "Medium", 
-             "High", "Medium")
+  Pais = c("Argentina", "Australia", "Austria", "Belgium", "Bolivia", "Brazil", "Canada", 
+           "Chile", "China", "Colombia", "Costa Rica", "Denmark", "Dominican Republic", 
+           "Ecuador", "El Salvador", "Finland", "France", "Germany", "Greece", "Guatemala", 
+           "Guyana", "Honduras", "India", "Indonesia", "Ireland", "Israel", "Italy", 
+           "Japan", "South Korea","Malaysia", "Mexico", "Mongolia", "Nepal", "Netherlands", 
+           "New Zealand", "Nicaragua", "Norway", "Pakistan", "Paraguay", "Peru", 
+           "Philippines", "Portugal", "Qatar", "Singapore", "Spain", "Sweden", 
+           "Switzerland", "Turkey", "United Kingdom", "United States of America", 
+           "Uruguay", "Venezuela"),
+  Classe = c("Medium", "High", "High", "Medium", "Medium", "Medium",
+             "High", "Medium", "Medium", "Medium", "Medium", "High",
+             "Medium", "Low", "Medium", "High", "Medium",
+             "High", "Medium", "Low", "Medium", "Low", "Medium",
+             "Low", "High", "Medium", "Medium", "Medium", "Medium", "Medium",
+             "Medium", "Medium", "Medium", "High", "High", "Low",
+             "High", "Low", "Low", "Medium", "Medium", "Medium",
+             "Medium", "High", "Medium", "High", "High", "Medium",
+             "High", "High", "Medium", "Low")
 )
 ```
 
@@ -984,7 +998,8 @@ data %>%
       "#8ecae6",
       "#219ebc",
       "#023047",
-      "#ffb703"
+      "#ffb703",
+      "#72A1DB"
     )
   ) +
   scale_y_continuous(labels = label_number(scale_cut = cut_short_scale())) +
@@ -1045,7 +1060,16 @@ data %>%
       "#219ebc",
       "#023047",
       "#ffb703",
-      "#9b5de5"
+      "#9b5de5",
+      "#9F86C0",
+      "#5E548E",
+      "#2A9D8F",
+      "#E76F51",
+      "#264653",
+      "#F8961E",
+      "#43AA8B",
+      "#F94144",
+      "#90BE6D"
     )
   ) +
   scale_y_continuous(labels = label_number(scale_cut = cut_short_scale())) +
@@ -1459,35 +1483,65 @@ modelo_gmm <- pgmm(
 
 ### 📊 Resumo do modelo GMM
 
-```{r gmm-resumo, message=FALSE, warning=FALSE}
+```{r gmm-resumo, message=FALSE, warning=FALSE, results='asis'}
 
-coefs_gmm <- summary(modelo_gmm, robust = TRUE)$coefficients 
+# Resumo e estrutura do painel
+sm          <- summary(modelo_gmm)
+pdim        <- plm::pdim(modelo_gmm)
+n_obs       <- pdim$N
+n_countries <- pdim$n
 
-as.data.frame(coefs_gmm) %>% rownames_to_column("Variável") %>% rename(
-  `Estimativa` = Estimate,
-  `Erro Padrão` = `Std. Error`,
-  `Estatística z` = `z-value`,
-  `p-valor` = `Pr(>|z|)`
-) %>% mutate(
-  Signif = case_when(
-    `p-valor` <= 0.001 ~ "***",
-    `p-valor` <= 0.01 ~ "**",
-    `p-valor` <= 0.05 ~ "*",
-    `p-valor` <= 0.1 ~ ".",
-    TRUE ~ ""
-  )
-) %>% gt() %>% tab_header(
-  title = md("**Estimativas do Modelo GMM — Painel Completo**"),
-  subtitle = "Modelo com efeitos individuais e diferenciação em primeiras diferenças"
-) %>% fmt_number(columns = where(is.numeric), decimals = 3) %>% cols_label(
-  Variável = "Variável",
-  `Estimativa` = "Coef.",
-  `Erro Padrão` = "Erro Padrão",
-  `Estatística z` = "z-valor",
-  `p-valor` = "p-valor",
-  Signif = " "
-) %>% tab_source_note(md("*Nota: `***` 0.1% | `**` 1% | `*` 5% | `.` 10%*"))
+# Testes de diagnóstico
+tests  <- sm$tests
+sargan <- tests$Sargan
+ar1    <- tests$AR1
+ar2    <- tests$AR2
+wald   <- tests$Wald
 
+# Título + subtítulo manual
+cat(
+  "<h3 style='text-align:center;'>Estimativas do Modelo GMM com Expectativas de Inflação</h3>\n",
+  "<h4 style='text-align:center;font-weight:normal;'>Painel desbalanceado (77 países, 1.316 obs.), two‑step Difference GMM</h4>\n"
+)
+
+# Tabela em HTML com stargazer
+stargazer(
+  modelo_gmm,
+  type = "html",
+  header = FALSE,
+  summary = FALSE,
+  dep.var.labels.include = FALSE,
+  covariate.labels = c(
+    "$\\alpha_1$ (Inflação defasada)",
+    "$\\alpha_2$ (Juros real)",
+    "$\\alpha_3$ (Indep. BC)",
+    "$\\alpha_4$ (Hiato do produto)",
+    "$\\alpha_5$ (Interação juros $\\times$ independência)",
+    "$\\alpha_6$ (Expectativa de inflação)"
+  ),
+  digits = 4,
+  star.cutoffs = c(0.05, 0.001),
+  star.char = c("*", "***"),
+  no.space = TRUE,
+  add.lines = list(
+    c("Nº de observações", as.character(n_obs)),
+    c("Nº de países (painel desbalanceado)", as.character(n_countries)),
+    c("Teste de Sargan (overid)",
+      sprintf("$\\chi^2(%d)=%.2f$, $p$‑value=%.3f$",
+              sargan$df, sargan$statistic, sargan$p.value)),
+    c("AR(1) (Arellano‑Bond)",
+      sprintf("$z=%.2f$, $p$‑value=%.4f$",
+              ar1$statistic, ar1$p.value)),
+    c("AR(2) (Arellano‑Bond)",
+      sprintf("$z=%.2f$, $p$‑value=%.3f$",
+              ar2$statistic, ar2$p.value)),
+    c("Wald (conj. de coeficientes)",
+      sprintf("$\\chi^2(%d)=%.2f$, $p$‑value<%.3f$",
+              wald$df, wald$statistic, wald$p.value))
+  ),
+  notes = c("* p<0.05; *** p<0.001"),
+  notes.align = "l"
+)
 ```
 
 ### 📊 Estimando o modelo GMM para as classes de Acemoglu
