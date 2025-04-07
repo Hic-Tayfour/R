@@ -94,14 +94,14 @@ gdp <- WDI(
 
 cpi <- WDI(
   country = "all",
-  indicator = "NY.GDP.DEFL.KD.ZG",
+  indicator = "FP.CPI.TOTL.ZG",
   start = 1960,
   end = NULL,
   extra = TRUE
 ) %>%
   filter(!country %in% agrupamentos) %>%
-  select(country, iso2c, iso3c, year, NY.GDP.DEFL.KD.ZG) %>%
-  rename(inflation = NY.GDP.DEFL.KD.ZG) %>%
+  select(country, iso2c, iso3c, year, FP.CPI.TOTL.ZG) %>%
+  rename(inflation = FP.CPI.TOTL.ZG) %>%
   arrange(country, year)
 
 debt <- WDI(
@@ -188,18 +188,24 @@ target <- data.frame(
 )
 
 acemoglu_classification <- data.frame(
-  Pais = c("Argentina", "Australia", "Austria", "Brazil", "Chile", 
-           "Denmark", "Finland", "France", "Greece", "Guatemala", 
-           "India", "Indonesia", "Korea", "Malaysia", "Mexico",
-           "Mongolia", "Netherlands", "Norway", "Paraguay","Philippines",
-           "Portugal", "Spain", "Sweden", "Switzerland", "Turkey", "United Kingdom",
-           "Uruguay"),
-  Classe = c("Medium", "High", "High", "Medium", "Medium", 
-             "High", "High", "Medium", "Medium", "Low", 
-             "Medium", "Low", "Medium", "Medium", "Medium",
-             "Medium", "High", "High", "Low", "Medium",
-             "Medium", "Medium", "High", "High", "Medium", 
-             "High", "Medium")
+  Pais = c("Argentina", "Australia", "Austria", "Belgium", "Bolivia", "Brazil", "Canada", 
+           "Chile", "China", "Colombia", "Costa Rica", "Denmark", "Dominican Republic", 
+           "Ecuador", "El Salvador", "Finland", "France", "Germany", "Greece", "Guatemala", 
+           "Guyana", "Honduras", "India", "Indonesia", "Ireland", "Israel", "Italy", 
+           "Japan", "South Korea","Malaysia", "Mexico", "Mongolia", "Nepal", "Netherlands", 
+           "New Zealand", "Nicaragua", "Norway", "Pakistan", "Paraguay", "Peru", 
+           "Philippines", "Portugal", "Qatar", "Singapore", "Spain", "Sweden", 
+           "Switzerland", "Turkey", "United Kingdom", "United States of America", 
+           "Uruguay", "Venezuela"),
+  Classe = c("Medium", "High", "High", "Medium", "Medium", "Medium",
+             "High", "Medium", "Medium", "Medium", "Medium", "High",
+             "Medium", "Low", "Medium", "High", "Medium",
+             "High", "Medium", "Low", "Medium", "Low", "Medium",
+             "Low", "High", "Medium", "Medium", "Medium", "Medium", "Medium",
+             "Medium", "Medium", "Medium", "High", "High", "Low",
+             "High", "Low", "Low", "Medium", "Medium", "Medium",
+             "Medium", "High", "Medium", "High", "High", "Medium",
+             "High", "High", "Medium", "Low")
 )
 
 data <- cbi %>%
@@ -1423,10 +1429,13 @@ tabela_gmm_medium <- as.data.frame(coefs_gmm_medium) %>%
 
 tabela_gmm_medium
 
-modelo_low_fe <- fixest::feols(
-  inflation ~ lag(inflation, 1) + real_rate * cbie_index + hiato_pct + inflation_forecast | country + year,
+gmm_low <- pgmm(
+  formula = inflation ~ lag(inflation, 1) + real_rate * cbie_index + hiato_pct + inflation_forecast
+  | lag(inflation, 2:3) + lag(real_rate, 2:3) + lag(inflation_forecast, 2:3) + cbie_index + hiato_pct,
   data = subset(painel, Classe == "Low"),
-  cluster = "country"
+  effect = "individual",
+  model = "twosteps",
+  transformation = "d"
 )
 
-summary(modelo_low_fe)
+
