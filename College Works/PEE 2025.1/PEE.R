@@ -247,7 +247,7 @@ data <- cbi %>%
     inflation          = "Inflação (%)",
     inflation_forecast = "Expectativa de Inflação (%)",
     taxa_juros         = "Taxa de juros nominal (%)(BC)",
-    cbie_index         = "Índice de independência do Banco Central",
+    cbie_index         = "Índice de independência do Banco Central (%)",
     divida             = "Dívida governamental (% do PIB)",
     pib_pot            = "PIB potencial (filtro HP)",
     hiato_pct          = "Hiato do produto (%)",
@@ -881,7 +881,8 @@ data %>%
       "#8ecae6",
       "#219ebc",
       "#023047",
-      "#ffb703"
+      "#ffb703",
+      "#72A1DB"
     )
   ) +
   scale_y_continuous(labels = label_number(scale_cut = cut_short_scale())) +
@@ -937,7 +938,16 @@ data %>%
       "#219ebc",
       "#023047",
       "#ffb703",
-      "#9b5de5"
+      "#9b5de5",
+      "#9F86C0",
+      "#5E548E",
+      "#2A9D8F",
+      "#E76F51",
+      "#264653",
+      "#F8961E",
+      "#43AA8B",
+      "#F94144",
+      "#90BE6D"
     )
   ) +
   scale_y_continuous(labels = label_number(scale_cut = cut_short_scale())) +
@@ -1281,161 +1291,19 @@ data %>%
 
 # 📈🧮 Estimação do Modelo GMM ----
 
-## Preprando os dados para o GMM ----
+panel_data <- pdata.frame(
+  data,
+  index = c("iso3c", "year")  # ou "country","year", etc.
+)
 
-painel <- pdata.frame(data, index = c("country", "year"))
-
-## Estimando o modelo ----
-
-modelo_gmm <- pgmm(
-  formula = inflation ~ lag(inflation, 1) + real_rate * cbie_index + hiato_pct + inflation_forecast
+gmm_model <- pgmm(
+  formula = inflation ~ lag(inflation, 1) +  cbie_index*taxa_juros + hiato_pct + inflation_forecast +
+taxa_juros
   | lag(inflation, 2:3) + lag(real_rate, 2:3) + lag(inflation_forecast, 2:3) + cbie_index + hiato_pct,
-  data           = painel,
+  data           = panel_data,
   effect         = "individual",
   model          = "twosteps",
   transformation = "d"
 )
 
-coefs_gmm <- summary(modelo_gmm, robust = TRUE)$coefficients
-
-tabela_gmm <- as.data.frame(coefs_gmm) %>%
-  rownames_to_column("Variável") %>%
-  rename(
-    `Estimativa` = Estimate,
-    `Erro Padrão` = `Std. Error`,
-    `Estatística z` = `z-value`,
-    `p-valor` = `Pr(>|z|)`
-  ) %>%
-  mutate(
-    Signif = case_when(
-      `p-valor` <= 0.001 ~ "***",
-      `p-valor` <= 0.01 ~ "**",
-      `p-valor` <= 0.05 ~ "*",
-      `p-valor` <= 0.1 ~ ".",
-      TRUE ~ ""
-    )
-  ) %>%
-  gt() %>%
-  tab_header(
-    title = md("**Estimativas do Modelo GMM — Painel Completo**"),
-    subtitle = "Modelo dinâmico com efeitos individuais e diferenciação em primeiras diferenças"
-  ) %>%
-  fmt_number(columns = where(is.numeric), decimals = 3) %>%
-  cols_label(
-    Variável = "Variável",
-    `Estimativa` = "Coef.",
-    `Erro Padrão` = "Erro Padrão",
-    `Estatística z` = "z-valor",
-    `p-valor` = "p-valor",
-    Signif = " "
-  ) %>%
-  tab_source_note(md("*Nota: `***` 0.1% | `**` 1% | `*` 5% | `.` 10%*"))
-
-tabela_gmm
-
-## Modelo GMM com as Classificações de Acemoglu ----
-
-painel <- left_join(painel, acemoglu_classification, by = c("country" = "Pais"))
-
-gmm_high <- pgmm(
-  formula = inflation ~ lag(inflation, 1) + real_rate * cbie_index + hiato_pct + inflation_forecast
-  | lag(inflation, 2:3) + lag(real_rate, 2:3) + lag(inflation_forecast, 2:3) + cbie_index + hiato_pct,
-  data = subset(painel, Classe == "High"),
-  effect = "individual",
-  model = "twosteps",
-  transformation = "d"
-)
-
-coefs_gmm_high <- summary(gmm_high, robust = TRUE)$coefficients
-
-tabela_gmm_high <- as.data.frame(coefs_gmm_high) %>%
-  rownames_to_column("Variável") %>%
-  rename(
-    `Estimativa` = Estimate,
-    `Erro Padrão` = `Std. Error`,
-    `Estatística z` = `z-value`,
-    `p-valor` = `Pr(>|z|)`
-  ) %>%
-  mutate(
-    Signif = case_when(
-      `p-valor` <= 0.001 ~ "***",
-      `p-valor` <= 0.01 ~ "**",
-      `p-valor` <= 0.05 ~ "*",
-      `p-valor` <= 0.1 ~ ".",
-      TRUE ~ ""
-    )
-  ) %>%
-  gt() %>%
-  tab_header(
-    title = md("**Estimativas do Modelo GMM — Classe 'High'**"),
-    subtitle = "Modelo dinâmico com efeitos individuais e diferenciação em primeiras diferenças"
-  ) %>%
-  fmt_number(columns = where(is.numeric), decimals = 3) %>%
-  cols_label(
-    Variável = "Variável",
-    `Estimativa` = "Coef.",
-    `Erro Padrão` = "Erro Padrão",
-    `Estatística z` = "z-valor",
-    `p-valor` = "p-valor",
-    Signif = " "
-  ) %>%
-  tab_source_note(md("*Nota: `***` 0.1% | `**` 1% | `*` 5% | `.` 10%*"))
-
-tabela_gmm_high
-
-gmm_medium <- pgmm(
-  formula = inflation ~ lag(inflation, 1) + real_rate * cbie_index + hiato_pct + inflation_forecast
-  | lag(inflation, 2:3) + lag(real_rate, 2:3) + lag(inflation_forecast, 2:3) + cbie_index + hiato_pct,
-  data = subset(painel, Classe == "Medium"),
-  effect = "individual",
-  model = "twosteps",
-  transformation = "d"
-)
-
-coefs_gmm_medium <- summary(gmm_medium, robust = TRUE)$coefficients
-
-tabela_gmm_medium <- as.data.frame(coefs_gmm_medium) %>%
-  rownames_to_column("Variável") %>%
-  rename(
-    `Estimativa` = Estimate,
-    `Erro Padrão` = `Std. Error`,
-    `Estatística z` = `z-value`,
-    `p-valor` = `Pr(>|z|)`
-  ) %>%
-  mutate(
-    Signif = case_when(
-      `p-valor` <= 0.001 ~ "***",
-      `p-valor` <= 0.01 ~ "**",
-      `p-valor` <= 0.05 ~ "*",
-      `p-valor` <= 0.1 ~ ".",
-      TRUE ~ ""
-    )
-  ) %>%
-  gt() %>%
-  tab_header(
-    title = md("**Estimativas do Modelo GMM — Classe 'Medium'**"),
-    subtitle = "Modelo dinâmico com efeitos individuais e diferenciação em primeiras diferenças"
-  ) %>%
-  fmt_number(columns = where(is.numeric), decimals = 3) %>%
-  cols_label(
-    Variável = "Variável",
-    `Estimativa` = "Coef.",
-    `Erro Padrão` = "Erro Padrão",
-    `Estatística z` = "z-valor",
-    `p-valor` = "p-valor",
-    Signif = " "
-  ) %>%
-  tab_source_note(md("*Nota: `***` 0.1% | `**` 1% | `*` 5% | `.` 10%*"))
-
-tabela_gmm_medium
-
-gmm_low <- pgmm(
-  formula = inflation ~ lag(inflation, 1) + real_rate * cbie_index + hiato_pct + inflation_forecast
-  | lag(inflation, 2:3) + lag(real_rate, 2:3) + lag(inflation_forecast, 2:3) + cbie_index + hiato_pct,
-  data = subset(painel, Classe == "Low"),
-  effect = "individual",
-  model = "twosteps",
-  transformation = "d"
-)
-
-
+summary(gmm_model)
