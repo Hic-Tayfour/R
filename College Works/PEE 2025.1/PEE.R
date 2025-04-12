@@ -1291,16 +1291,26 @@ data %>%
 
 # 📈🧮 Estimação do Modelo GMM ----
 
-panel_data <- pdata.frame(
+panel <- pdata.frame(
   data,
-  index = c("iso3c", "year")  # ou "country","year", etc.
+  index = c("iso3c", "year")
 )
 
+## 🧮 Estimando o Modelo ----
+
 gmm_model <- pgmm(
-  formula = inflation ~ lag(inflation, 1) +  cbie_index*taxa_juros + hiato_pct + inflation_forecast +
-taxa_juros
-  | lag(inflation, 2:3) + lag(real_rate, 2:3) + lag(inflation_forecast, 2:3) + cbie_index + hiato_pct,
-  data           = panel_data,
+  formula = inflation ~
+    lag(inflation, 1) +
+    cbie_index * real_rate +
+    lag(hiato_pct, 1) +
+    inflation_forecast
+  | 
+    lag(inflation, 3:4) +
+    lag(real_rate, 2:3) +
+    lag(inflation_forecast, 3:4) +
+    cbie_index +
+    lag(hiato_pct, 3:4),
+  data           = panel,
   effect         = "individual",
   model          = "twosteps",
   transformation = "d"
