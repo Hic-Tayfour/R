@@ -1,5 +1,25 @@
-Olá, tudo bem? Espero que sim.
+## 📘 Zerando o Livro *R for Data Science*
 
-Aqui você encontrará meu caderno, feito no RStudio. Segui o livro "R para Data Science", disponível gratuitamente aqui: https://r4ds.hadley.nz/ . Com o intuito de aprofundar ainda mais meus conhecimentos em R e Ciência de Dados, repliquei os ensinamentos do livro, adaptando certas partes para melhorar meu entendimento. Espero que faça bom uso do material aqui presente.
+Olá! Espero que esteja tudo bem com você.  
+Neste caderno, desenvolvido no **RStudio**, compartilho meus estudos baseados no livro:
 
-Atenciosamente, Hicham Tayfour
+🔗 [**R for Data Science (2ª edição)** — Hadley Wickham & Mine Çetinkaya-Rundel](https://r4ds.hadley.nz/)
+
+Com o objetivo de aprofundar meus conhecimentos em **R** e **Ciência de Dados**, repliquei os exemplos propostos no livro, **adaptando certas partes para reforçar meu entendimento** e organizar o conteúdo de forma prática.
+
+---
+
+### 📚 O que você encontrará aqui:
+
+- ✅ Códigos reproduzidos e comentados dos capítulos do livro
+- 🧪 Testes, variações e extensões dos exemplos originais
+- 📊 Aplicações com `ggplot2`, `dplyr`, `tidyr`, `readr` e outros pacotes do *tidyverse*
+- ✍️ Anotações pessoais para facilitar revisões futuras
+
+---
+
+Este material foi feito com dedicação e foco no aprendizado ativo.  
+Sinta-se à vontade para usar, adaptar ou expandir os exemplos em seus próprios projetos.
+
+Atenciosamente,  
+**Hicham Munir Tayfour**
