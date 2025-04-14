@@ -164,29 +164,58 @@ rate <- data_wide %>%
   filter(!is.na(country)) %>%
   select(country, iso2c, iso3c, year, taxa_juros)
 
-target <- data.frame(
-  Pais = c("New Zealand", "Canada", "Chile", "Israel", "United Kingdom", "Sweden",
-           "Finland", "Australia", "Spain", "Czech Republic", "Poland", "Brazil",
-           "Colombia", "South Africa", "Thailand", "South Korea", "Mexico",
-           "Iceland", "Norway", "Hungary", "Peru", "Philippines", "Guatemala",
-           "Indonesia", "Romania", "Turkey", "Serbia", "Ghana", "Uruguay",
-           "Albania", "Georgia", "Armenia", "Japan", "India", "Russia",
-           "Moldova", "Paraguay", "Uganda", "Dominican Republic"),
-  AnoAdocao = c(1989, 1991, 1991, 1991, 1992, 1993,
-                1993, 1993, 1994, 1997, 1998, 1999,
-                1999, 2000, 2000, 2001, 2001,
-                2001, 2001, 2001, 2002, 2002, 2005,
-                2005, 2005, 2006, 2007, 2007,
-                2009, 2009, 2009, 2013, 2015, 2014,
-                2010, 2011, 2011, 2012, 2015),
-  SegueAtualmente = c("sim", "sim", "sim", "sim", "sim", "sim",
-                      "não", "sim", "não", "sim", "sim", "sim",
-                      "sim", "sim", "sim", "sim", "sim",
-                      "sim", "sim", "sim", "sim", "sim", "sim",
-                      "sim", "não", "sim", "sim", "sim",
-                      "sim", "sim", "sim", "sim", "sim", "sim",
-                      "sim", "sim", "sim", "sim", "sim")
-)
+target_panel_bond <- read_excel("target(macrobond).xlsx", sheet = "Sheet1") %>%
+  rename(date = "...1") %>%
+  mutate(date = as.Date(date, origin = "1899-12-30")) %>%
+  mutate(year = year(date)) %>%
+  group_by(year) %>%
+  filter(date == max(date)) %>%
+  ungroup() %>%
+  pivot_longer(
+    cols = -c(date, year),
+    names_to = "full_country_name",
+    values_to = "target"
+  ) %>%
+  mutate(country = gsub("^([^,]+),.*", "\\1", full_country_name)) %>%
+  select(country, year, target) %>%
+  filter(!is.na(target))%>%
+  arrange(country, year)
+
+target_panel_eikon <- read_excel("target(eikon).xlsx", sheet = "valores") %>%
+  mutate(country = str_to_title(GEOGN)) %>%
+  mutate(across(matches("^\\d+$"), as.character)) %>%
+  pivot_longer(
+    cols = matches("^\\d+$"),
+    names_to = "date_num",
+    values_to = "target"
+  ) %>%
+  mutate(
+    target = na_if(target, "NA"),
+    date = as.Date(as.numeric(date_num), origin = "1899-12-30"),
+    year = year(date),
+    target = as.numeric(target)
+  ) %>%
+  select(country, year, target) %>%
+  arrange(country, year)
+
+
+target <- target_panel_eikon %>%
+  full_join(target_panel_bond, by = c("country", "year"), suffix = c("_eikon", "_bond")) %>%
+  mutate(
+    target = coalesce(target_eikon, target_bond)
+  ) %>%
+  select(country, year, target) %>%
+  filter(year >= 2000, year <= 2023) %>%
+  distinct(country, year, .keep_all = TRUE) %>%  
+  mutate(
+    iso3c = case_when(
+      country == "Euro Area" ~ "EMU",
+      TRUE ~ countrycode(country, "country.name", "iso3c")
+    )
+  ) %>%
+  arrange(country, year)
+
+
 
 acemoglu_classification <- data.frame(
   Pais = c("Argentina", "Australia", "Austria", "Belgium", "Bolivia", "Brazil", "Canada", 
@@ -215,6 +244,7 @@ data <- cbi %>%
   inner_join(gdp  %>% select(-country), by = c("iso3c", "year")) %>%
   inner_join(rate %>% select(-country), by = c("iso3c", "year")) %>%
   inner_join(inf_for %>% select(-country), by = c("iso3c", "year")) %>%
+  inner_join(target %>% select(-country), by = c("iso3c", "year")) %>%
   filter(year >= 2000) %>%
   select(-c(iso2c.y, iso2c.x.x, iso2c.y.y)) %>%
   rename(iso2c = iso2c.x) %>%
@@ -241,7 +271,8 @@ data <- cbi %>%
     divida,
     pib_pot,
     hiato_pct,
-    real_rate
+    real_rate,
+    target
   ) %>%
   set_variable_labels(
     pib                = "GDP (constant 2015 US$)",
@@ -252,9 +283,13 @@ data <- cbi %>%
     divida             = "Dívida governamental (% do PIB)",
     pib_pot            = "PIB potencial (filtro HP)",
     hiato_pct          = "Hiato do produto (%)",
-    real_rate          = "Taxa de juros real (%)"
+    real_rate          = "Taxa de juros real (%)",
+    target             = "Meta de inflação (%)"
   ) %>% 
-  mutate(across(where(~ inherits(.x, "matrix")), as.numeric))
+  mutate(across(where(~ inherits(.x, "matrix")), as.numeric)) %>%
+  group_by(country, year) %>%
+  slice(1) %>%
+  ungroup()
 
 # 📊 Gráficos ----
 
@@ -262,10 +297,10 @@ data <- cbi %>%
 
 data %>%
   mutate(across(
-    c(pib,inflation,inflation_forecast,taxa_juros,cbie_index,divida,pib_pot,hiato_pct,real_rate
+    c(pib,inflation,inflation_forecast,taxa_juros,cbie_index,divida,pib_pot,hiato_pct,real_rate,target
     ),
     ~ as.numeric(.x)
-  )) %>% select(iso3c,pib,inflation,inflation_forecast,taxa_juros,cbie_index,divida,pib_pot,hiato_pct,real_rate
+  )) %>% select(iso3c,pib,inflation,inflation_forecast,taxa_juros,cbie_index,divida,pib_pot,hiato_pct,real_rate,target
   ) %>%
   pivot_longer(cols = -iso3c,
                names_to = "variavel",
@@ -281,7 +316,7 @@ data %>%
            color = "white",
            width = 0.85) +
   scale_fill_manual(
-    values = c("#4DACD6","#4FAE62","#F6C54D","#E37D46","#C02D45","#8ecae6","#219ebc","#023047","#ffb703"
+    values = c("#4DACD6","#4FAE62","#F6C54D","#E37D46","#C02D45","#8ecae6","#219ebc","#023047","#ffb703","#F94144"
     ),
     name = "Variável"
   ) +
@@ -391,8 +426,6 @@ anim_save(
     renderer = gifski_renderer()
   )
 )
-
-
 
 # Gráfico 3 : 📊 Gráfico da Evolução do CBI
 
@@ -1613,7 +1646,7 @@ data %>%
   labs(
     title = "Volatilidade da Inflação por Classificação de Independência do BC",
     subtitle = "Desvio padrão da inflação para diferentes níveis de independência (Acemoglu)",
-    x = "Nível de Independência do Banco Central (Acemoglu)",
+    x = "Nível Institucional (Acemoglu)",
     y = "Desvio Padrão da Inflação",
     caption = expression(bold("Fonte: ") ~ "Acemoglu et. al + FMI")
   ) +
@@ -1628,7 +1661,7 @@ data %>%
     panel.grid.major.y = element_line(color = "grey90")
   )
 
-# Gráfico 17 : 📊 Gráfico 
+# Gráfico 17 : 📊 Gráfico da Regra de Taylor por Classificação de Acemoglu
 
 data %>%
   left_join(acemoglu_classification, by = c("country" = "Pais")) %>%
@@ -1646,8 +1679,8 @@ data %>%
   scale_fill_manual(values = c("#E37D46", "#F6C54D", "#4DACD6")) +
   labs(
     title = "Regra de Taylor: Resposta da Taxa de Juros à Inflação",
-    subtitle = "Coeficiente de resposta por classificação de independência de Acemoglu",
-    x = "Nível de Independência do Banco Central (Acemoglu)",
+    subtitle = "Coeficiente de resposta por classificação de Acemoglu",
+    x = "Nível Institucional (Acemoglu)",
     y = "Coeficiente da Regra de Taylor",
     caption = expression(bold("Fonte: ") ~ "Acemoglu et. al + FMI")
   ) +
