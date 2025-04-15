@@ -14,6 +14,7 @@ library(seasonal)     # Ajuste sazonal para séries temporais
 library(imf.data)     # Dados do IMF
 library(gtExtras)     # Gráficos
 library(ggstream)     # Gráficos
+library(stringr)      # Manipulação de strings
 library(viridis)      # Gráficos
 library(mFilter)      # Filtro HP 
 library(ggtext)       # Gráfico
@@ -291,6 +292,68 @@ data <- cbi %>%
   slice(1) %>%
   ungroup()
 
+criar_tabela_formatada_novo <- function(titulo, subtitulo, fonte, nomes_linhas, nomes_colunas, valores_linhas) {
+  
+  dados <- data.frame(
+    Variável = nomes_linhas,
+    matrix(valores_linhas, nrow = length(nomes_linhas), byrow = FALSE)
+  )
+  
+  colnames(dados) <- c("Variável", nomes_colunas)
+  
+  gt(dados) %>%
+    tab_header(
+      title = titulo,
+      subtitle = subtitulo
+    ) %>%
+    tab_source_note(
+      source_note = fonte
+    ) %>%
+    tab_style(
+      style = cell_text(weight = "bold"),
+      locations = list(
+        cells_column_labels(everything()),
+        cells_body(columns = "Variável")
+      )
+    ) %>%
+    cols_align(align = "center", columns = -1) %>%
+    tab_options(table.font.size = "small") %>%
+    fmt_number(columns = -1, decimals = 0)
+}
+
+criar_tabela_ocorrencias_novo <- function(dados) {
+  resultados <- analisar_ocorrencias(dados)
+  
+  titulo <- "Análise de Ocorrências nos Dados Macroeconômicos"
+  subtitulo <- paste0("Base com ", n_distinct(dados$country), " países e ", 
+                      n_distinct(dados$year), " anos (", min(dados$year), "-", max(dados$year), ")")
+  fonte <- "Fonte: WDI , IMF-IFS , TheGlobalEconomy, Eikon , MacroBond"
+  
+  nomes_linhas <- resultados$nomes_variaveis
+  
+  valores_linhas <- matrix(resultados$valores_linhas, ncol = 5, byrow = TRUE)  
+  
+  nomes_colunas <- c("Qtd Total Esperada", "Qtd Total Observada",
+                     "Qtd de Países com Todos os Dados",
+                     "Qtd de Países Incompletos",
+                     "Qtd de Países sem nenhum dado")
+  
+  criar_tabela_formatada_novo(
+    titulo = titulo,
+    subtitulo = subtitulo,
+    fonte = fonte,
+    nomes_linhas = nomes_linhas,
+    nomes_colunas = nomes_colunas,
+    valores_linhas = valores_linhas
+  )
+}
+
+tabela_ocorrencias_novo <- criar_tabela_ocorrencias_novo(data)
+print(tabela_ocorrencias_novo)
+
+
+
+
 # 📊 Gráficos ----
 
 # Gráfico 1 : 📊 Gráfico da Base de dados 
@@ -348,7 +411,7 @@ data %>%
       size = 10,
       color = "black"
     ),
-    legend.position = "left",
+    legend.position = "none",
     legend.title = element_text(face = "bold"),
     legend.text = element_text(size = 10),
     panel.grid.major.y = element_line(color = "grey80"),
@@ -1724,3 +1787,108 @@ gmm_model <- pgmm(
 )
 
 summary(gmm_model)
+
+resumo <- summary(gmm_model)
+
+coefs <- as.data.frame(resumo$coefficients)
+coefs$Termo <- rownames(coefs)
+
+coefs_ordenados <- coefs %>%
+  slice(match(
+    c("cbie_index:real_rate", 
+      "lag(inflation_gap, 1)", 
+      "lag(hiato_pct, 1)", 
+      "inflation_forecast", 
+      "cbie_index", 
+      "real_rate"), 
+    Termo
+  ))
+
+tabela_coefs <- coefs_ordenados %>%
+  transmute(
+    `Parâmetro` = c("α₁", "α₂", "α₃", "α₄", "α₅", "α₆"),
+    `Descrição` = c(
+      "(Independência do BC × Taxa Real de Juros)",
+      "(Gap de Inflação Defasado)",
+      "(Hiato do Produto Defasado)",
+      "(Expectativa de Inflação)",
+      "(Índice de Independência do BC)",
+      "(Taxa Real de Juros)"
+    ),
+    `Estimativa`   = Estimate,
+    `Erro Padrão`  = `Std. Error`,
+    `valor-z`      = `z-value`,
+    `Pr(>|z|)`     = `Pr(>|z|)`
+  )
+
+tabela_coef_gt <- tabela_coefs %>%
+  gt() %>%
+  tab_header(
+    title = md("**Estimativas do Modelo GMM**"),
+    subtitle = md("*Painel Desbalanceado com 49 países (2000–2023)*")
+  ) %>%
+  cols_label(
+    `Parâmetro` = "",
+    `Descrição` = "",
+    `Estimativa` = "Estimativa",
+    `Erro Padrão` = "Erro Padrão",
+    `valor-z` = "valor-z",
+    `Pr(>|z|)` = md("Pr(>|*z*|)")
+  ) %>%
+  fmt_number(columns = c(`Estimativa`, `Erro Padrão`, `valor-z`, `Pr(>|z|)`), decimals = 4) %>%
+  text_transform(
+    locations = cells_body(columns = `Pr(>|z|)`),
+    fn = function(x) {
+      sig <- case_when(
+        as.numeric(x) < 0.001 ~ "<b style='color:#D7263D'>***</b>",
+        as.numeric(x) < 0.01  ~ "<b style='color:#F49D37'>**</b>",
+        as.numeric(x) < 0.05  ~ "<b style='color:#1B9AAA'>*</b>",
+        as.numeric(x) < 0.1   ~ "<b style='color:#8AC926'>.</b>",
+        TRUE ~ ""
+      )
+      paste0(format(as.numeric(x), digits = 3, scientific = TRUE), sig)
+    }
+  ) %>%
+  cols_merge(columns = c(`Parâmetro`, `Descrição`),
+             pattern = "{1} {2}") %>%
+  cols_align("center", columns = everything()) %>%
+  tab_options(
+    table.font.size = 12,
+    heading.align = "center",
+    row.striping.include_table_body = TRUE,
+    row.striping.background_color = "#f9f9f9",
+    table.border.top.width = px(2),
+    table.border.bottom.width = px(2)
+  )
+
+n_paises <- gmm_model$n
+n_obs <- resumo$nobs
+sargan_chisq <- round(resumo$sargan$statistic, 4)
+sargan_df <- resumo$sargan$parameter
+sargan_p <- signif(resumo$sargan$p.value, 4)
+ar1_txt <- resumo$autocorr$`AR(1)`
+ar2_txt <- resumo$autocorr$`AR(2)`
+wald_chisq <- round(resumo$wald$statistic, 3)
+wald_df <- resumo$wald$parameter
+wald_p <- signif(resumo$wald$p.value, 4)
+
+texto_estatisticas <- paste0(
+  "**Estatísticas e Testes de Validade**  \n",
+  "Nº de países (*n*): ", n_paises, " (painel desbalanceado)  \n",
+  "Nº de observações (*N*): ", n_obs, "  \n",
+  "Teste de Sargan: χ²(", sargan_df, ") = ", sargan_chisq, " (p = ", sargan_p, ")  \n",
+  "Autocorr. AR(1): ", ar1_txt, "  \n",
+  "Autocorr. AR(2): ", ar2_txt, "  \n",
+  "Teste de Wald (coef.): χ²(", wald_df, ") = ", wald_chisq, " (p = ", wald_p, ")"
+)
+
+tabela_completa_gt <- tabela_coef_gt %>%
+  tab_source_note(
+    source_note = md(texto_estatisticas)
+  ) %>%
+  tab_footnote(
+    footnote = md("**Códigos de significância**: <span style='color:#D7263D'>***</span> 0,1%, <span style='color:#F49D37'>**</span> 1%, <span style='color:#1B9AAA'>*</span> 5%, <span style='color:#8AC926'>.</span> 10%"),
+    locations = cells_column_labels(columns = `Pr(>|z|)`)
+  )
+
+tabela_completa_gt
