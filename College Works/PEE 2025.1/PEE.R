@@ -1695,33 +1695,32 @@ data %>%
     panel.grid.major.y = element_line(color = "grey90")
   )
 
+
 # 📈🧮 Estimação do Modelo GMM ----
 
 ## 🧮 Preparando os Dados ----
 
-panel <- pdata.frame(
-  data,
-  index = c("iso3c", "year")
-)
+panel <- data %>%
+  mutate(inflation_gap = inflation - target) %>%
+  pdata.frame(index = c("iso3c", "year"))
 
-## 🧮 Estimando o Modelo ----
-
+# GMM usando "inflation_gap" como variável dependente
 gmm_model <- pgmm(
-  formula = inflation ~
-    lag(inflation, 1) +
-    cbie_index * real_rate +
-    lag(hiato_pct, 1) +
-    inflation_forecast
-  | 
-    lag(inflation, 3:4) +
-    lag(real_rate, 2:3) +
-    lag(inflation_forecast, 3:4) +
-    cbie_index +
-    lag(hiato_pct, 3:4),
+  formula = inflation_gap ~
+    lag(inflation_gap, 1) +        
+    cbie_index * real_rate +       
+    lag(hiato_pct, 1) +            
+    inflation_forecast             
+  |
+    lag(inflation_gap, 3:4) +      
+    lag(real_rate, 2:3) +          
+    lag(inflation_forecast, 3:4) + 
+    cbie_index +                   
+    lag(hiato_pct, 3:4),           
   data           = panel,
   effect         = "individual",
   model          = "twosteps",
-  transformation = "d"
+  transformation = "ld"
 )
-summary(gmm_model)
 
+summary(gmm_model)
