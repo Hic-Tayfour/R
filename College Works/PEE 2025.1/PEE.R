@@ -292,6 +292,56 @@ data <- cbi %>%
   slice(1) %>%
   ungroup()
 
+analisar_ocorrencias <- function(dados) {
+  variaveis_banco <- c("pib", "inflation", "inflation_forecast", "target", 
+                       "taxa_juros", "divida", "cbie_index")
+  
+  nomes_variaveis <- c("PIB", "Inflação", "Inflação Esperada", "Meta de Inflação", 
+                       "Taxa Nominal de Juros", "Dívida", "CBI")
+  
+  total_paises <- n_distinct(dados$country)
+  total_anos <- n_distinct(dados$year)
+  total_esperado <- total_paises * total_anos
+  
+  qtd_observada <- numeric(length(variaveis_banco))
+  paises_completos <- numeric(length(variaveis_banco))
+  paises_incompletos <- numeric(length(variaveis_banco))
+  paises_sem_dados <- numeric(length(variaveis_banco))
+  
+  for (i in seq_along(variaveis_banco)) {
+    var <- variaveis_banco[i]
+    
+    qtd_observada[i] <- sum(!is.na(dados[[var]]))
+    
+    por_pais <- dados %>%
+      group_by(country) %>%
+      summarise(
+        total_anos_esperados = n(),
+        anos_com_dados = sum(!is.na(.data[[var]])),
+        completo = anos_com_dados == total_anos_esperados,
+        sem_dados = anos_com_dados == 0,
+        .groups = "drop"
+      )
+    
+    paises_completos[i] <- sum(por_pais$completo)
+    paises_sem_dados[i] <- sum(por_pais$sem_dados)
+    paises_incompletos[i] <- total_paises - paises_completos[i] - paises_sem_dados[i]
+  }
+  
+  valores_linhas <- c(
+    rep(total_esperado, length(variaveis_banco)),  
+    qtd_observada,                                 
+    paises_completos,                              
+    paises_incompletos,                            
+    paises_sem_dados                               
+  )
+  
+  list(
+    nomes_variaveis = nomes_variaveis,
+    valores_linhas = valores_linhas
+  )
+}
+
 criar_tabela_formatada_novo <- function(titulo, subtitulo, fonte, nomes_linhas, nomes_colunas, valores_linhas) {
   
   dados <- data.frame(
@@ -303,11 +353,11 @@ criar_tabela_formatada_novo <- function(titulo, subtitulo, fonte, nomes_linhas, 
   
   gt(dados) %>%
     tab_header(
-      title = titulo,
-      subtitle = subtitulo
+      title = md("**{titulo}**"),
+      subtitle = md(paste0("*", subtitulo, "*"))
     ) %>%
     tab_source_note(
-      source_note = fonte
+      source_note = md(fonte)
     ) %>%
     tab_style(
       style = cell_text(weight = "bold"),
@@ -317,9 +367,10 @@ criar_tabela_formatada_novo <- function(titulo, subtitulo, fonte, nomes_linhas, 
       )
     ) %>%
     cols_align(align = "center", columns = -1) %>%
-    tab_options(table.font.size = "small") %>%
-    fmt_number(columns = -1, decimals = 0)
+    tab_options(table.font.size = 12) %>%
+    fmt_number(columns = -1, decimals = 0, sep_mark = ".")
 }
+
 
 criar_tabela_ocorrencias_novo <- function(dados) {
   resultados <- analisar_ocorrencias(dados)
@@ -327,16 +378,18 @@ criar_tabela_ocorrencias_novo <- function(dados) {
   titulo <- "Análise de Ocorrências nos Dados Macroeconômicos"
   subtitulo <- paste0("Base com ", n_distinct(dados$country), " países e ", 
                       n_distinct(dados$year), " anos (", min(dados$year), "-", max(dados$year), ")")
-  fonte <- "Fonte: WDI , IMF-IFS , TheGlobalEconomy, Eikon , MacroBond"
+  fonte <- "Fonte: WDI, IMF-IFS, TheGlobalEconomy, Eikon, MacroBond"
   
-  nomes_linhas <- resultados$nomes_variaveis
+  nomes_linhas <- c("Qtd Total Esperada", "Qtd Total Observada",
+                    "Qtd de Países com Todos os Dados",
+                    "Qtd de Países Incompletos",
+                    "Qtd de Países sem nenhum dado")
   
-  valores_linhas <- matrix(resultados$valores_linhas, ncol = 5, byrow = TRUE)  
+  nomes_colunas <- resultados$nomes_variaveis
   
-  nomes_colunas <- c("Qtd Total Esperada", "Qtd Total Observada",
-                     "Qtd de Países com Todos os Dados",
-                     "Qtd de Países Incompletos",
-                     "Qtd de Países sem nenhum dado")
+  valores_linhas <- matrix(resultados$valores_linhas,
+                           nrow = length(nomes_linhas),
+                           byrow = TRUE)
   
   criar_tabela_formatada_novo(
     titulo = titulo,
@@ -350,9 +403,6 @@ criar_tabela_ocorrencias_novo <- function(dados) {
 
 tabela_ocorrencias_novo <- criar_tabela_ocorrencias_novo(data)
 print(tabela_ocorrencias_novo)
-
-
-
 
 # 📊 Gráficos ----
 
@@ -1788,107 +1838,57 @@ gmm_model <- pgmm(
 
 summary(gmm_model)
 
-resumo <- summary(gmm_model)
+library(gt)
+library(tidyverse)
 
-coefs <- as.data.frame(resumo$coefficients)
-coefs$Termo <- rownames(coefs)
-
-coefs_ordenados <- coefs %>%
-  slice(match(
-    c("cbie_index:real_rate", 
-      "lag(inflation_gap, 1)", 
-      "lag(hiato_pct, 1)", 
-      "inflation_forecast", 
-      "cbie_index", 
-      "real_rate"), 
-    Termo
-  ))
-
-tabela_coefs <- coefs_ordenados %>%
-  transmute(
-    `Parâmetro` = c("α₁", "α₂", "α₃", "α₄", "α₅", "α₆"),
-    `Descrição` = c(
-      "(Independência do BC × Taxa Real de Juros)",
-      "(Gap de Inflação Defasado)",
-      "(Hiato do Produto Defasado)",
-      "(Expectativa de Inflação)",
-      "(Índice de Independência do BC)",
-      "(Taxa Real de Juros)"
-    ),
-    `Estimativa`   = Estimate,
-    `Erro Padrão`  = `Std. Error`,
-    `valor-z`      = `z-value`,
-    `Pr(>|z|)`     = `Pr(>|z|)`
-  )
-
-tabela_coef_gt <- tabela_coefs %>%
-  gt() %>%
-  tab_header(
-    title = md("**Estimativas do Modelo GMM**"),
-    subtitle = md("*Painel Desbalanceado com 49 países (2000–2023)*")
-  ) %>%
-  cols_label(
-    `Parâmetro` = "",
-    `Descrição` = "",
-    `Estimativa` = "Estimativa",
-    `Erro Padrão` = "Erro Padrão",
-    `valor-z` = "valor-z",
-    `Pr(>|z|)` = md("Pr(>|*z*|)")
-  ) %>%
-  fmt_number(columns = c(`Estimativa`, `Erro Padrão`, `valor-z`, `Pr(>|z|)`), decimals = 4) %>%
-  text_transform(
-    locations = cells_body(columns = `Pr(>|z|)`),
-    fn = function(x) {
-      sig <- case_when(
-        as.numeric(x) < 0.001 ~ "<b style='color:#D7263D'>***</b>",
-        as.numeric(x) < 0.01  ~ "<b style='color:#F49D37'>**</b>",
-        as.numeric(x) < 0.05  ~ "<b style='color:#1B9AAA'>*</b>",
-        as.numeric(x) < 0.1   ~ "<b style='color:#8AC926'>.</b>",
-        TRUE ~ ""
-      )
-      paste0(format(as.numeric(x), digits = 3, scientific = TRUE), sig)
-    }
-  ) %>%
-  cols_merge(columns = c(`Parâmetro`, `Descrição`),
-             pattern = "{1} {2}") %>%
-  cols_align("center", columns = everything()) %>%
-  tab_options(
-    table.font.size = 12,
-    heading.align = "center",
-    row.striping.include_table_body = TRUE,
-    row.striping.background_color = "#f9f9f9",
-    table.border.top.width = px(2),
-    table.border.bottom.width = px(2)
-  )
-
-n_paises <- gmm_model$n
-n_obs <- resumo$nobs
-sargan_chisq <- round(resumo$sargan$statistic, 4)
-sargan_df <- resumo$sargan$parameter
-sargan_p <- signif(resumo$sargan$p.value, 4)
-ar1_txt <- resumo$autocorr$`AR(1)`
-ar2_txt <- resumo$autocorr$`AR(2)`
-wald_chisq <- round(resumo$wald$statistic, 3)
-wald_df <- resumo$wald$parameter
-wald_p <- signif(resumo$wald$p.value, 4)
-
-texto_estatisticas <- paste0(
-  "**Estatísticas e Testes de Validade**  \n",
-  "Nº de países (*n*): ", n_paises, " (painel desbalanceado)  \n",
-  "Nº de observações (*N*): ", n_obs, "  \n",
-  "Teste de Sargan: χ²(", sargan_df, ") = ", sargan_chisq, " (p = ", sargan_p, ")  \n",
-  "Autocorr. AR(1): ", ar1_txt, "  \n",
-  "Autocorr. AR(2): ", ar2_txt, "  \n",
-  "Teste de Wald (coef.): χ²(", wald_df, ") = ", wald_chisq, " (p = ", wald_p, ")"
+# Resultados com estimativas e erros padrão
+gmm_resultados <- tribble(
+  ~Parametro, ~Estimativa, ~Erro, ~Sig,
+  "α₁ (Independência do BC × Taxa Real de Juros)",     0.6874, 0.3468, "*",
+  "α₂ (Gap de Inflação Defasado)",                    0.2151, 0.0777, "**",
+  "α₃ (Hiato do Produto Defasado)",                   0.1997, 0.0627, "**",
+  "α₄ (Expectativa de Inflação)",                     0.6908, 0.0667, "***",
+  "α₅ (Índice de Independência do BC)",              -3.3666, 0.4285, "***",
+  "α₆ (Taxa Real de Juros)",                         -0.6239, 0.2892, "*"
 )
 
-tabela_completa_gt <- tabela_coef_gt %>%
-  tab_source_note(
-    source_note = md(texto_estatisticas)
+# Criar coluna formatada com quebra de linha (usa <br> e markdown)
+gmm_formatado <- gmm_resultados %>%
+  mutate(
+    Estimador = paste0(
+      sprintf("%.4f", Estimativa), Sig, "<br>(",
+      sprintf("%.4f", Erro), ")"
+    )
   ) %>%
-  tab_footnote(
-    footnote = md("**Códigos de significância**: <span style='color:#D7263D'>***</span> 0,1%, <span style='color:#F49D37'>**</span> 1%, <span style='color:#1B9AAA'>*</span> 5%, <span style='color:#8AC926'>.</span> 10%"),
-    locations = cells_column_labels(columns = `Pr(>|z|)`)
-  )
+  select(Parametro, Estimador)
 
-tabela_completa_gt
+# Estatísticas como rodapé
+texto_rodape <- paste(
+  "**Estatísticas e Testes de Validade**<br>",
+  "Nº de países (n): 49 (painel desbalanceado)<br>",
+  "Nº de observações (N): 1466<br>",
+  "Teste de Sargan: χ²(297) = 42.792 (p = 1)<br>",
+  "Autocorr. AR(1): z = -1.9590 (p = 0.05011)<br>",
+  "Autocorr. AR(2): z = 1.4951 (p = 0.1349)<br>",
+  "Teste de Wald (coef.): χ²(6) = 1138.468 (p = 9.906e-243)"
+)
+
+# Tabela com estilo e quebras de linha reais
+gt(gmm_formatado) %>%
+  tab_header(title = "Estimativas do Modelo GMM") %>%
+  cols_label(
+    Parametro = "Variável",
+    Estimador = "Estimativa"
+  ) %>%
+  fmt_markdown(columns = "Estimador") %>%
+  tab_style(
+    style = cell_text(align = "center"),
+    locations = cells_body(columns = everything())
+  ) %>%
+  tab_style(
+    style = cell_text(weight = "bold"),
+    locations = cells_column_labels()
+  ) %>%
+  tab_source_note(md("**Significância:** *** p < 0.001, ** p < 0.01, * p < 0.05")) %>%
+  tab_source_note(md(texto_rodape))
+
