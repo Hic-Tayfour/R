@@ -841,146 +841,6 @@ ggplot() +
     plot.margin        = margin(15, 25, 15, 25)
   )
 
-
-# Gráfico 5 : 📊 Gráfico da Inflação anual (2000-Hoje; Países com Metas de inflação)
-
-ggplot() +
-  geom_ribbon(
-    data = data %>%
-      filter(
-        year > 2000,
-        country %in% (target %>% filter(SegueAtualmente == "sim") %>% pull(Pais))
-      ) %>%
-      group_by(year) %>%
-      summarise(
-        mean_inflation = mean(inflation, na.rm = TRUE),
-        sd_inflation   = sd(inflation, na.rm = TRUE),
-        .groups = "drop"
-      ),
-    aes(
-      x = year,
-      ymin = mean_inflation - sd_inflation,
-      ymax = mean_inflation + sd_inflation
-    ),
-    fill = "#2A9D8F", alpha = 0.2
-  ) +
-  geom_line(
-    data = data %>%
-      filter(
-        year > 2000,
-        country %in% (target %>% filter(SegueAtualmente == "sim") %>% pull(Pais))
-      ) %>%
-      group_by(year) %>%
-      summarise(mean_inflation = mean(inflation, na.rm = TRUE), .groups = "drop"),
-    aes(x = year, y = mean_inflation),
-    color = "#1F4E79", size = 1
-  ) +
-  geom_point(
-    data = data %>%
-      filter(
-        year > 2000,
-        country %in% (target %>% filter(SegueAtualmente == "sim") %>% pull(Pais))
-      ) %>%
-      group_by(year) %>%
-      mutate(
-        mean_inflation = mean(inflation, na.rm = TRUE),
-        sd_inflation   = sd(inflation, na.rm = TRUE),
-        distance_up    = inflation - (mean_inflation + sd_inflation)
-      ) %>%
-      filter(inflation > mean_inflation + sd_inflation) %>%
-      slice_max(distance_up, with_ties = FALSE) %>%
-      ungroup(),
-    aes(x = year, y = inflation),
-    color = "darkgreen", size = 3
-  ) +
-  geom_text(
-    data = data %>%
-      filter(
-        year > 2000,
-        country %in% (target %>% filter(SegueAtualmente == "sim") %>% pull(Pais))
-      ) %>%
-      group_by(year) %>%
-      mutate(
-        mean_inflation = mean(inflation, na.rm = TRUE),
-        sd_inflation   = sd(inflation, na.rm = TRUE),
-        distance_up    = inflation - (mean_inflation + sd_inflation)
-      ) %>%
-      filter(inflation > mean_inflation + sd_inflation) %>%
-      slice_max(distance_up, with_ties = FALSE) %>%
-      ungroup(),
-    aes(x = year, y = inflation, label = iso3c),
-    color = "darkgreen", vjust = -0.8, size = 3
-  ) +
-  geom_point(
-    data = data %>%
-      filter(
-        year > 2000,
-        country %in% (target %>% filter(SegueAtualmente == "sim") %>% pull(Pais))
-      ) %>%
-      group_by(year) %>%
-      mutate(
-        mean_inflation = mean(inflation, na.rm = TRUE),
-        sd_inflation   = sd(inflation, na.rm = TRUE),
-        distance_down  = (mean_inflation - sd_inflation) - inflation
-      ) %>%
-      filter(inflation < mean_inflation - sd_inflation) %>%
-      slice_max(distance_down, with_ties = FALSE) %>%
-      ungroup(),
-    aes(x = year, y = inflation),
-    color = "red", size = 3
-  ) +
-  geom_text(
-    data = data %>%
-      filter(
-        year > 2000,
-        country %in% (target %>% filter(SegueAtualmente == "sim") %>% pull(Pais))
-      ) %>%
-      group_by(year) %>%
-      mutate(
-        mean_inflation = mean(inflation, na.rm = TRUE),
-        sd_inflation   = sd(inflation, na.rm = TRUE),
-        distance_down  = (mean_inflation - sd_inflation) - inflation
-      ) %>%
-      filter(inflation < mean_inflation - sd_inflation) %>%
-      slice_max(distance_down, with_ties = FALSE) %>%
-      ungroup(),
-    aes(x = year, y = inflation, label = iso3c),
-    color = "red", vjust = 1.5, size = 3
-  ) +
-  scale_x_continuous(
-    breaks = sort(unique(data %>%
-                           filter(year > 2000, country %in% (target %>% filter(SegueAtualmente == "sim") %>% pull(Pais))) %>%
-                           pull(year))),
-    expand = expansion(mult = c(0.01, 0.01))
-  ) +
-  scale_y_continuous(
-    expand = expansion(mult = c(0.02, 0.1))
-  ) +
-  labs(
-    title    = "Inflação Média Anual — Países com Metas de Inflação",
-    subtitle = "Desvio padrão e destaques para outliers acima/abaixo",
-    x        = "Ano",
-    y        = "Inflação (%)",
-    caption  = expression(bold("Fonte: ") ~ "WDI + CBIE + Target Framework")
-  ) +
-  theme(
-    plot.background    = element_rect(fill = "white", color = NA),
-    panel.background   = element_rect(fill = "white", color = NA),
-    panel.grid.major.y = element_line(color = "grey80"),
-    panel.grid.major.x = element_blank(),
-    panel.grid.minor   = element_blank(),
-    axis.line.x.bottom = element_line(color = "black"),
-    axis.line.y.left   = element_line(color = "black"),
-    axis.ticks         = element_line(color = "black"),
-    plot.title         = element_text(face = "bold", size = 16, hjust = 0),
-    plot.subtitle      = element_text(size = 12, hjust = 0, margin = margin(b = 10)),
-    axis.title         = element_text(face = "bold", size = 12),
-    axis.text          = element_text(size = 10, color = "black"),
-    plot.caption       = element_text(hjust = 0, size = 10, color = "black"),
-    plot.margin        = margin(15, 25, 15, 25)
-  )
-
-
 # Gráfico 6 : 📊 Gráfico da Resposta da Inflação à Taxa Real de Juros
 
 data %>%
@@ -1094,49 +954,6 @@ data %>%
     panel.grid.major.x = element_blank()
   )
 
-
-
-# Gráfico 7 : 📊 Gráfico da média do CBIE dados países que seguem ou não as metas de inflação
-
-data %>%
-  filter(
-    year >= 2000,
-    country %in% (target %>% pull(Pais))
-  ) %>%
-  mutate(grupo_target = if_else(
-    country %in% (target %>% filter(SegueAtualmente == "sim") %>% pull(Pais)),
-    "Segue metas", "Não segue"
-  )) %>%
-  group_by(year, grupo_target) %>%
-  summarise(cbie_medio = mean(cbie_index, na.rm = TRUE), .groups = "drop") %>%
-  ggplot(aes(x = year, y = cbie_medio, color = grupo_target)) +
-  geom_line(size = 1.2) +
-  geom_point(size = 2.5) +
-  scale_color_manual(values = c("Segue metas" = "#2A9D8F", "Não segue" = "#E76F51")) +
-  labs(
-    title = "Evolução do Índice de Independência do Banco Central",
-    subtitle = "Comparação entre países que seguem ou não metas de inflação",
-    x = "Ano", y = "CBIE Médio", color = "Grupo",
-    caption = expression(bold("Fonte: ") ~ "CBIE + Target Framework")
-  ) +
-  theme(
-    plot.background    = element_rect(fill = "white", color = NA),
-    panel.background   = element_rect(fill = "white", color = NA),
-    panel.grid.major.y = element_line(color = "grey80"),
-    panel.grid.major.x = element_blank(),
-    panel.grid.minor   = element_blank(),
-    axis.line.x.bottom = element_line(color = "black"),
-    axis.line.y.left   = element_line(color = "black"),
-    axis.ticks         = element_line(color = "black"),
-    plot.title         = element_text(face = "bold", size = 16, hjust = 0),
-    plot.subtitle      = element_text(size = 12, hjust = 0, margin = margin(b = 10)),
-    axis.title         = element_text(face = "bold", size = 12),
-    axis.text          = element_text(size = 10, color = "black"),
-    legend.title       = element_text(face = "bold"),
-    legend.position    = "top",
-    plot.caption       = element_text(hjust = 0, size = 10, color = "black"),
-    plot.margin        = margin(15, 25, 15, 25)
-  )
 
 # Gráfico 8 : 📊 Gráfico da média da inflação por classe institucional
 
@@ -1837,9 +1654,6 @@ gmm_model <- pgmm(
 )
 
 summary(gmm_model)
-
-library(gt)
-library(tidyverse)
 
 # Resultados com estimativas e erros padrão
 gmm_resultados <- tribble(
