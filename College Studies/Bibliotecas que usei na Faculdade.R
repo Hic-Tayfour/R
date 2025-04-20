@@ -81,6 +81,7 @@ library(catboost)       # Gradient boosting da Yandex - https://catboost.ai/en/d
 library(glmnet)         # LASSO, Ridge e Elastic Net - https://cran.r-project.org/web/packages/glmnet/glmnet.pdf
 library(caret)          # Treinamento e validação cruzada - https://cran.r-project.org/web/packages/caret/caret.pdf
 library(hdm)            # Double Machine Learning - https://cran.r-project.org/web/packages/hdm/hdm.pdf
+library(torch)          # Redes Neurais e TensorFlow - https://cran.r-project.org/web/packages/torch/torch.pdf
 
 # Tabelas e Relatórios
 library(stargazer)      # Tabelas formatadas para regressão - https://cran.r-project.org/web/packages/stargazer/stargazer.pdf
