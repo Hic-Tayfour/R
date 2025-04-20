@@ -53,6 +53,7 @@ library(viridis)        # Paletas de cores perceptualmente uniformes - https://c
 library(CGPfunctions)   # Gráficos estatísticos aprimorados - https://cran.r-project.org/web/packages/CGPfunctions/CGPfunctions.pdf
 library(ggeffects)      # Efeitos marginais visualizáveis de modelos - https://cran.r-project.org/web/packages/ggeffects/ggeffects.pdf
 library(scales)         # Escalas para visualização com ggplot2 - https://cran.r-project.org/web/packages/scales/scales.pdf
+library(tidyplots)      # Gráficos para publicação em artigos científicos - https://cran.r-project.org/web/packages/tidyplots/tidyplots.pdf
 
 
 # Séries Temporais e Financeiras
