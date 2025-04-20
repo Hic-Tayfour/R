@@ -11,6 +11,9 @@ library(duckdb)         # Banco de dados embutido e eficiente - https://cran.r-p
 library(purrr)          # Programação funcional (ex: map, walk) - https://cran.r-project.org/web/packages/purrr/purrr.pdf
 library(broom)          # Organização de resultados de modelos estatísticos - https://cran.r-project.org/web/packages/broom/broom.pdf
 library(labelled)       # Manipulação de variáveis com rótulos - https://cran.r-project.org/web/packages/labelled/labelled.pdf
+library(stringr)        # Manipulação de strings - https://cran.r-project.org/web/packages/stringr/stringr.pdf
+library(glue)           # Interpolação de strings - https://cran.r-project.org/web/packages/glue/glue.pdf
+
 
 # Estatísticas Descritivas e Testes
 library(DescTools)      # Ferramentas estatísticas para análises descritivas - https://cran.r-project.org/web/packages/DescTools/DescTools.pdf
@@ -48,6 +51,9 @@ library(ggtext)         # Elementos de texto avançado - https://cran.r-project.
 library(plotly)         # Gráficos interativos - https://cran.r-project.org/web/packages/plotly/plotly.pdf
 library(viridis)        # Paletas de cores perceptualmente uniformes - https://cran.r-project.org/web/packages/viridis/viridis.pdf
 library(CGPfunctions)   # Gráficos estatísticos aprimorados - https://cran.r-project.org/web/packages/CGPfunctions/CGPfunctions.pdf
+library(ggeffects)      # Efeitos marginais visualizáveis de modelos - https://cran.r-project.org/web/packages/ggeffects/ggeffects.pdf
+library(scales)         # Escalas para visualização com ggplot2 - https://cran.r-project.org/web/packages/scales/scales.pdf
+
 
 # Séries Temporais e Financeiras
 library(tidyquant)      # Integração tidyverse com dados financeiros - https://cran.r-project.org/web/packages/tidyquant/tidyquant.pdf
@@ -58,6 +64,9 @@ library(WDI)            # Dados do World Bank (Indicadores) - https://cran.r-pro
 library(imf.data)       # Acesso aos dados do FMI - https://cran.r-project.org/web/packages/imf.data/imf.data.pdf
 library(zoo)            # Manipulação de séries temporais indexadas - https://cran.r-project.org/web/packages/zoo/zoo.pdf
 library(mFilter)        # Filtros para séries temporais (HP, BK, etc.) - https://cran.r-project.org/web/packages/mFilter/mFilter.pdf
+library(seasonal)       # Ajuste sazonal com X-13ARIMA-SEATS - https://cran.r-project.org/web/packages/seasonal/seasonal.pdf
+library(rugarch)        # Modelagem GARCH univariada - https://cran.r-project.org/web/packages/rugarch/rugarch.pdf
+
 
 # Machine Learning
 library(tidymodels)     # Framework completo para ML - https://cran.r-project.org/web/packages/tidymodels/tidymodels.pdf
@@ -90,6 +99,8 @@ library(microdatasus)   # Acesso a dados do SUS - https://cran.r-project.org/web
 library(sidrar)         # Acesso a dados do IBGE via API - https://cran.r-project.org/web/packages/sidrar/sidrar.pdf
 library(rnaturalearth)  # Mapas geográficos e dados mundiais - https://cran.r-project.org/web/packages/rnaturalearth/rnaturalearth.pdf
 library(sf)             # Dados espaciais e geográficos - https://cran.r-project.org/web/packages/sf/sf.pdf
+library(countrycode)    # Conversão de códigos e nomes de países - https://cran.r-project.org/web/packages/countrycode/countrycode.pdf
+
 
 # Conjuntos de Dados para Exemplos
 library(palmerpenguins) # Dados de pinguins para análise - https://cran.r-project.org/web/packages/palmerpenguins/palmerpenguins.pdf
