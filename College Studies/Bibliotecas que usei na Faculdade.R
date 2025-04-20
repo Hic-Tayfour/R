@@ -95,7 +95,7 @@ library(rvest)          # Web scraping com R - https://cran.r-project.org/web/pa
 library(repurrrsive)    # Exemplos recursivos com listas - https://cran.r-project.org/web/packages/repurrrsive/repurrrsive.pdf
 
 # Dados Públicos e Geográficos
-library(microdatasus)   # Acesso a dados do SUS - https://cran.r-project.org/web/packages/microdatasus/microdatasus.pdf
+library(microdatasus)   # Acesso a dados do SUS - https://github.com/rfsaldanha/microdatasus/wiki
 library(sidrar)         # Acesso a dados do IBGE via API - https://cran.r-project.org/web/packages/sidrar/sidrar.pdf
 library(rnaturalearth)  # Mapas geográficos e dados mundiais - https://cran.r-project.org/web/packages/rnaturalearth/rnaturalearth.pdf
 library(sf)             # Dados espaciais e geográficos - https://cran.r-project.org/web/packages/sf/sf.pdf
