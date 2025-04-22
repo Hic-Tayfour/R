@@ -38,6 +38,9 @@ Todos os projetos foram implementados em **R**, acompanhados das respectivas bas
 ### 📈 Problemas em Economia
 - [PEE — 2025.1](https://github.com/Hic-Tayfour/R/tree/main/College%20Works/PEE%202025.1)
 
+### 📈 Comércio Internacional
+- [APS 1 -2025.1](https://github.com/Hic-Tayfour/R/tree/main/College%20Works/APS%201%202025.1) 
+
 ---
 
 Cada pasta contém:
