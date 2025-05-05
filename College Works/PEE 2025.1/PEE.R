@@ -561,19 +561,21 @@ world %>%
       count(iso3c, name = "n_obs") %>%
       mutate(
         total_ideal = 10 * n_distinct(data$year),
-        prop_dados = n_obs / total_ideal
+        prop_dados  = n_obs / total_ideal
       ),
     by = c("iso_a3" = "iso3c")
   ) %>%
   ggplot() +
-  geom_sf(aes(fill = prop_dados), color = "black", size = 0.1) +
-  scale_fill_gradient(
-    low = "#F94144",   
-    high = "#4FAE62",  
-    na.value = "white",
-    name = "Proporção de\nDados (%)",
-    limits = c(0, 1),
-    labels = percent_format(accuracy = 1)
+  geom_sf(aes(fill = prop_dados), color = "black", size = .1) +
+  scale_fill_gradient2(
+    low       = paletteer_c("ggthemes::Red-Blue Diverging", 30)[1],    
+    mid       = paletteer_c("ggthemes::Red-Blue Diverging", 30)[15],   
+    high      = paletteer_c("ggthemes::Red-Blue Diverging", 30)[30],   
+    midpoint  = 0.5,
+    na.value  = "white",
+    name      = "Proporção de\nDados (%)",
+    limits    = c(0, 1),
+    labels    = percent_format(accuracy = 1)
   ) +
   labs(
     title    = "Cobertura Global por País",
@@ -1118,19 +1120,18 @@ create_gmm_table <- function(gmm_model, title, data, panel) {
   
   mapping <- tribble(
     ~term,                          ~Parametro,
-    "lag(gap, 1)",                  "α₁ (Gap de Inflação Defasado)",
-    "cbie_index",                   "α₂ (Índice de Independência do BC)",
-    "cbie_policy",                  "α₂ (Índice de Independência do BC - Política Monetária)",
-    "cbie_policy_q1",               "α₂ (Índice de Independência do BC - Política Monetária Q1)",
+    "I(cbie_index * real_rate)",    "α₁ (Independência do BC × Taxa Real de Juros)",
+    "I(cbie_policy * real_rate)",   "α₁ (Independência do BC (PM) × Taxa Real de Juros)",
+    "I(cbie_policy_q1 * real_rate)","α₁ (Independência do BC (PM Q1) × Taxa Real de Juros)",
+    "lag(gap, 1)",                  "α₂ (Gap de Inflação Defasado)",
     "lag(hiato_pct, 1)",            "α₃ (Hiato do Produto Defasado)",
     "inflation_forecast",           "α₄ (Expectativa de Inflação)",
-    "real_rate",                    "α₅ (Taxa Real de Juros)",
-    "I(cbie_index * real_rate)",    "α₆ (Independência do BC × Taxa Real de Juros)",
-    "I(cbie_policy * real_rate)",   "α₆ (Independência do BC (PM) × Taxa Real de Juros)",
-    "I(cbie_policy_q1 * real_rate)","α₆ (Independência do BC (PM Q1) × Taxa Real de Juros)"
+    "cbie_index",                   "α₅ (Índice de Independência do BC)",
+    "cbie_policy",                  "α₅ (Índice de Independência do BC - Política Monetária)",
+    "cbie_policy_q1",               "α₅ (Índice de Independência do BC - Política Monetária Q1)",
+    "real_rate",                    "α₆ (Taxa Real de Juros)"
   )
   
-  # Criar tabela de resultados
   res <- cm %>%
     left_join(mapping, by = "term") %>%
     mutate(
@@ -1148,18 +1149,21 @@ create_gmm_table <- function(gmm_model, title, data, panel) {
         ")"
       )
     ) %>%
-    arrange(factor(Parametro, levels = c(
-      "α₁ (Gap de Inflação Defasado)",
-      "α₂ (Índice de Independência do BC)",
-      "α₂ (Índice de Independência do BC - Política Monetária)",
-      "α₂ (Índice de Independência do BC - Política Monetária Q1)",
-      "α₃ (Hiato do Produto Defasado)",
-      "α₄ (Expectativa de Inflação)",
-      "α₅ (Taxa Real de Juros)",
-      "α₆ (Independência do BC × Taxa Real de Juros)",
-      "α₆ (Independência do BC (PM) × Taxa Real de Juros)",
-      "α₆ (Independência do BC (PM Q1) × Taxa Real de Juros)"
-    ))) %>%
+    arrange(factor(
+      Parametro,
+      levels = c(
+        "α₁ (Independência do BC × Taxa Real de Juros)",
+        "α₁ (Independência do BC (PM) × Taxa Real de Juros)",
+        "α₁ (Independência do BC (PM Q1) × Taxa Real de Juros)",
+        "α₂ (Gap de Inflação Defasado)",
+        "α₃ (Hiato do Produto Defasado)",
+        "α₄ (Expectativa de Inflação)",
+        "α₅ (Índice de Independência do BC)",
+        "α₅ (Índice de Independência do BC - Política Monetária)",
+        "α₅ (Índice de Independência do BC - Política Monetária Q1)",
+        "α₆ (Taxa Real de Juros)"
+      )
+    )) %>%
     select(Parâmetro = Parametro, Resultado)
   
   sg <- sargan(gmm_model, robust = TRUE)
@@ -1173,47 +1177,35 @@ create_gmm_table <- function(gmm_model, title, data, panel) {
   n_countries <- length(unique(data$iso3c))
   n_obs <- nrow(panel)
   
-  table <- res %>%
+  res %>%
     gt() %>%
     tab_header(title) %>%
     fmt_markdown(columns = "Resultado") %>%
-    tab_source_note(md(glue(
-      "Países (n): {n_countries}  •  Observações (N): {n_obs}"
-    ))) %>%
+    tab_source_note(md(glue("Países (n): {n_countries}  •  Observações (N): {n_obs}"))) %>%
     tab_source_note(md("Significância: *** p<0.001; ** p<0.01; * p<0.05")) %>%
-    tab_source_note(md(glue(
-      "Sargan: χ²({sg$df}) = {round(sg$statistic,3)} (p = {round(sg$p.value,3)})"
-    ))) %>%
-    tab_source_note(md(glue(
-      "Wald: χ²({wald_df}) = {round(wald_stat,3)} (p = {format.pval(wald_p,3)})"
-    ))) %>%
-    tab_source_note(md(glue(
-      "AR(1): z = {round(ar1$statistic,3)} (p = {round(ar1$p.value,3)})"
-    ))) %>%
-    tab_source_note(md(glue(
-      "AR(2): z = {round(ar2$statistic,3)} (p = {round(ar2$p.value,3)})"
-    )))
-  
-  return(table)
+    tab_source_note(md(glue("Sargan: χ²({sg$df}) = {round(sg$statistic,3)} (p = {round(sg$p.value,3)})"))) %>%
+    tab_source_note(md(glue("Wald: χ²({wald_df}) = {round(wald_stat,3)} (p = {format.pval(wald_p,3)})"))) %>%
+    tab_source_note(md(glue("AR(1): z = {round(ar1$statistic,3)} (p = {round(ar1$p.value,3)})"))) %>%
+    tab_source_note(md(glue("AR(2): z = {round(ar2$statistic,3)} (p = {round(ar2$p.value,3)})")))
 }
 
 table_cbie_index <- create_gmm_table(
-  gmm_model_cbie_index, 
-  "Estimativas do Modelo GMM - Índice de Independência do BC",
+  gmm_model_cbie_index,
+  "Estimativas GMM — Índice de Independência do BC",
   data,
   panel
 )
 
 table_cbie_policy <- create_gmm_table(
-  gmm_model_cbie_policy, 
-  "Estimativas do Modelo GMM - Independência do BC (Política Monetária)",
+  gmm_model_cbie_policy,
+  "Estimativas GMM — Independência do BC (Política Monetária)",
   data,
   panel
 )
 
 table_cbie_policy_q1 <- create_gmm_table(
-  gmm_model_cbie_policy_q1, 
-  "Estimativas do Modelo GMM - Independência do BC (Política Monetária Q1)",
+  gmm_model_cbie_policy_q1,
+  "Estimativas GMM — Independência do BC (Política Monetária Q1)",
   data,
   panel
 )
