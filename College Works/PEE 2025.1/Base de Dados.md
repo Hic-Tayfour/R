@@ -6,7 +6,8 @@ github_files <- c(
   "https://github.com/Hic-Tayfour/R/raw/main/College%20Works/PEE%202025.1/Data/CBIDta.xlsx",
   "https://github.com/Hic-Tayfour/R/raw/main/College%20Works/PEE%202025.1/Data/InflationForecast(FMI).xlsx",
   "https://github.com/Hic-Tayfour/R/raw/main/College%20Works/PEE%202025.1/Data/target(eikon).xlsx",
-  "https://github.com/Hic-Tayfour/R/raw/main/College%20Works/PEE%202025.1/Data/target(macrobond).xlsx"
+  "https://github.com/Hic-Tayfour/R/raw/main/College%20Works/PEE%202025.1/Data/target(macrobond).xlsx",
+  "https://github.com/Hic-Tayfour/R/blob/main/College%20Works/PEE%202025.1/Data/rate_macrobond.xlsx"
 )
 
 # Nomes locais dos arquivos
@@ -14,7 +15,8 @@ local_files <- c(
   "CBIDta.xlsx",
   "InflationForecast(FMI).xlsx",
   "target(eikon).xlsx",
-  "target(macrobond).xlsx"
+  "target(macrobond).xlsx",
+  "rate_macrobond.xlsx"
 )
 
 # Loop para baixar os arquivos
