@@ -34,6 +34,31 @@ Esse material serve como um guia de referência rápida e comentada — ideal pa
 
 ---
 
+### 📦 Paleta de Cores 
+
+Neste repositório, também está disponível um **script em R** com uma biblioteca que fornece paletas de cores para uso no RStudio.
+O script está **organizado por tipo de paleta** (ex: contínua, discreta, dinâmica, estatística) e, para cada paleta, há:
+
+- ✅ O **número de cores geradas**
+- 🔗 O **título da paleta de cores**
+
+Esse material funciona como um **guia de referência rápida e comentada** — ideal para revisão, ensino ou projetos de extensão.
+
+---
+
+### 📦 Caracteres Unicode
+
+Neste repositório, também está disponível um **script em R** com uma biblioteca que permite extrair e utilizar **caracteres Unicode** no RStudio.
+O script está **organizado por tipo de bloco Unicode** (ex: símbolos matemáticos, alfabeto grego, operadores) e, para cada bloco, há:
+
+- ✅ Um **conjunto de caracteres com descrição, código e símbolo**
+- 🔗 O **nome oficial do bloco Unicode**
+- 💡 Dicas de aplicação e contexto de uso
+
+Esse material serve como um guia de referência rápida e comentada — ideal para revisão, ensino ou extensão, especialmente em contextos que envolvem **símbolos matemáticos, textos científicos ou gráficos com anotações técnicas**.
+
+---
+
 Sinta-se à vontade para explorar, adaptar ou complementar com seus próprios estudos!
 
 Atenciosamente,  
