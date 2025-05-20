@@ -329,7 +329,7 @@ ifs <- load_datasets("IFS")
 
 # Seleção da série de taxa de juros
 
-data_wide <- ifs$get_series(
+data_wide_ifs <- ifs$get_series(
   freq         = "A",
   ref_area     = NULL,
   indicator    = "FPOLM_PA",
@@ -339,7 +339,7 @@ data_wide <- ifs$get_series(
 
 # Transformação da base
 
-rate <- data_wide %>%
+rate <- data_wide_ifs %>%
   pivot_longer(cols = -TIME_PERIOD,
                names_to = "col_indicator",
                values_to = "taxa_juros") %>%
@@ -391,6 +391,70 @@ rate <- rate %>%
     iso3c = countrycode(country, origin = "country.name", destination = "iso3c")
   ) %>%
   arrange(country, year)
+
+```
+
+## Base de Dados de Situação Fiscal
+
+```{r download-situacao-fiscal, message=FALSE, warning=FALSE}
+
+# Importação da base IFS do FMI
+
+data_wide_fm <- load_datasets("FM")$get_series(
+  freq        = "A",
+  ref_area    = NULL,                       
+  indicator   = "GGXONLB_G01_GDP_PT",        
+  start_period = "1990",
+  end_period   = "2025"
+)
+
+# Seleção da série de taxa de juros e Transformação da base
+
+capb <- data_wide_fm %>%
+  pivot_longer(-TIME_PERIOD,
+               names_to  = "col_indicator",
+               values_to = "capb") %>%
+  mutate(
+    iso2c = sub("^A\\.([^.]*)\\..*$", "\\1", col_indicator),
+    iso2c = if_else(iso2c %in% c("7A","U2"), "EA", iso2c),
+    year  = as.integer(TIME_PERIOD),
+    capb  = as.numeric(capb)
+  ) %>%
+  filter(grepl("^[A-Z]{2}$", iso2c)) %>%        
+  mutate(                                       
+    iso3c = case_when(
+      iso2c == "EA" ~ "EMU", 
+      iso2c == "XK" ~ "XKX", 
+      TRUE ~ countrycode(iso2c, "iso2c", "iso3c", warn = FALSE)
+    ),
+    country = case_when(
+      iso2c == "EA" ~ "Euro Area",
+      iso2c == "XK" ~ "Kosovo",
+      TRUE ~ countrycode(iso2c, "iso2c", "country.name", warn = FALSE)
+    )
+  ) %>%
+  arrange(country, year) %>%
+  group_by(country) %>%
+  mutate(impulso_fiscal = -(capb - dplyr::lag(capb, order_by = year))) %>%
+  ungroup() %>%
+  select(country, iso2c, iso3c, year, capb, impulso_fiscal) %>%
+  semi_join(
+    target %>% filter(year >= 2000, year <= 2023) %>% distinct(iso3c, year),
+    by = c("iso3c", "year")
+  ) %>%
+  mutate(iso2c_original = iso2c) %>%
+  select(-iso2c) %>%
+  rename(iso2c = iso2c_original)
+
+# Juntando a base de situação fiscal com a base de dívida
+
+debt <- debt %>%
+  left_join(
+    capb %>% 
+      select(iso3c, year, impulso_fiscal) %>% 
+      distinct(),
+    by = c("iso3c", "year")
+  )
 
 ```
 
@@ -465,6 +529,7 @@ data <- cbi %>%
     cbie_policy,
     cbie_policy_q1,
     divida,
+    impulso_fiscal,
     pib_pot,
     hiato_pct,
     real_rate,
@@ -481,6 +546,7 @@ data <- cbi %>%
     cbie_policy = "Índice de independência do Banco Central (política monetária)",
     cbie_policy_q1 = "Índice de independência do Banco Central (política monetária Q1)",
     divida = "Dívida governamental (% do PIB)",
+    impulso_fiscal = "Impulso fiscal (p.p.)",
     pib_pot = "PIB potencial (filtro HP)",
     hiato_pct = "Hiato do produto (%)",
     real_rate = "Taxa de juros real (%)",
@@ -503,10 +569,10 @@ data <- cbi %>%
 
 analisar_ocorrencias <- function(dados) {
   variaveis_banco <- c("pib", "inflation", "inflation_forecast", "target", 
-                       "taxa_juros", "divida", "cbie_index")
+                       "taxa_juros", "divida", "impulso_fiscal","cbie_index")
   
   nomes_variaveis <- c("PIB", "Inflação", "Inflação Esperada", "Meta de Inflação", 
-                       "Taxa Nominal de Juros", "Dívida", "CBI")
+                       "Taxa Nominal de Juros", "Dívida", "Impulso Fiscal" ,"CBI")
   
   total_paises <- n_distinct(dados$country)
   total_anos <- n_distinct(dados$year)
@@ -611,8 +677,7 @@ criar_tabela_ocorrencias_novo <- function(dados) {
 }
 
 tabela_ocorrencias_novo <- criar_tabela_ocorrencias_novo(data)
-
-tabela_ocorrencias_novo
+print(tabela_ocorrencias_novo)
 
 
 ```
@@ -636,10 +701,10 @@ rm(list = setdiff(ls(), manter))
 
 data %>%
   mutate(across(
-    c(pib,inflation,inflation_forecast,taxa_juros,cbie_index,divida,pib_pot,hiato_pct,real_rate,target
+    c(pib,inflation,inflation_forecast,taxa_juros,cbie_index,divida,impulso_fiscal,pib_pot,hiato_pct,real_rate,target
     ),
     ~ as.numeric(.x)
-  )) %>% select(iso3c,pib,inflation,inflation_forecast,taxa_juros,cbie_index,divida,pib_pot,hiato_pct,real_rate,target
+  )) %>% select(iso3c,pib,inflation,inflation_forecast,taxa_juros,cbie_index,divida,impulso_fiscal,pib_pot,hiato_pct,real_rate,target
   ) %>%
   pivot_longer(cols = -iso3c,
                names_to = "variavel",
@@ -655,7 +720,7 @@ data %>%
            color = "white",
            width = 0.85) +
   scale_fill_manual(
-    values = c("#4DACD6","#4FAE62","#F6C54D","#E37D46","#C02D45","#8ecae6","#219ebc","#023047","#ffb703","#F94144"
+    values = c("#4DACD6","#4FAE62","#F6C54D","#E37D46","#C02D45","#8ecae6","#219ebc","#023047","#ffb703","#F94144","#F3722C"
     ),
     name = "Variável"
   ) +
@@ -708,28 +773,34 @@ world %>%
     data %>%
       select(iso3c, year,
              pib, inflation, inflation_forecast, taxa_juros, cbie_index,
-             divida, pib_pot, hiato_pct, real_rate, target) %>%
-      pivot_longer(cols = -c(iso3c, year),
-                   names_to = "variavel",
-                   values_to = "valor") %>%
+             divida, impulso_fiscal, pib_pot, hiato_pct, real_rate, target) %>%
+      pivot_longer(
+        cols      = -c(iso3c, year),
+        names_to  = "variavel",
+        values_to = "valor"
+      ) %>%
       filter(!is.na(valor)) %>%
-      count(iso3c, name = "n_obs") %>%
-      mutate(
-        total_ideal = 10 * n_distinct(data$year),
-        prop_dados  = n_obs / total_ideal
+      group_by(iso3c) %>%                      
+      summarise(
+        n_obs       = n(),                     
+        n_var       = n_distinct(variavel),    
+        n_year      = n_distinct(year),        
+        total_ideal = n_var * n_year,          
+        prop_dados  = n_obs / total_ideal,     
+        .groups     = "drop"
       ),
     by = c("iso_a3" = "iso3c")
   ) %>%
   ggplot() +
   geom_sf(aes(fill = prop_dados), color = "black", size = .1) +
   scale_fill_gradient2(
-    low       = paletteer::paletteer_c("ggthemes::Red-Blue Diverging", 30)[1],    
-    mid       = paletteer::paletteer_c("ggthemes::Red-Blue Diverging", 30)[15],   
-    high      = paletteer::paletteer_c("ggthemes::Red-Blue Diverging", 30)[30],   
+    low       = paletteer::paletteer_c("ggthemes::Red-Blue Diverging", 30)[1],
+    mid       = paletteer::paletteer_c("ggthemes::Red-Blue Diverging", 30)[15],
+    high      = paletteer::paletteer_c("ggthemes::Red-Blue Diverging", 30)[30],
     midpoint  = 0.5,
+    limits    = c(0, 1),
     na.value  = "white",
     name      = "Proporção de\nDados (%)",
-    limits    = c(0, 1),
     labels    = percent_format(accuracy = 1)
   ) +
   labs(
@@ -748,7 +819,6 @@ world %>%
     legend.text     = element_text(size = 9),
     plot.margin     = margin(2, 2, 2, 2)
   )
-
 
 
 ```
@@ -1297,6 +1367,35 @@ summary(gmm_model_cbie_index)
 
 ### 🧮 Análise de Robustez
 
+###  🧮 GMM com Impulso Fiscal
+
+```{r GMM_impulso_fiscal ,message=FALSE,warning=FALSE}
+
+gmm_model_cbie_index_fiscal <- pgmm(
+  formula = gap ~
+    lag(gap, 1) +        
+    cbie_index +                   
+    lag(hiato_pct, 1) +            
+    inflation_forecast +
+    real_rate +
+    impulso_fiscal +
+    I(cbie_index * real_rate)
+  |
+    lag(impulso_fiscal, 1:2) +
+    lag(gap, 3:4) +      
+    lag(real_rate, 2:3) +          
+    lag(inflation_forecast, 3:4) + 
+    lag(hiato_pct, 3:4),           
+  data           = panel,
+  effect         = "individual",
+  model          = "twosteps",
+  transformation = "ld"
+)
+
+summary(gmm_model_cbie_index_fiscal)
+
+```
+
 #### 🧮 GMM usando CBI(Policy Rate) 
 
 ```{r GMM_cbie_index ,message=FALSE,warning=FALSE}
@@ -1308,8 +1407,10 @@ gmm_model_cbie_policy <- pgmm(
     lag(hiato_pct, 1) +            
     inflation_forecast +
     real_rate +
+    impulso_fiscal +
     I(cbie_policy * real_rate) 
   |
+    lag(impulso_fiscal, 1:2) +
     lag(gap, 3:4) +      
     lag(real_rate, 2:3) +          
     lag(inflation_forecast, 3:4) + 
@@ -1319,6 +1420,7 @@ gmm_model_cbie_policy <- pgmm(
   model          = "twosteps",
   transformation = "ld"
 )
+
 
 summary(gmm_model_cbie_policy)
 
@@ -1335,8 +1437,11 @@ gmm_model_cbie_policy_q1 <- pgmm(
     real_rate +
     lag(hiato_pct, 1) +            
     inflation_forecast +
+    impulso_fiscal +
     I(cbie_policy_q1 * real_rate) 
+
   |
+    lag(impulso_fiscal, 1:2) +
     lag(gap, 3:4) +      
     lag(real_rate, 2:3) +          
     lag(inflation_forecast, 3:4) + 
@@ -1356,9 +1461,11 @@ summary(gmm_model_cbie_policy_q1)
 ```{r tabela-GMM ,message=FALSE,warning=FALSE}
 
 create_gmm_table <- function(gmm_model, title, data, panel) {
-  s <- summary(gmm_model, robust = TRUE)
-  cm <- as_tibble(s$coefficients, rownames = "term")
-  pcol <- grep("^Pr", colnames(cm), value = TRUE)
+  s   <- summary(gmm_model, robust = TRUE)
+  cm  <- as_tibble(s$coefficients, rownames = "term")
+  
+  # Coluna de p‑valor (primeira cujo nome começa com "Pr")
+  pcol <- grep("^Pr", colnames(cm), value = TRUE)[1]
   
   mapping <- tribble(
     ~term,                          ~Parametro,
@@ -1371,13 +1478,14 @@ create_gmm_table <- function(gmm_model, title, data, panel) {
     "cbie_index",                   "α₅ (Índice de Independência do BC)",
     "cbie_policy",                  "α₅ (Índice de Independência do BC - Política Monetária)",
     "cbie_policy_q1",               "α₅ (Índice de Independência do BC - Política Monetária Q1)",
-    "real_rate",                    "α₆ (Taxa Real de Juros)"
+    "real_rate",                    "α₆ (Taxa Real de Juros)",
+    "impulso_fiscal",               "α₇ (Impulso Fiscal)"
   )
   
   res <- cm %>%
     left_join(mapping, by = "term") %>%
     mutate(
-      Parametro = ifelse(is.na(Parametro), term, Parametro),
+      Parametro = coalesce(Parametro, term),
       Resultado = paste0(
         sprintf("%.4f", Estimate),
         case_when(
@@ -1391,33 +1499,33 @@ create_gmm_table <- function(gmm_model, title, data, panel) {
         ")"
       )
     ) %>%
-    arrange(factor(
-      Parametro,
-      levels = c(
-        "α₁ (Independência do BC × Taxa Real de Juros)",
-        "α₁ (Independência do BC (PM) × Taxa Real de Juros)",
-        "α₁ (Independência do BC (PM Q1) × Taxa Real de Juros)",
-        "α₂ (Gap de Inflação Defasado)",
-        "α₃ (Hiato do Produto Defasado)",
-        "α₄ (Expectativa de Inflação)",
-        "α₅ (Índice de Independência do BC)",
-        "α₅ (Índice de Independência do BC - Política Monetária)",
-        "α₅ (Índice de Independência do BC - Política Monetária Q1)",
-        "α₆ (Taxa Real de Juros)"
-      )
-    )) %>%
+    arrange(match(Parametro, c(
+      "α₁ (Independência do BC × Taxa Real de Juros)",
+      "α₁ (Independência do BC (PM) × Taxa Real de Juros)",
+      "α₁ (Independência do BC (PM Q1) × Taxa Real de Juros)",
+      "α₂ (Gap de Inflação Defasado)",
+      "α₃ (Hiato do Produto Defasado)",
+      "α₄ (Expectativa de Inflação)",
+      "α₅ (Índice de Independência do BC)",
+      "α₅ (Índice de Independência do BC - Política Monetária)",
+      "α₅ (Índice de Independência do BC - Política Monetária Q1)",
+      "α₆ (Taxa Real de Juros)",
+      "α₇ (Impulso Fiscal)"
+    ))) %>%
     select(Parâmetro = Parametro, Resultado)
   
-  sg <- sargan(gmm_model, robust = TRUE)
+  # Estatísticas complementares
+  sg  <- sargan(gmm_model, robust = TRUE)
   ar1 <- mtest(gmm_model, 1)
   ar2 <- mtest(gmm_model, 2)
   coefs <- coef(gmm_model)
-  Vrob <- vcov(gmm_model, robust = TRUE)
+  Vrob  <- vcov(gmm_model, robust = TRUE)
   wald_stat <- as.numeric(t(coefs) %*% solve(Vrob) %*% coefs)
-  wald_df <- length(coefs)
-  wald_p <- pchisq(wald_stat, wald_df, lower.tail = FALSE)
+  wald_df   <- length(coefs)
+  wald_p    <- pchisq(wald_stat, wald_df, lower.tail = FALSE)
+  
   n_countries <- length(unique(data$iso3c))
-  n_obs <- nrow(panel)
+  n_obs       <- nrow(panel)
   
   res %>%
     gt() %>%
@@ -1431,9 +1539,17 @@ create_gmm_table <- function(gmm_model, title, data, panel) {
     tab_source_note(md(glue("AR(2): z = {round(ar2$statistic,3)} (p = {round(ar2$p.value,3)})")))
 }
 
+
 table_cbie_index <- create_gmm_table(
   gmm_model_cbie_index,
   "Estimativas GMM — Índice de Independência do BC",
+  data,
+  panel
+)
+
+table_cbie_index_fiscal <- create_gmm_table(
+  gmm_model_cbie_index_fiscal,
+  "Estimativas GMM — Índice de Independência do BC (Fiscal)",
   data,
   panel
 )
@@ -1454,8 +1570,10 @@ table_cbie_policy_q1 <- create_gmm_table(
 
 # Exibir as tabelas
 table_cbie_index
+table_cbie_index_fiscal
 table_cbie_policy
 table_cbie_policy_q1
+
 
 ```
 

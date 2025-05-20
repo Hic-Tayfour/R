@@ -402,7 +402,7 @@ data <- cbi %>%
     cbie_policy = "Índice de independência do Banco Central (política monetária)",
     cbie_policy_q1 = "Índice de independência do Banco Central (política monetária Q1)",
     divida = "Dívida governamental (% do PIB)",
-    impulso_fiscal = "Impulso fiscal (% do PIB)",
+    impulso_fiscal = "Impulso fiscal (p.p.)",
     pib_pot = "PIB potencial (filtro HP)",
     hiato_pct = "Hiato do produto (%)",
     real_rate = "Taxa de juros real (%)",
@@ -538,10 +538,10 @@ rm(list = setdiff(ls(), manter))
 
 data %>%
   mutate(across(
-    c(pib,inflation,inflation_forecast,taxa_juros,cbie_index,divida,pib_pot,hiato_pct,real_rate,target
+    c(pib,inflation,inflation_forecast,taxa_juros,cbie_index,divida,impulso_fiscal,pib_pot,hiato_pct,real_rate,target
     ),
     ~ as.numeric(.x)
-  )) %>% select(iso3c,pib,inflation,inflation_forecast,taxa_juros,cbie_index,divida,pib_pot,hiato_pct,real_rate,target
+  )) %>% select(iso3c,pib,inflation,inflation_forecast,taxa_juros,cbie_index,divida,impulso_fiscal,pib_pot,hiato_pct,real_rate,target
   ) %>%
   pivot_longer(cols = -iso3c,
                names_to = "variavel",
@@ -557,7 +557,7 @@ data %>%
            color = "white",
            width = 0.85) +
   scale_fill_manual(
-    values = c("#4DACD6","#4FAE62","#F6C54D","#E37D46","#C02D45","#8ecae6","#219ebc","#023047","#ffb703","#F94144"
+    values = c("#4DACD6","#4FAE62","#F6C54D","#E37D46","#C02D45","#8ecae6","#219ebc","#023047","#ffb703","#F94144","#F3722C"
     ),
     name = "Variável"
   ) +
@@ -606,28 +606,34 @@ world %>%
     data %>%
       select(iso3c, year,
              pib, inflation, inflation_forecast, taxa_juros, cbie_index,
-             divida, pib_pot, hiato_pct, real_rate, target) %>%
-      pivot_longer(cols = -c(iso3c, year),
-                   names_to = "variavel",
-                   values_to = "valor") %>%
+             divida, impulso_fiscal, pib_pot, hiato_pct, real_rate, target) %>%
+      pivot_longer(
+        cols      = -c(iso3c, year),
+        names_to  = "variavel",
+        values_to = "valor"
+      ) %>%
       filter(!is.na(valor)) %>%
-      count(iso3c, name = "n_obs") %>%
-      mutate(
-        total_ideal = 10 * n_distinct(data$year),
-        prop_dados  = n_obs / total_ideal
-      ),
+      group_by(iso3c) %>%                    
+    summarise(
+      n_obs       = n(),                     
+      n_var       = n_distinct(variavel),    
+      n_year      = n_distinct(year),        
+      total_ideal = n_var * n_year,          
+      prop_dados  = n_obs / total_ideal,     
+      .groups     = "drop"
+    ),
     by = c("iso_a3" = "iso3c")
   ) %>%
   ggplot() +
   geom_sf(aes(fill = prop_dados), color = "black", size = .1) +
   scale_fill_gradient2(
-    low       = paletteer::paletteer_c("ggthemes::Red-Blue Diverging", 30)[1],    
-    mid       = paletteer::paletteer_c("ggthemes::Red-Blue Diverging", 30)[15],   
-    high      = paletteer::paletteer_c("ggthemes::Red-Blue Diverging", 30)[30],   
+    low       = paletteer::paletteer_c("ggthemes::Red-Blue Diverging", 30)[1],
+    mid       = paletteer::paletteer_c("ggthemes::Red-Blue Diverging", 30)[15],
+    high      = paletteer::paletteer_c("ggthemes::Red-Blue Diverging", 30)[30],
     midpoint  = 0.5,
+    limits    = c(0, 1),
     na.value  = "white",
     name      = "Proporção de\nDados (%)",
-    limits    = c(0, 1),
     labels    = percent_format(accuracy = 1)
   ) +
   labs(
@@ -1341,6 +1347,7 @@ table_cbie_policy_q1
 
 
 ## 📊 Gráfico de Efeitos Marginais
+
 
 # Função de previsão do gap
 predict_gap <- function(cbie_index, real_rate, coef_cbi, coef_real, coef_int) {
