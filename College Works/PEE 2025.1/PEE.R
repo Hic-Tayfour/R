@@ -1342,7 +1342,6 @@ table_cbie_policy_q1
 
 ## 📊 Gráfico de Efeitos Marginais
 
-
 # Função de previsão do gap
 predict_gap <- function(cbie_index, real_rate, coef_cbi, coef_real, coef_int) {
   coef_cbi * cbie_index +
