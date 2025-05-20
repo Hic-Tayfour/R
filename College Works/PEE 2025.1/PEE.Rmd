@@ -32,7 +32,7 @@ author: |
 
 date: |
   <div style="text-align: center; margin-top: 20px;">
-    <p><strong>São Paulo – Fevereiro de 2025</strong></p>
+    <p><strong>São Paulo – Fevereiro/Maio de 2025</strong></p>
   </div>
 
 output:
@@ -66,6 +66,27 @@ Para testar essa hipótese, será conduzida uma análise empírica baseada em da
 -   A **potência da política monetária**, avaliada por meio da resposta da inflação a variações na taxa de juros real.
 
 Modelos econométricos e análises descritivas complementares serão utilizados para investigar essa relação ao longo do tempo e entre diferentes grupos de países (por regime monetário e instituições).
+
+# Reprodução
+
+Este trabalho poderá ser encontrado no GitHub [PEE 2025.1 - Grupo 7](https://github.com/Hic-Tayfour/R/tree/main/College%20Works/PEE%202025.1). A estrutura do repositório está organizada para garantir reprodutibilidade total da análise.
+
+## 📁 Estrutura de Arquivos
+
+A pasta `Data` contém 5 arquivos `.xlsx` fundamentais:
+
+1. **CBIDta.xlsx**: Dados sobre independência dos bancos centrais (CBIE) — Romelli (2022, 2024) — cobrindo 155 países entre 1923 e 2023.
+2. **InflationForecast(FMI).xlsx**: Projeções de inflação do FMI.
+3. **rate_macrobond.xlsx**: Taxas de juros nominais coletadas via Macrobond.
+4. **target(eikon).xlsx**: Metas de inflação obtidas via Eikon.
+5. **target(macrobond).xlsx**: Metas de inflação obtidas via Macrobond (prioritárias para países da Zona do Euro).
+
+Além disso, os seguintes scripts e documentos estão incluídos:
+
+- **PEE.R**: Código principal com etapas de importação, limpeza, cálculo e estimativas.
+- **PEE.Rmd**: Documento R Markdown com a estrutura analítica e narrativa do trabalho.
+- **Base de Dados.md**: Script para download automatizado dos dados via GitHub.
+- **README.md**: Descrição completa do projeto, metodologia e orientações de execução.
 
 # ⚙️ Configuração do Ambiente
 
@@ -677,10 +698,11 @@ criar_tabela_ocorrencias_novo <- function(dados) {
 }
 
 tabela_ocorrencias_novo <- criar_tabela_ocorrencias_novo(data)
-print(tabela_ocorrencias_novo)
+tabela_ocorrencias_novo
 
 
 ```
+
 # 🚯 Removendo Bases Auxiliares
 
 ```{r remove-bases, message=FALSE, warning=FALSE}
@@ -691,7 +713,6 @@ manter <- c("data",
 rm(list = setdiff(ls(), manter))
 
 ```
-
 
 # 📈 Análise Descritiva
 
@@ -910,7 +931,6 @@ data %>%
 
 ```
 
-
 ## 📊 Gráfico da Evolução do CBI
 
 ```{r grafico-cbi, message=FALSE, warning=FALSE}
@@ -1064,7 +1084,7 @@ ggplot() +
   )
 ```
 
-## 📊 Gráfico da Evolução da Variáveis 
+## 📊 Gráfico da Evolução da Variáveis
 
 ```{r grafico-variaveis, message=FALSE, warning=FALSE}
 
@@ -1216,7 +1236,6 @@ data %>%
 
 ```
 
-
 ## 📊 Gráfico do Hiato de Produto e Inflação
 
 ```{r grafico-hiato-inflacao, message=FALSE, warning=FALSE}
@@ -1329,7 +1348,6 @@ data %>%
 
 # 📈🧮 Estimação do Modelo GMM
 
-
 ## 🧮 Preparando os Dados
 
 ```{r panel ,message=FALSE,warning=FALSE}
@@ -1367,7 +1385,7 @@ summary(gmm_model_cbie_index)
 
 ### 🧮 Análise de Robustez
 
-###  🧮 GMM com Impulso Fiscal
+### 🧮 GMM com Impulso Fiscal
 
 ```{r GMM_impulso_fiscal ,message=FALSE,warning=FALSE}
 
@@ -1396,7 +1414,7 @@ summary(gmm_model_cbie_index_fiscal)
 
 ```
 
-#### 🧮 GMM usando CBI(Policy Rate) 
+#### 🧮 GMM usando CBI(Policy Rate)
 
 ```{r GMM_cbie_index ,message=FALSE,warning=FALSE}
 
@@ -1456,8 +1474,8 @@ summary(gmm_model_cbie_policy_q1)
 
 ```
 
+## 🧮 Resultados com estimativas e erros padrão
 
-## 🧮  Resultados com estimativas e erros padrão
 ```{r tabela-GMM ,message=FALSE,warning=FALSE}
 
 create_gmm_table <- function(gmm_model, title, data, panel) {
@@ -1639,7 +1657,6 @@ ggplot(df1, aes(x = real_rate, y = gap_hat, color = factor(cbie_index))) +
 
 ```
 
-
 ### 🧮 Efeitos Marginais CBI
 
 ```{r efeitos-marginais-cbie, message=FALSE, warning=FALSE}
@@ -1684,5 +1701,3 @@ ggplot(df2, aes(x = cbie_index, y = gap_hat, color = factor(real_rate))) +
   )
 
 ```
-
-
