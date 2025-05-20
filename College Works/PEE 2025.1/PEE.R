@@ -15,6 +15,7 @@ library(seasonal)     # Ajuste sazonal para séries temporais
 library(imf.data)     # Dados do IMF
 library(gtExtras)     # Gráficos
 library(ggstream)     # Gráficos
+library(ggrepel)      # Gráficos
 library(rugarch)      # Modelos GARCH
 library(stringr)      # Manipulação de strings
 library(viridis)      # Gráficos
@@ -158,7 +159,7 @@ inf_for <- read_xlsx("InflationForecast(FMI).xlsx") %>%
 
 ifs <- load_datasets("IFS")
 
-data_wide <- ifs$get_series(
+data_wide_ifs <- ifs$get_series(
   freq         = "A",
   ref_area     = NULL,
   indicator    = "FPOLM_PA",
@@ -166,7 +167,7 @@ data_wide <- ifs$get_series(
   end_period   = "2025"
 )
 
-rate <- data_wide %>%
+rate <- data_wide_ifs %>%
   pivot_longer(cols = -TIME_PERIOD,
                names_to = "col_indicator",
                values_to = "taxa_juros") %>%
@@ -214,7 +215,6 @@ rate <- rate %>%
     iso3c = countrycode(country, origin = "country.name", destination = "iso3c")
   ) %>%
   arrange(country, year)
-
 
 target_panel_bond <- read_excel("target(macrobond).xlsx", sheet = "Sheet1") %>%
   rename(date = "...1") %>%
@@ -274,6 +274,57 @@ target <- target_panel_eikon %>%
   arrange(country, year)
 
 
+data_wide_fm <- load_datasets("FM")$get_series(
+  freq        = "A",
+  ref_area    = NULL,                       
+  indicator   = "GGXONLB_G01_GDP_PT",        
+  start_period = "1990",
+  end_period   = "2025"
+)
+
+capb <- data_wide_fm %>%
+  pivot_longer(-TIME_PERIOD,
+               names_to  = "col_indicator",
+               values_to = "capb") %>%
+  mutate(
+    iso2c = sub("^A\\.([^.]*)\\..*$", "\\1", col_indicator),
+    iso2c = if_else(iso2c %in% c("7A","U2"), "EA", iso2c),
+    year  = as.integer(TIME_PERIOD),
+    capb  = as.numeric(capb)
+  ) %>%
+  filter(grepl("^[A-Z]{2}$", iso2c)) %>%        
+  mutate(                                       
+    iso3c = case_when(
+      iso2c == "EA" ~ "EMU", 
+      iso2c == "XK" ~ "XKX", 
+      TRUE ~ countrycode(iso2c, "iso2c", "iso3c", warn = FALSE)
+    ),
+    country = case_when(
+      iso2c == "EA" ~ "Euro Area",
+      iso2c == "XK" ~ "Kosovo",
+      TRUE ~ countrycode(iso2c, "iso2c", "country.name", warn = FALSE)
+    )
+  ) %>%
+  arrange(country, year) %>%
+  group_by(country) %>%
+  mutate(impulso_fiscal = -(capb - dplyr::lag(capb, order_by = year))) %>%
+  ungroup() %>%
+  select(country, iso2c, iso3c, year, capb, impulso_fiscal) %>%
+  semi_join(
+    target %>% filter(year >= 2000, year <= 2023) %>% distinct(iso3c, year),
+    by = c("iso3c", "year")
+  ) %>%
+  mutate(iso2c_original = iso2c) %>%
+  select(-iso2c) %>%
+  rename(iso2c = iso2c_original)
+
+debt <- debt %>%
+  left_join(
+    capb %>% 
+      select(iso3c, year, impulso_fiscal) %>% 
+      distinct(),
+    by = c("iso3c", "year")
+  )
 
 acemoglu_classification <- data.frame(
   Pais = c("Argentina", "Australia", "Austria", "Belgium", "Bolivia", "Brazil", "Canada", 
@@ -334,6 +385,7 @@ data <- cbi %>%
     cbie_policy,
     cbie_policy_q1,
     divida,
+    impulso_fiscal,
     pib_pot,
     hiato_pct,
     real_rate,
@@ -350,6 +402,7 @@ data <- cbi %>%
     cbie_policy = "Índice de independência do Banco Central (política monetária)",
     cbie_policy_q1 = "Índice de independência do Banco Central (política monetária Q1)",
     divida = "Dívida governamental (% do PIB)",
+    impulso_fiscal = "Impulso fiscal (% do PIB)",
     pib_pot = "PIB potencial (filtro HP)",
     hiato_pct = "Hiato do produto (%)",
     real_rate = "Taxa de juros real (%)",
@@ -364,10 +417,10 @@ data <- cbi %>%
 
 analisar_ocorrencias <- function(dados) {
   variaveis_banco <- c("pib", "inflation", "inflation_forecast", "target", 
-                       "taxa_juros", "divida", "cbie_index")
+                       "taxa_juros", "divida", "impulso_fiscal","cbie_index")
   
   nomes_variaveis <- c("PIB", "Inflação", "Inflação Esperada", "Meta de Inflação", 
-                       "Taxa Nominal de Juros", "Dívida", "CBI")
+                       "Taxa Nominal de Juros", "Dívida", "Impulso Fiscal" ,"CBI")
   
   total_paises <- n_distinct(dados$country)
   total_anos <- n_distinct(dados$year)
@@ -568,9 +621,9 @@ world %>%
   ggplot() +
   geom_sf(aes(fill = prop_dados), color = "black", size = .1) +
   scale_fill_gradient2(
-    low       = paletteer_c("ggthemes::Red-Blue Diverging", 30)[1],    
-    mid       = paletteer_c("ggthemes::Red-Blue Diverging", 30)[15],   
-    high      = paletteer_c("ggthemes::Red-Blue Diverging", 30)[30],   
+    low       = paletteer::paletteer_c("ggthemes::Red-Blue Diverging", 30)[1],    
+    mid       = paletteer::paletteer_c("ggthemes::Red-Blue Diverging", 30)[15],   
+    high      = paletteer::paletteer_c("ggthemes::Red-Blue Diverging", 30)[30],   
     midpoint  = 0.5,
     na.value  = "white",
     name      = "Proporção de\nDados (%)",
@@ -1012,6 +1065,61 @@ data %>%
     legend.position  = "none"
   )
 
+## 📊 Gráfico da Mudança no CBI e Inflação
+
+data %>%
+  group_by(country) %>%
+  mutate(
+    change_inflation = (
+      (
+        (inflation + dplyr::lead(inflation, 1) + dplyr::lead(inflation, 2) +
+           dplyr::lead(inflation, 3) + dplyr::lead(inflation, 4)) /4
+      ) /
+        ((inflation + dplyr::lag(inflation, 1) + dplyr::lag(inflation, 2)) / 3) - 1
+    ),
+    cbie_change = (cbie_index - dplyr::lag(cbie_index, 1)) / cbie_index
+  ) %>%
+  filter(!is.na(change_inflation), !is.na(cbie_change), cbie_change != 0) %>%
+  ggplot(aes(x = cbie_change, y = change_inflation)) +
+  geom_point(
+    aes(fill = cbie_index),
+    alpha = 0.8,
+    shape = 21,
+    size = 3,
+    color = "black"
+  ) +
+  geom_smooth(method = "lm", se = FALSE, fullrange = TRUE, color = "darkblue", linewidth = 1) +
+  geom_hline(yintercept = 0, linetype = "solid", color = "black") +
+  geom_vline(xintercept = 0, linetype = "solid", color = "black") +
+  geom_text_repel(aes(label = paste(iso3c, year, sep = "-")), size = 3, max.overlaps = 10) +
+  
+  coord_cartesian(ylim = c(-1.2, 4)) +
+  scale_fill_viridis_c(
+    option = "inferno",
+    direction = 1,
+    begin = 0.1,
+    end = 0.9,
+    guide = "none",
+    na.value = NA
+  ) +
+  labs(
+    title    = "Reformas Institucionais e Queda na Inflação",
+    subtitle = "Pontos representam episódios de mudança no CBI — preenchimento indica nível do índice",
+    x        = "\u0394% CBI Index",
+    y        = "\u0394% Inflação",
+    caption  = expression(bold("Fonte:") ~ "WDI + CBIE + FMI")
+  ) +
+  theme_classic(base_size = 13) +
+  theme(
+    plot.title       = element_text(face = "bold", size = 15, hjust = 0),
+    plot.subtitle    = element_text(size = 11.5, hjust = 0, margin = margin(b = 10)),
+    axis.title       = element_text(face = "bold"),
+    axis.text        = element_text(color = "gray20"),
+    panel.grid.major = element_line(color = "grey85", linewidth = 0.3),
+    plot.caption     = element_text(hjust = 0, size = 10, color = "gray40"),
+    legend.position  = "none"
+  )
+
 # 📊 Estimações ----
 
 ## 📊 Preparando os dados
@@ -1043,6 +1151,30 @@ gmm_model_cbie_index <- pgmm(
 
 summary(gmm_model_cbie_index)
 
+gmm_model_cbie_index_fiscal <- pgmm(
+  formula = gap ~
+    lag(gap, 1) +        
+    cbie_index +                   
+    lag(hiato_pct, 1) +            
+    inflation_forecast +
+    real_rate +
+    impulso_fiscal +
+    I(cbie_index * real_rate)
+  |
+    lag(impulso_fiscal, 1:2) +
+    lag(gap, 3:4) +      
+    lag(real_rate, 2:3) +          
+    lag(inflation_forecast, 3:4) + 
+    lag(hiato_pct, 3:4),           
+  data           = panel,
+  effect         = "individual",
+  model          = "twosteps",
+  transformation = "ld"
+)
+
+
+summary(gmm_model_cbie_index_fiscal)
+
 gmm_model_cbie_policy <- pgmm(
   formula = gap ~
     lag(gap, 1) +        
@@ -1050,8 +1182,10 @@ gmm_model_cbie_policy <- pgmm(
     lag(hiato_pct, 1) +            
     inflation_forecast +
     real_rate +
+    impulso_fiscal +
     I(cbie_policy * real_rate) 
   |
+    lag(impulso_fiscal, 1:2) +
     lag(gap, 3:4) +      
     lag(real_rate, 2:3) +          
     lag(inflation_forecast, 3:4) + 
@@ -1072,8 +1206,11 @@ gmm_model_cbie_policy_q1 <- pgmm(
     real_rate +
     lag(hiato_pct, 1) +            
     inflation_forecast +
+    impulso_fiscal +
     I(cbie_policy_q1 * real_rate) 
+
   |
+    lag(impulso_fiscal, 1:2) +
     lag(gap, 3:4) +      
     lag(real_rate, 2:3) +          
     lag(inflation_forecast, 3:4) + 
@@ -1086,37 +1223,14 @@ gmm_model_cbie_policy_q1 <- pgmm(
 
 summary(gmm_model_cbie_policy_q1)
 
-gmm_model <- pgmm(
-  formula = gap ~
-    lag(gap, 1) +        
-    cbie_index + 
-    real_rate +
-    lag(hiato_pct, 1) +            
-    inflation_forecast +
-    I(cbie_index * real_rate) +
-    I(cbie_index * real_rate^2) +
-    I(real_rate^2) 
-  |
-    lag(gap, 3:4) +      
-    lag(real_rate, 2:3) +          
-    lag(inflation_forecast, 3:4) + 
-    lag(hiato_pct, 3:4),           
-  data           = panel,
-  effect         = "individual",
-  model          = "twosteps",
-  transformation = "ld"
-)
-
-summary(gmm_model)
-
-summary(gmm_model, robust = TRUE)
-
 ## 📊 Tabela de Resultados
 
 create_gmm_table <- function(gmm_model, title, data, panel) {
-  s <- summary(gmm_model, robust = TRUE)
-  cm <- as_tibble(s$coefficients, rownames = "term")
-  pcol <- grep("^Pr", colnames(cm), value = TRUE)
+  s   <- summary(gmm_model, robust = TRUE)
+  cm  <- as_tibble(s$coefficients, rownames = "term")
+  
+  # Coluna de p‑valor (primeira cujo nome começa com "Pr")
+  pcol <- grep("^Pr", colnames(cm), value = TRUE)[1]
   
   mapping <- tribble(
     ~term,                          ~Parametro,
@@ -1129,13 +1243,14 @@ create_gmm_table <- function(gmm_model, title, data, panel) {
     "cbie_index",                   "α₅ (Índice de Independência do BC)",
     "cbie_policy",                  "α₅ (Índice de Independência do BC - Política Monetária)",
     "cbie_policy_q1",               "α₅ (Índice de Independência do BC - Política Monetária Q1)",
-    "real_rate",                    "α₆ (Taxa Real de Juros)"
+    "real_rate",                    "α₆ (Taxa Real de Juros)",
+    "impulso_fiscal",               "α₇ (Impulso Fiscal)"
   )
   
   res <- cm %>%
     left_join(mapping, by = "term") %>%
     mutate(
-      Parametro = ifelse(is.na(Parametro), term, Parametro),
+      Parametro = coalesce(Parametro, term),
       Resultado = paste0(
         sprintf("%.4f", Estimate),
         case_when(
@@ -1149,33 +1264,33 @@ create_gmm_table <- function(gmm_model, title, data, panel) {
         ")"
       )
     ) %>%
-    arrange(factor(
-      Parametro,
-      levels = c(
-        "α₁ (Independência do BC × Taxa Real de Juros)",
-        "α₁ (Independência do BC (PM) × Taxa Real de Juros)",
-        "α₁ (Independência do BC (PM Q1) × Taxa Real de Juros)",
-        "α₂ (Gap de Inflação Defasado)",
-        "α₃ (Hiato do Produto Defasado)",
-        "α₄ (Expectativa de Inflação)",
-        "α₅ (Índice de Independência do BC)",
-        "α₅ (Índice de Independência do BC - Política Monetária)",
-        "α₅ (Índice de Independência do BC - Política Monetária Q1)",
-        "α₆ (Taxa Real de Juros)"
-      )
-    )) %>%
+    arrange(match(Parametro, c(
+      "α₁ (Independência do BC × Taxa Real de Juros)",
+      "α₁ (Independência do BC (PM) × Taxa Real de Juros)",
+      "α₁ (Independência do BC (PM Q1) × Taxa Real de Juros)",
+      "α₂ (Gap de Inflação Defasado)",
+      "α₃ (Hiato do Produto Defasado)",
+      "α₄ (Expectativa de Inflação)",
+      "α₅ (Índice de Independência do BC)",
+      "α₅ (Índice de Independência do BC - Política Monetária)",
+      "α₅ (Índice de Independência do BC - Política Monetária Q1)",
+      "α₆ (Taxa Real de Juros)",
+      "α₇ (Impulso Fiscal)"
+    ))) %>%
     select(Parâmetro = Parametro, Resultado)
   
-  sg <- sargan(gmm_model, robust = TRUE)
+  # Estatísticas complementares
+  sg  <- sargan(gmm_model, robust = TRUE)
   ar1 <- mtest(gmm_model, 1)
   ar2 <- mtest(gmm_model, 2)
   coefs <- coef(gmm_model)
-  Vrob <- vcov(gmm_model, robust = TRUE)
+  Vrob  <- vcov(gmm_model, robust = TRUE)
   wald_stat <- as.numeric(t(coefs) %*% solve(Vrob) %*% coefs)
-  wald_df <- length(coefs)
-  wald_p <- pchisq(wald_stat, wald_df, lower.tail = FALSE)
+  wald_df   <- length(coefs)
+  wald_p    <- pchisq(wald_stat, wald_df, lower.tail = FALSE)
+  
   n_countries <- length(unique(data$iso3c))
-  n_obs <- nrow(panel)
+  n_obs       <- nrow(panel)
   
   res %>%
     gt() %>%
@@ -1189,9 +1304,17 @@ create_gmm_table <- function(gmm_model, title, data, panel) {
     tab_source_note(md(glue("AR(2): z = {round(ar2$statistic,3)} (p = {round(ar2$p.value,3)})")))
 }
 
+
 table_cbie_index <- create_gmm_table(
   gmm_model_cbie_index,
   "Estimativas GMM — Índice de Independência do BC",
+  data,
+  panel
+)
+
+table_cbie_index_fiscal <- create_gmm_table(
+  gmm_model_cbie_index_fiscal,
+  "Estimativas GMM — Índice de Independência do BC (Fiscal)",
   data,
   panel
 )
@@ -1212,6 +1335,7 @@ table_cbie_policy_q1 <- create_gmm_table(
 
 # Exibir as tabelas
 table_cbie_index
+table_cbie_index_fiscal
 table_cbie_policy
 table_cbie_policy_q1
 
@@ -1219,95 +1343,112 @@ table_cbie_policy_q1
 ## 📊 Gráfico de Efeitos Marginais
 
 
+# Função de previsão do gap
+predict_gap <- function(cbie_index, real_rate, coef_cbi, coef_real, coef_int) {
+  coef_cbi * cbie_index +
+    coef_real * real_rate +
+    coef_int  * cbie_index * real_rate
+}
+
+# Extração dos coeficientes do modelo
 coefs     <- coef(gmm_model_cbie_index)
 coef_real <- coefs["real_rate"]
 coef_cbi  <- coefs["cbie_index"]
 coef_int  <- coefs["I(cbie_index * real_rate)"]
 
-cbi_levels <- c(round(min(panel$cbie_index),2), 0.5, round(max(panel$cbie_index),2))
+# Definição de níveis para CBI e Juros Reais
+cbi_levels <- c(round(min(panel$cbie_index, na.rm = TRUE), 2), 0.5, round(max(panel$cbie_index, na.rm = TRUE), 2))
+rr_levels  <- c(round(mean(panel$real_rate, na.rm = TRUE), 2), 1.6, 4)
 
-rr_levels  <- c(0, 5, 10)
-
+# --- Gap Previsto vs Juros Reais (diferentes CBI) ---
 df1 <- expand.grid(
   real_rate  = seq(0, 10, length.out = 100),
   cbie_index = cbi_levels
-) %>% mutate(
-  gap_hat = coef_cbi * cbie_index +
-    coef_real * real_rate +
-    coef_int  * cbie_index * real_rate
+) %>%
+  mutate(
+    gap_hat = predict_gap(cbie_index, real_rate, coef_cbi, coef_real, coef_int)
+  )
+
+ymax1 <- max(abs(df1$gap_hat), na.rm = TRUE)
+
+legend_labels_cbi <- sprintf(
+  "CBI = %.2f: gap = %.2f + %.2f·RR",
+  cbi_levels,
+  coef_cbi * cbi_levels,
+  coef_real + coef_int * cbi_levels
 )
 
-ymax1 <- max(abs(df1$gap_hat))
-
 ggplot(df1, aes(x = real_rate, y = gap_hat, color = factor(cbie_index))) +
+  geom_line(size = 1.3) +
+  geom_point(data = df1 %>% filter(real_rate %in% c(0, 5, 10)), size = 2, alpha = 0.6) +
   geom_hline(yintercept = 0, linetype = "dashed", color = "grey50") +
-  geom_line(size = 1) +
   coord_cartesian(ylim = c(-ymax1, ymax1)) +
-  scale_color_brewer(
-    type    = "qual", palette = 2,
-    labels  = paste0(
-      "CBI=", cbi_levels, 
-      ": gap = ", round(coef_cbi * cbi_levels, 2),
-      " + ", round(coef_real + coef_int * cbi_levels, 2), "·RR"
-    )
+  scale_color_manual(
+    values = RColorBrewer::brewer.pal(length(cbi_levels), "Set1"),
+    labels = legend_labels_cbi,
+    name   = "Fórmulas"
   ) +
   labs(
     title    = "Gap Previsto vs Juros Reais",
     subtitle = "Linhas para diferentes valores de CBI",
     x        = "Juros Reais (%)",
-    y        = "Gap Previsto",
-    color    = "Fórmulas"
+    y        = "Gap Previsto"
   ) +
-  theme_classic(base_size = 12) +
+  theme_classic(base_size = 13) +
   theme(
-    plot.title    = element_text(face = "bold", size = 14, hjust = 0),
+    plot.title    = element_text(face = "bold", size = 15, hjust = 0),
     plot.subtitle = element_text(size = 11, hjust = 0),
     axis.title    = element_text(face = "bold"),
     legend.title  = element_text(face = "bold"),
-    legend.text   = element_text(size = 9)
+    legend.text   = element_text(size = 10),
+    legend.position = "right"
   )
 
+# --- Gap Previsto vs CBI (diferentes Juros Reais) ---
 df2 <- expand.grid(
   cbie_index = seq(0, 1, length.out = 100),
   real_rate  = rr_levels
-) %>% mutate(
-  gap_hat = coef_cbi * cbie_index +
-    coef_real * real_rate +
-    coef_int  * cbie_index * real_rate
+) %>%
+  mutate(
+    gap_hat = predict_gap(cbie_index, real_rate, coef_cbi, coef_real, coef_int)
+  )
+
+ymax2 <- max(abs(df2$gap_hat), na.rm = TRUE)
+
+legend_labels_rr <- sprintf(
+  "RR = %.2f: gap = %.2f + %.2f·CBI",
+  rr_levels,
+  coef_real * rr_levels,
+  coef_cbi + coef_int * rr_levels
 )
 
-ymax2 <- max(abs(df2$gap_hat))
-
 ggplot(df2, aes(x = cbie_index, y = gap_hat, color = factor(real_rate))) +
+  geom_line(size = 1.3) +
+  geom_point(data = df2 %>% filter(cbie_index %in% c(0, 0.5, 1)), size = 2, alpha = 0.6) +
   geom_hline(yintercept = 0, linetype = "dashed", color = "grey50") +
-  geom_line(size = 1) +
   coord_cartesian(ylim = c(-ymax2, ymax2)) +
-  scale_color_brewer(
-    type    = "qual", palette = 3,
-    labels  = paste0(
-      "RR=", rr_levels,
-      ": gap = ", round(coef_real * rr_levels, 2),
-      " + ", round(coef_cbi + coef_int * rr_levels, 2), "·CBI"
-    )
+  scale_color_manual(
+    values = RColorBrewer::brewer.pal(length(rr_levels), "Set2"),
+    labels = legend_labels_rr,
+    name   = "Fórmulas"
   ) +
   labs(
     title    = "Gap Previsto vs CBI",
     subtitle = "Linhas para diferentes níveis de Juros Reais",
     x        = "CBI (Índice de Independência)",
-    y        = "Gap Previsto",
-    color    = "Fórmulas"
+    y        = "Gap Previsto"
   ) +
-  theme_classic(base_size = 12) +
+  theme_classic(base_size = 13) +
   theme(
-    plot.title    = element_text(face = "bold", size = 14, hjust = 0),
+    plot.title    = element_text(face = "bold", size = 15, hjust = 0),
     plot.subtitle = element_text(size = 11, hjust = 0),
     axis.title    = element_text(face = "bold"),
     legend.title  = element_text(face = "bold"),
-    legend.text   = element_text(size = 9)
+    legend.text   = element_text(size = 10),
+    legend.position = "right"
   )
 
-
+# Limpeza de variáveis temporárias
 rm(coefs, coef_real, coef_cbi, coef_int,
-   cbi_levels, rr_levels, df1, ymax1, df2, ymax2)
-
-
+   cbi_levels, rr_levels, df1, ymax1, legend_labels_cbi,
+   df2, ymax2, legend_labels_rr, predict_gap)
