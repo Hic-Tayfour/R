@@ -1,0 +1,24 @@
+cff-version: 1.2.0
+message: "Se você usar este material de estudo, por favor cite como indicado abaixo."
+authors:
+  - family-names: "Tayfour"
+    given-names: "Hicham"
+    alias: "Hic-Tayfour"
+title: "RStudio - Estudos e Projetos em R"
+abstract: "Repositório educacional contendo estudos, projetos acadêmicos e material de apoio para aprendizado da linguagem R e análise de dados."
+version: 1.0.0
+date-released: 2023-09-16
+url: "https://github.com/Hic-Tayfour/R"
+repository-code: "https://github.com/Hic-Tayfour/R"
+keywords:
+  - "R programming"
+  - "data analysis"
+  - "statistics"
+  - "educational material"
+  - "RStudio"
+  - "probabilidades"
+  - "análise descritiva"
+  - "economia"
+  - "machine learning"
+type: dataset
+license: MIT
