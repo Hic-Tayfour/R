@@ -4,8 +4,8 @@ authors:
   - family-names: "Tayfour"
     given-names: "Hicham"
     alias: "Hic-Tayfour"
-title: "RStudio - Estudos e Projetos em R"
-abstract: "Repositório educacional contendo estudos, projetos acadêmicos e material de apoio para aprendizado da linguagem R e análise de dados."
+title: "Estudos e Projetos em R"
+abstract: "Repositório educacional contendo estudos, projetos acadêmicos e material de apoio para aprendizado da linguagem R, análise de dados e aprendizagem de máquina."
 version: 1.0.0
 date-released: 2023-09-16
 url: "https://github.com/Hic-Tayfour/R"
