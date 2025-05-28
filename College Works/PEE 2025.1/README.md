@@ -2,7 +2,7 @@
 
 ### 🎯 Objetivo do Trabalho
 
-Este projeto investiga como o grau de independência do Banco Central afeta a eficácia da política monetária no controle da inflação, com foco no Brasil e comparação internacional.
+Este projeto investiga como o grau de independência do Banco Central afeta a potência da política monetária no controle da inflação.
 
 **A abordagem envolve:**
 
