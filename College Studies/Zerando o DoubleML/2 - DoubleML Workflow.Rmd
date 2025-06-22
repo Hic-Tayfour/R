@@ -1,0 +1,212 @@
+---
+title: "2 - DoubleML Workflow"
+author: "Hicham Munir Tayfour"
+output:
+  html_document:
+    theme: flatly       
+    toc: true           
+    toc_float: true     
+    code_folding: hide  
+    highlight: tango    
+---
+
+
+As etapas a seguir, que chamamos de *workflow* do DoubleML, têm como objetivo fornecer uma estyrutura geral para análises casuais com o [**DoubleML**](https://docs.doubleml.org/stable/index.html#doubleml-package). Após uma breve explicação da ideia de cada etapa, ilustramos seu significado no exemplo do 401(k). Caso você tenha interesse em mais detalhes sobre o exemplo do 401(k), pode acessar o [**Python**](https://docs.doubleml.org/stable/examples/py_double_ml_pension.html) e [**R**](https://docs.doubleml.org/stable/examples/R_double_ml_pension.html) notebookestão disponíveis online.
+
+## 2.1 - Formuação do problema
+
+A etapa inicial do *workflow* do **DoubleML** é formular o problema causal em questão. Antes de iniciarmos a análise estatística, é necessário explicitar as condições exigidas para que a interpretação do estimadopr - que será calculado posteriorimente - seja causal. Em muitos casos, os grafos acíclicos direcionados (*DAGs*) são úteis para formular o problema causal, ilustrar os canais causais envolvidos e dos elementos cíclicos do arcabouço inferencial. Nesta etapa, uma argumentação precisa e uma boa discussão da pergunta de pesquisa são fundamentais.
+
+![](Imagens/i1c2.png){fig-align="center"}
+
+No estudo do 401(k), estamos interessados em estimar o efeito médio do tratamento da participação em planos de aposentadoria do tipo 401(k) sobre o patrimônio financeiro líquido dos empregados. Como não podemos contar com um experimento randomizado bem conduzido neste caso, precisamos basear nossa análise em dados observacionais. Assim, devemos utilizar uma estratégia de identificação que se baseie no controle adequado de possíveis variáveis de confundimento. Uma complicação que surge no exemplo do 401(k) é a chamada endogeneidade na atribuição do tratamento. A variável de tratamento é a participação do empregado em um plano de aposentadoria 401(k), uma decisão tomada pelos próprios empregados e que provalmente é influenciada por fatores não observáveis. Por exemplo, parace razoável supor que pessoas com maior renda tenham uma preferência maior por poupar e, portanto, uma maior propensão a participar de um plano de aposentadoria. Se nossa análisenão levar em conta essa autoseleção para o tratamento, o feito estimado tende a ser enviesado.
+
+Para contornar o problema de endogeneidade no tratamento, é possível explorar a aleatoriedade na elegibilidade para os planos 401(k). Em outras palavras, o acesso ao tratamento pode ser considerado como atribuído aleatoriamente, desde que controlemos pelas variáveis de confundimento. Estudos anteriores nesse contexto argumentam que, se características relacionadas às preferências por poupança forem devidamente consideradas, a elegibilidade pode ser tratada como quase aleatoriamente atribuída (na época em que os planos 401(k) foram introduzidos). Essa exogeneidade condicional no acesso ao tratamento permite estimar o efeito causal de interesse por meio de uma abordagem com variável instrumental (IV). No entanto, para simplificar, focaremos no chamado efeito de intenção de tratar (intent-to-treat effect). Esse efeito corresponde ao efeito médio do tratamento da elegibilidade (= o instrumento) sobre o patrimônio financeiro líquido (= o desfecho) e é de grande interesse em muitas aplicações. A análise com IV está disponível nos Notebooks em [Python](https://docs.doubleml.org/stable/examples/py_double_ml_pension.html) e [R](https://docs.doubleml.org/stable/examples/R_double_ml_pension.html) que estão disponíveis online.
+
+A discussão anterior foca no problema causal. Vamos também abordar os métodos estatísticos usados na estimação. Para identificar o efeito médio do tratamento da participação ou da elegibilidade sobre os ativos, é essencial que os fatores de confundimento sejam tratados adequadamente. É aqui que entram as ferramentas de aprendizado de máquina. Claro, poderíamos simplesmente estimar o efeito causal utilizando um modelo clássico de regressão linear (com ou sem IV): o pesquisador teria que escolher manualmente, e possivelmente transformar, as variáveis de confundimento no modelo de regressão. No entanto, as técnicas de aprendizado de máquina oferecem maior flexibilidade em termos de especificação orientada por dados da equação de regressão principal e da primeira etapa.
+
+## 2.2 - Backend dos Dados
+
+Na *Etapa 1*, inicializaremos o backend de dados e, com isso, declaremos o papel da variável de desfecho, da variável de tratamento e das variáveis de confundimento.
+
+Utilizaremos dados de pesquisa *Survey of Income and Progran Participation* de 1991, que estão disponíveis por meio da função [`fetch_401k` do Python](https://docs.doubleml.org/stable/api/generated/doubleml.datasets.fetch_401K.html) ou [`fetch_401k` do R](https://docs.doubleml.org/r/stable/reference/fetch_401k.html). O backend de dados pode ser inicializado a partir de diferentes objetos do tipo *dataframe* tanto em Python quanto em R. Para estimar o efeito de intenção de tratar no exemplo do 401(k), usamos a variável de elegibilidade (`e401`) como varável de tratamento de interesse. A variável de desfecho é `net_tfa` e controlamos pelas variáveis de confundimento `['age', 'inc', 'educ', 'fsize', 'marr', 'twoearn', 'db', 'pira', 'hown']`.
+
+```{r message = FALSE, warning = FALSE}
+
+library(DoubleML)
+
+data = fetch_401k(return_type='data.table')
+
+# Construct DoubleMLData object from data.table
+
+dml_data = DoubleMLData$new(data, y_col='net_tfa', d_cols='e401',
+                        x_cols=c('age', 'inc', 'educ', 'fsize',
+                                'marr', 'twoearn', 'db', 'pira',
+                                'hown'))
+
+data_frame = fetch_401k(return_type='data.frame')
+
+# Construct DoubleMLData object from data.frame
+
+dml_data_df = double_ml_data_from_data_frame(data_frame,
+                                            y_col='net_tfa',
+                                            d_cols='e401',
+                                            x_cols=c('age', 'inc',
+                                                    'educ', 'fsize',
+                                                    'marr', 'twoearn',
+                                                    'db', 'pira',
+                                                    'hown'))
+
+
+
+```
+
+## 2.3 - Modelo Causal
+
+Na *Etapa 2*, escolhemos um modelo causal. Atualmente, o [**DoubleML**](https://docs.doubleml.org/stable/index.html#doubleml-package), implementa diversos modelos que diferem quanto à estrutura causal subjacente (por exemplo, incluir ou não incluir variáveis instrumentais) e às suposições adotadas.
+
+![](Imagens/i2c2.png){fig-align="center"}
+
+De acordo com a discussão anterior, estamos interessados em estimar o efeito da elegibilidade sobre o patrimônio financeiro líquido. Assim, não precisamos usar um modelo inclua tanto uma variável de tratamento quanto uma variável instrumental. Há dois modelos possíveis: o [modelos de regressão parcial](https://docs.doubleml.org/stable/guide/models.html#plr-model) (**PLR**) e o [modelo de regressão interativa](https://docs.doubleml.org/stable/guide/models.html#irm-model) (**IRM**). Esses modelos diferem quanto ao tipo da variável de tratamento (contínua vs. binária) e às suposições sobre a equação de regressão. Por exemplo, o **PLR** assume uma estrutura praticamente linear, enquanto indivíduos. Para manter a apresentação consisa, optamos pelo modelo de regressão linear parcial.
+
+## 2.4 - Métodos de Machine Learning (ML)
+
+Na *Etapa 3*, podemos especificar as ferramentas de aprendizagem de máquina utilizadas para a estimação das partes de *nuisance*. De modo geral, podemos escolher qualquer *learner* de biblioteca [**scikit-learn**](https://scikit-learn.org/) no Python e dp ecossistema [**mlr3**](https://mlr3.mlr-org.com/) no R.
+
+Há duas partes de *nuisance* no modelo **PLR**, $g_0(X) = E(Y|X)$ e $m_0(X) = E(D|X)$. Neste exemplo, vamos especificar uma *random forest* e um *xgboost learner* para ambos os problemas de predição. Podemos passar diretamente os parâmetros durante a inicialização dos objetos *learner*. Como temos uma variável de tratamento binária, podemos usar um *learner* de regressão para a variação de desfecho contínua, que é o patrimônio financeiro líquido.
+
+```{r message = FALSE, warning = FALSE}
+
+library(mlr3)
+library(mlr3learners)
+
+# Random forest learners
+
+ml_l_rf = lrn("regr.ranger", max.depth = 7,
+            mtry = 3, min.node.size =3)
+
+ml_m_rf = lrn("classif.ranger", max.depth = 5,
+            mtry = 4, min.node.size = 7)
+
+# Xgboost learners
+
+ml_l_xgb = lrn("regr.xgboost", objective = "reg:squarederror",
+                eta = 0.1, nrounds = 35)
+
+ml_m_xgb = lrn("classif.xgboost", objective = "binary:logistic",
+                eval_metric = "logloss",
+                eta = 0.1, nrounds = 34)
+
+```
+
+## 2.5 - Especificações DML
+
+Na *Etapa 4*, inicializamos e parametrizamos o objeto de modelo que será usado posteiormente para realizar a estimação.
+
+Inicializamos um objeto [**DoubleMLPLR (Python)**](https://docs.doubleml.org/stable/guide/models.html#partially-linear-regression-model-plr) / [**DoubleMLPLR (R)**](https://docs.doubleml.org/r/stable/reference/DoubleMLPLR.html) utilizando o backend de dados gerado anteriormente. Além disso, especificamos reamostragem (ou seja, o número de repetições e participações no [*repeated cross-fitting*](https://docs.doubleml.org/stable/guide/resampling.html#repeated-cross-fitting)), o algoritmo DML ([DML1 vs DML2](https://docs.doubleml.org/stable/guide/algorithms.html#algorithms)) e a função de score (["partialling out" ou "IV-type"](https://docs.doubleml.org/stable/guide/scores.html#plr-score)).
+
+```{r message = FALSE, warning = FALSE}
+
+set.seed(123)
+
+# Default values
+
+dml_plr_forest = DoubleMLPLR$new(dml_data,
+                                ml_l = ml_l_rf,
+                                ml_m = ml_m_rf)
+
+set.seed(123)
+
+# Parametrized by user
+
+dml_plr_forest = DoubleMLPLR$new(dml_data,
+                                ml_l = ml_l_rf,
+                                ml_m = ml_m_rf,
+                                n_folds = 3,
+                                score = 'partialling out',
+                                dml_procedure = 'dml2')
+
+```
+
+## 2.6 - Estimação
+
+Realizamos a estimação na *Etapa 5*. Nesta etapa, o algoritmo de *cross-fitting* é executado de forma que as previsões necessárias para o cálculo de score sejam obtidas. Como resltados, os usuários podem acessar as estimativas dos coeficientes e os erros-padrão, seja por meio dos campos correspondentes, seja atravês de um *summary*.
+
+```{r message = FALSE, warning = FALSE}
+
+# Estimation
+
+dml_plr_forest$fit()
+
+# Coefficient estimate
+
+dml_plr_forest$coef
+
+# Standard error
+
+dml_plr_forest$se
+
+# Summary
+
+dml_plr_forest$summary()
+
+```
+
+## 2.7 - Inferência
+
+Na **Etapa 6**, podemos realizar métodos adicionais de inferência e, por fim, interpretar os resultados. Por exemplo, podemos construir intervalos de confiança ou, no caso de múltiplos parâmetros causais sendo estimados, ajustar a análise para testes múltiplos. O [**DoubleML**](https://docs.doubleml.org/stable/index.html#doubleml-package) oferece diversas abordagens para realizar [**inferência simultânea válida**](https://docs.doubleml.org/stable/guide/se_confint.html#sim-inf), algumas delas baseadas em *bootsrap* com multiplicadores.
+
+Para concluir a análise do efeito de intenção de tratar no exemplo do 401(k), isto é, o efeito médio do tratamento da elegibilidade para planos de aposentadoria 401(k) sobre o patrimônio financeiro líquido, encontramos um efeito positivo e significativo: Ser elegível para esse tipo de plano aumenta o valor do patrimônio financeiro líquido em aproximadamente US\$ 9.000. Essa estimativa é bem menor que o efeito incondicional da elegibilidade sobre o patrimônio: Se não controlássemos pelas variáveis de confundimento, o efeito médio estimado corresponderia a US\$ 19.559.
+
+```{r message = FALSE, warning = FALSE}
+
+# Summary
+
+dml_plr_forest$summary()
+
+# Confidence intervals
+
+dml_plr_forest$confint()
+
+# Multiplier bootstrap (relevant in case with multiple treatment variables)
+
+dml_plr_forest$bootstrap()
+
+# Simultaneous confidence bands
+
+dml_plr_forest$confint(joint = TRUE)
+
+```
+
+## 2.8 - Análise de Sensibilidade
+
+Na *Etapa 7*, podemos analisar a sensibilidade dos parâmetros estimados. No [**modelo de regressão linear parcial (PLR)**](https://docs.doubleml.org/stable/guide/models.html#plr-model), a interpretação causal depende da exogeneidade condicional, o que exige o controle de variáveis de confundimento. O pacote [**DoubleML**](https://docs.doubleml.org/stable/index.html#doubleml-package) para Python implementa ferramentas de [**análise de sensibilidade**](https://docs.doubleml.org/stable/guide/sensitivity.html#sensitivity) com relação a confundidores omitidos.
+
+Ao analisar a sensibilidade do efeito de intenção de tratar no exemplo do 401(k), verificamos que o efeito continua positivo mesmo após o ajuste para confundidores omitidos, com um limite inferior de US\$ 4.611 para a estimativa pontual e US\$ 2.359 ao considerar a incerteza estatística.
+
+```Python
+
+# Sensitivity analysis
+dml_plr_tree.sensitivity_analysis(cf_y=0.04, cf_d=0.03)
+Out[24]: <doubleml.plm.plr.DoubleMLPLR at 0x7fccdbb5ae40>
+
+# Sensitivity summary
+print(dml_plr_tree.sensitivity_summary)
+================== Sensitivity Analysis ==================
+
+------------------ Scenario          ------------------
+Significance Level: level=0.95
+Sensitivity parameters: cf_y=0.04; cf_d=0.03, rho=1.0
+
+------------------ Bounds with CI    ------------------
+         CI lower  theta lower        theta   theta upper      CI upper
+e401  2359.496777  4610.983759  8909.634078  13208.284397  15430.415812
+
+------------------ Robustness Values ------------------
+      H_0    RV (%)   RVa (%)
+e401  0.0  7.029209  5.233154
+
+```
+
+
+

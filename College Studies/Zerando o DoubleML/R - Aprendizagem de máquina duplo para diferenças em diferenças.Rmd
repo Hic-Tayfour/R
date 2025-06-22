@@ -1,0 +1,401 @@
+---
+title: "R - Aprendizagem de máquina duplo para diferenças em diferenças"
+author: "Hicham Munir Tayfour"
+output:
+  html_document:
+    theme: flatly       
+    toc: true           
+    toc_float: true     
+    code_folding: hide  
+    highlight: tango  
+---
+
+# R: DoubleML para Difference-in-Differences
+
+Neste exemplo, demonstramos como `DoubleML` pode ser usado em combinação com o [pacote did para R](https://bcallaway11.github.io/did/index.html) para estimar efeitos médios de tratamento grupo-tempo em modelos de diferença-em-diferenças (DiD) com múltiplos períodos.
+
+```{r, message = FALSE, warning = FALSE}
+
+library(DoubleML)
+
+library(did)
+
+library(mlr3)
+
+library(mlr3learners)
+
+# suprimir mensagens durante o ajuste
+lgr::get_logger("mlr3")$set_threshold("warn")
+
+set.seed(1234)
+
+```
+
+## Exemplo Demonstrativo do did
+
+Demonstraremos o uso de `DoubleML` para DiD no [exemplo introdutório](https://bcallaway11.github.io/did/articles/did-basics.html) do pacote `did`.
+
+```{r, message = FALSE, warning = FALSE}
+
+# Gerar dados, código original disponível em https://github.com/bcallaway11/did/blob/master/vignettes/did-basics.Rmd
+time.periods <- 4
+
+sp <- reset.sim()
+
+sp$te <- 0
+
+set.seed(1814)
+
+# gerar conjunto de dados com 4 períodos de tempo
+time.periods <- 4
+
+# adicionar efeitos dinâmicos
+sp$te.e <- 1:time.periods
+
+# gerar conjunto de dados com esses parâmetros
+# aqui, descartamos todas as unidades que são tratadas no período de tempo 1 pois elas não nos ajudam a recuperar ATT(g,t)'s.
+dta <- build_sim_dataset(sp)
+
+# Quantas observações restaram após descartar as unidades ``sempre-tratadas''
+nrow(dta)
+
+# Como os dados se parecem
+head(dta)
+
+```
+
+## Comparação com o pacote did
+
+Por padrão, a estimação em `did` é baseada em regressão linear e logística (não penalizada). Vamos começar com este modelo padrão primeiro.
+
+```{r, message = FALSE, warning = FALSE}
+
+# estimar efeitos médios de tratamento grupo-tempo usando método att_gt
+example_attgt <- att_gt(yname = "Y",
+                        tname = "period",
+                        idname = "id",
+                        gname = "G",
+                        xformla = ~X,
+                        data = dta)
+
+# resumir os resultados
+summary(example_attgt)
+
+```
+
+## Usando ML para DiD: Integrando DoubleML em did
+
+Como descrito em nossa [Seção sobre modelos DiD no guia do usuário](https://docs.doubleml.org/stable/guide/models.html#difference-in-differences-models-did), [Sant'Anna and Zhao (2020)](https://linkinghub.elsevier.com/retrieve/pii/S0304407620301901) desenvolveram um modelo DiD duplamente robusto que é compatível com estimação baseada em ML. Como este modelo duplamente robusto é usado internamente em `did`, é possível usar `DoubleML` aqui para obter estimativas pontuais válidas e intervalos de confiança. Para isso, precisamos escrever um wrapper em torno de um modelo `DoubleMLIRM` e passá-lo para `did` como uma abordagem de estimação customizada. Uma vez que isso é implementado, podemos usar todas as funcionalidades e vantagens do pacote `did`.
+
+Por agora, vamos abstrair do uso de algoritmos ML sofisticados para manter a comparação com a implementação clássica `did` simples. Portanto, usaremos regressão linear e logística para os componentes nuisance no modelo DiD.
+
+```{r, message = FALSE, warning = FALSE}
+
+# DoubleML wrapper para did
+set.seed(1234)
+
+doubleml_did_linear <- function(y1, y0, D, covariates,
+                                ml_g = lrn("regr.lm"),
+                                ml_m = lrn("classif.log_reg"),
+                                n_folds = 10, n_rep = 1, ...) {
+  # aviso se n_rep > 1 para lidar com mapeamento de psi para inf.func
+  if (n_rep > 1) {
+    warning("n_rep > 1 is not supported.")
+  }
+  
+  # Computar diferença nos resultados
+  delta_y <- y1 - y0
+  
+  # Preparar backend de dados
+  dml_data = DoubleML::double_ml_data_from_matrix(X = covariates, y = delta_y, d = D)
+  
+  # Computar o ATT
+  dml_obj = DoubleML::DoubleMLIRM$new(dml_data, ml_g = ml_g, ml_m = ml_m, 
+                                      score = "ATTE", n_folds = n_folds)
+  dml_obj$fit()
+  att = dml_obj$coef[1]
+  
+  # Retornar resultados
+  inf.func <- dml_obj$psi[, 1, 1]
+  output <- list(ATT = att, att.inf.func = inf.func)
+  return(output)
+}
+
+example_attgt_dml_linear <- att_gt(yname = "Y",
+                                   tname = "period",
+                                   idname = "id",
+                                   gname = "G",
+                                   xformla = ~X,
+                                   data = dta,
+                                   est_method = doubleml_did_linear)
+
+summary(example_attgt_dml_linear)
+
+```
+
+Quaisquer diferenças da implementação padrão `did` surgem devido à aleatoriedade amostral, porque `DoubleML` usa cross-fitting internamente, o que não é necessário se métodos de estimação paramétrica clássicos são usados.
+
+Em seguida, vamos demonstrar como podemos usar aprendizes ML mais complexos. Para isso, apenas temos que passar outro aprendiz `mlr3` através do wrapper, por exemplo uma floresta aleatória. Note que o processo de geração de dados original é linear, de modo que não esperamos que a floresta aleatória leve a melhores resultados que os aprendizes lineares. Fornecemos uma variante do wrapper que inclui uma avaliação das predições nuisance no final deste notebook.
+
+```{r, message = FALSE, warning = FALSE}
+
+# DoubleML wrapper para did com aprendiz de floresta aleatória
+set.seed(1234)
+
+doubleml_did_rf <- function(y1, y0, D, covariates,
+                            ml_g = lrn("regr.ranger"),
+                            ml_m = lrn("classif.ranger"),
+                            n_folds = 10, n_rep = 1, ...) {
+  # aviso se n_rep > 1 para lidar com mapeamento de psi para inf.func
+  if (n_rep > 1) {
+    warning("n_rep > 1 is not supported.")
+  }
+  
+  # Computar diferença nos resultados
+  delta_y <- y1 - y0
+  
+  # Preparar backend de dados
+  dml_data = DoubleML::double_ml_data_from_matrix(X = covariates, y = delta_y, d = D)
+  
+  # Computar o ATT
+  dml_obj = DoubleML::DoubleMLIRM$new(dml_data, ml_g = ml_g, ml_m = ml_m, 
+                                      score = "ATTE", n_folds = n_folds)
+  dml_obj$fit()
+  att = dml_obj$coef[1]
+  
+  # Retornar resultados
+  inf.func <- dml_obj$psi[, 1, 1]
+  output <- list(ATT = att, att.inf.func = inf.func)
+  return(output)
+}
+
+example_attgt_dml_rf <- att_gt(yname = "Y",
+                               tname = "period",
+                               idname = "id",
+                               gname = "G",
+                               xformla = ~X,
+                               data = dta,
+                               est_method = doubleml_did_rf)
+
+summary(example_attgt_dml_rf)
+
+```
+
+Podemos ver que os resultados não são dramaticamente diferentes dos resultados anteriores. Podemos observar dos erros padrão maiores que o aprendiz de floresta aleatória padrão parece ser uma regra de predição menos precisa.
+
+## Explorando as Funcionalidades do did
+
+O pacote `did` oferece várias ferramentas para modelos DiD de múltiplos períodos, por exemplo plotar os efeitos médios de tratamento grupo-tempo, que podem ser exploradas exatamente como no uso nativo `did`.
+
+```{r, message = FALSE, warning = FALSE}
+
+# Plotar efeitos médios de tratamento grupo-tempo
+ggdid(example_attgt_dml_linear)
+
+```
+
+Também é possível calcular estimativas de efeito agregadas. Note que os resultados são novamente muito próximos àqueles no [notebook original](https://bcallaway11.github.io/did/articles/did-basics.html#aggregating-group-time-average-treatment-effects).
+
+```{r, message = FALSE, warning = FALSE}
+
+agg.simple <- aggte(example_attgt_dml_linear, type = "simple")
+
+summary(agg.simple)
+
+```
+
+## Detalhes sobre Performance Preditiva
+
+Podemos adicionar uma funcionalidade de avaliação ao wrapper para acessar como a performance preditiva da regressão linear e logística difere daquela do aprendiz de floresta aleatória.
+
+```{r, message = FALSE, warning = FALSE}
+
+library(mlr3measures)
+
+# Adicionar um wrapper que computa o RMSE e acurácia para os componentes nuisance, pode ser customizado fornecendo medidas customizadas
+eval_preds = function(y, d, predictions, params_names, custom_measures = NULL) {
+  measures_res = list()
+  if (!is.null(custom_measures)) {
+    # Alternativamente fornecer uma lista nomeada com funções de avaliação customizadas
+    measure_funcs = list()
+  } else {
+    measure_funcs = list()
+    measure_funcs[['ml_m']] = mlr3measures::acc
+    measure_funcs[['ml_g0']] = mlr3measures::rmse
+  }
+  
+  for (param_name in params_names) {
+    preds = predictions[[param_name]][, 1, 1]
+    if (param_name == "ml_m") {
+      obs = d
+      # mapear predições de probabilidade para binário
+      preds = as.factor(ifelse(preds > 0.5, 1, 0))
+      obs = as.factor(preds)
+    }
+    else if (param_name == "ml_g0") {
+      obs = y[d == 0]
+      preds = preds[d == 0]
+    }
+    
+    if (param_name == "ml_g1") {
+      next
+    }
+    else {
+      measure_func = measure_funcs[[param_name]]
+      measure_pred = measure_func(obs, preds)
+      measures_res[[param_name]] = measure_pred
+    }
+  }
+  return(measures_res)
+}
+
+# avaliar performance do aprendiz: modelos lineares
+doubleml_did_eval_linear <- function(y1, y0, D, covariates,
+                                     ml_g = lrn("regr.lm"),
+                                     ml_m = lrn("classif.log_reg"),
+                                     n_folds = 10, n_rep = 1, ...) {
+  # aviso se n_rep > 1 para lidar com mapeamento de psi para inf.func
+  if (n_rep > 1) {
+    warning("n_rep > 1 is not supported.")
+  }
+  
+  # Computar diferença nos resultados
+  delta_y <- y1 - y0
+  
+  # Preparar backend de dados
+  dml_data = DoubleML::double_ml_data_from_matrix(X = covariates, y = delta_y, d = D)
+  
+  # Computar o ATT
+  dml_obj = DoubleML::DoubleMLIRM$new(dml_data, ml_g = ml_g, ml_m = ml_m, 
+                                      score = "ATTE", n_folds = n_folds)
+  dml_obj$fit(store_predictions = TRUE)
+  att = dml_obj$coef[1]
+  
+  # Retornar resultados
+  inf.func <- dml_obj$psi[, 1, 1]
+  
+  # Avaliar performance do aprendiz
+  predictions = dml_obj$predictions
+  params_names = dml_obj$params_names()
+  eval_predictions = eval_preds(delta_y, D, predictions, params_names)
+  print(eval_predictions)
+  
+  output <- list(ATT = att, att.inf.func = inf.func)
+  return(output)
+}
+
+library(mlr3measures)
+
+# avaliar performance do aprendiz: floresta aleatória
+doubleml_did_eval_rf <- function(y1, y0, D, covariates,
+                                 ml_g = lrn("regr.ranger"),
+                                 ml_m = lrn("classif.ranger"),
+                                 n_folds = 10, n_rep = 1, ...) {
+  # aviso se n_rep > 1 para lidar com mapeamento de psi para inf.func
+  if (n_rep > 1) {
+    warning("n_rep > 1 is not supported.")
+  }
+  
+  # Computar diferença nos resultados
+  delta_y <- y1 - y0
+  
+  # Preparar backend de dados
+  dml_data = DoubleML::double_ml_data_from_matrix(X = covariates, y = delta_y, d = D)
+  
+  # Computar o ATT
+  dml_obj = DoubleML::DoubleMLIRM$new(dml_data, ml_g = ml_g, ml_m = ml_m, 
+                                      score = "ATTE", n_folds = n_folds)
+  dml_obj$fit(store_predictions = TRUE)
+  att = dml_obj$coef[1]
+  
+  # Retornar resultados
+  inf.func <- dml_obj$psi[, 1, 1]
+  
+  # Avaliar performance do aprendiz
+  predictions = dml_obj$predictions
+  params_names = dml_obj$params_names()
+  eval_predictions = eval_preds(delta_y, D, predictions, params_names)
+  print(eval_predictions)
+  
+  output <- list(ATT = att, att.inf.func = inf.func)
+  return(output)
+}
+
+```
+
+Executar os wrappers de avaliação ajuda a ver que o aprendiz de floresta aleatória tem um RMSE maior para predizer o resultado $E[\Delta Y|D=1,X]$. Ambos os modelos predizem o status de tratamento (grupo) dos indivíduos com uma acurácia de $1$.
+
+```{r, message = FALSE, warning = FALSE}
+
+# Executar estimação com avaliação: Modelo linear
+set.seed(1234)
+
+example_attgt_dml_eval_linear <- att_gt(yname = "Y",
+                                        tname = "period",
+                                        idname = "id",
+                                        gname = "G",
+                                        xformla = ~X,
+                                        data = dta,
+                                        est_method = doubleml_did_eval_linear,
+                                        print_details = TRUE)
+
+summary(example_attgt_dml_eval_linear)
+
+```
+
+```{r, message = FALSE, warning = FALSE}
+
+# Executar estimação com avaliação: Modelo de floresta aleatória
+set.seed(1234)
+
+example_attgt_dml_eval_rf <- att_gt(yname = "Y",
+                                    tname = "period",
+                                    idname = "id",
+                                    gname = "G",
+                                    xformla = ~X,
+                                    data = dta,
+                                    est_method = doubleml_did_eval_rf,
+                                    print_details = TRUE)
+
+summary(example_attgt_dml_eval_rf)
+
+```
+
+## Principais Resultados
+
+### Comparação de Métodos
+
+1. **did padrão** vs **DoubleML linear**: Resultados praticamente idênticos, diferenças devidas apenas ao cross-fitting aleatório
+2. **DoubleML linear** vs **DoubleML Random Forest**: RF mostra RMSE ligeiramente maior (menos preciso para este DGP linear)
+3. **Acurácia perfeita**: Ambos os métodos predizem perfeitamente o status de grupo/tratamento (accuracy = 1.0)
+
+### Efeitos Estimados
+
+**Efeitos Grupo-Tempo Significativos:**
+- **Grupo 2**: ATT cresce de ~0.91 (período 2) para ~2.96 (período 4) 
+- **Grupo 3**: ATT cresce de ~1.10 (período 3) para ~2.05 (período 4)
+- **Grupo 4**: ATT apenas significativo no período 4 (~0.95)
+
+**Efeito Agregado Simples:** ~1.66 (altamente significativo)
+
+### Performance Preditiva
+
+**Modelos Lineares (RMSE ≈ 1.40-1.43):**
+- Melhor ajuste para o DGP linear verdadeiro
+- Erros padrão menores e estimativas mais precisas
+
+**Random Forest (RMSE ≈ 1.53-2.40):**
+- RMSE consistentemente maior
+- Overfitting para este processo linear simples
+
+## Agradecimentos e Observações Finais
+
+Gostaríamos de agradecer aos autores do pacote `did` para R por manter uma interface flexível para modelos DiD de múltiplos períodos.
+
+Gostaríamos de notar que a implementação apresentada aqui é muito similar àquela implementada no pacote Python. Para mais detalhes, gostaríamos de referenciar os exemplos [DiD](https://docs.doubleml.org/stable/examples/index.html#difference-in-differences) em Python.
+
+## Referências
+
+Callaway, Brantly, and Pedro HC Sant'Anna. "Difference-in-differences with multiple time periods." Journal of Econometrics 225.2 (2021): 200-230.
+
+Sant'Anna, Pedro HC, and Jun Zhao. "Doubly robust difference-in-differences estimators." Journal of Econometrics 219.1 (2020): 101-122.

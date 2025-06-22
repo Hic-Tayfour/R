@@ -1,0 +1,764 @@
+---
+title: "R - Impacto do 401(k) na riqueza financeira "
+author: "Hicham Munir Tayfour"
+output:
+  html_document:
+    theme: flatly       
+    toc: true           
+    toc_float: true     
+    code_folding: hide  
+    highlight: tango  
+---
+
+# R: Impacto do 401(k) na Riqueza Financeira
+
+Neste exemplo com dados reais, ilustramos como o pacote [DoubleML](https://docs.doubleml.org/stable/index.html) pode ser usado para estimar o efeito da elegibilidade e participação em 401(k) nos ativos acumulados. O conjunto de dados 401(k) foi analisado em vários estudos, entre outros [Chernozhukov et al. (2018)](https://arxiv.org/abs/1608.00060).
+
+Os planos 401(k) são contas de pensão patrocinadas por empregadores. O problema chave em determinar o efeito da participação em planos 401(k) nos ativos acumulados é a heterogeneidade do poupador aliada ao fato de que a decisão de se inscrever em um 401(k) é não-aleatória. É geralmente reconhecido que algumas pessoas têm uma preferência maior por poupança do que outras. Também parece provável que aqueles indivíduos com alta preferência não observada por poupança seriam os mais propensos a escolher participar em planos de poupança para aposentadoria com vantagens fiscais e tenderiam a ter quantidades otherwise altas de ativos acumulados. A presença de preferências de poupança não observadas com essas propriedades então implica que estimativas convencionais que não levam em conta a heterogeneidade do poupador e endogeneidade da participação serão enviesadas para cima, tendendo a superestimar os efeitos de poupança da participação em 401(k).
+
+Pode-se argumentar que a elegibilidade para inscrição em um plano 401(k) nestes dados pode ser tomada como exógena após condicionar em algumas observáveis das quais a mais importante para seu argumento é a renda. A ideia básica é que, pelo menos na época em que os 401(k)'s inicialmente se tornaram disponíveis, as pessoas eram improváveis de estar baseando suas decisões de emprego em se um empregador oferecia um 401(k), mas ao invés disso focariam na renda e outros aspectos do trabalho.
+
+## Dados
+
+Os dados pré-processados podem ser obtidos chamando `fetch_401k()`. Os argumentos `polynomial_features` e `instrument` podem ser usados para replicar os modelos usados em [Chernozhukov et al. (2018)](https://arxiv.org/abs/1608.00060). Note que uma conexão com a internet é necessária para carregar os dados. Começamos com uma especificação baseline do modelo de regressão e recarregamos os dados depois caso queiramos usar outra especificação.
+
+```{r, message = FALSE, warning = FALSE}
+
+# Carregar pacotes necessários para este tutorial
+library(DoubleML)
+
+library(mlr3)
+
+library(mlr3learners)
+
+library(data.table)
+
+library(ggplot2)
+
+# suprimir mensagens durante o ajuste
+lgr::get_logger("mlr3")$set_threshold("warn")
+
+# carregar dados como um data.table
+data = fetch_401k(return_type = "data.table", instrument = TRUE)
+
+dim(data)
+
+str(data)
+
+```
+
+Veja a seção "Details" na descrição do conjunto de dados, que pode ser acessada digitando `help(fetch_401k)`.
+
+Os dados consistem de 9.915 observações em nível domiciliar extraídas da Survey of Income and Program Participation (SIPP) de 1991. Todas as variáveis se referem a 1990. Usamos ativos financeiros líquidos (`net_tfa`) como a variável de resultado, $Y$, em nossa análise. Os ativos financeiros líquidos são computados como a soma de saldos de IRA, saldos de 401(k), contas correntes, títulos de poupança, outras contas que rendem juros, outros ativos que rendem juros, ações e fundos mútuos menos dívidas não hipotecárias.
+
+Entre os $9915$ indivíduos, $3682$ são elegíveis para participar no programa. A variável `e401` indica elegibilidade e `p401` indica participação, respectivamente.
+
+```{r, message = FALSE, warning = FALSE}
+
+hist_e401 = ggplot(data, aes(x = e401, fill = factor(e401))) +
+  geom_bar() + theme_minimal() +
+  ggtitle("Elegibilidade, 401(k)") +
+  theme(legend.position = "bottom", plot.title = element_text(hjust = 0.5),
+        text = element_text(size = 20))
+
+print(hist_e401)
+
+```
+
+```{r, message = FALSE, warning = FALSE}
+
+hist_p401 = ggplot(data, aes(x = p401, fill = factor(p401))) +
+  geom_bar() + theme_minimal() +
+  ggtitle("Participação, 401(k)") +
+  theme(legend.position = "bottom", plot.title = element_text(hjust = 0.5),
+        text = element_text(size = 20))
+
+print(hist_p401)
+
+```
+
+A elegibilidade está altamente associada com riqueza financeira:
+
+```{r, message = FALSE, warning = FALSE}
+
+dens_net_tfa = ggplot(data, aes(x = net_tfa, color = factor(e401), fill = factor(e401))) +
+  geom_density() + xlim(c(-20000, 150000)) +
+  facet_wrap(.~e401) + theme_minimal() +
+  theme(legend.position = "bottom", text = element_text(size = 20))
+
+print(dens_net_tfa)
+
+```
+
+Como uma primeira estimativa, calculamos o efeito preditivo médio incondicional (APE) da elegibilidade 401(k) nos ativos acumulados. Este efeito corresponde ao efeito médio de tratamento se a elegibilidade 401(k) fosse atribuída a indivíduos de uma maneira inteiramente randomizada. O APE incondicional de `e401` é cerca de $19559$:
+
+```{r, message = FALSE, warning = FALSE}
+
+APE_e401_uncond = data[e401==1, mean(net_tfa)] - data[e401==0, mean(net_tfa)]
+
+round(APE_e401_uncond, 2)
+
+```
+
+Entre os $3682$ indivíduos que são elegíveis, $2594$ decidiram participar no programa. O APE incondicional de `p401` é cerca de $27372$:
+
+```{r, message = FALSE, warning = FALSE}
+
+APE_p401_uncond = data[p401==1, mean(net_tfa)] - data[p401==0, mean(net_tfa)]
+
+round(APE_p401_uncond, 2)
+
+```
+
+Como discutido, essas estimativas são enviesadas pois não levam em conta a heterogeneidade do poupador e endogeneidade da participação.
+
+## O Pacote DoubleML
+
+Vamos usar o pacote [DoubleML](https://docs.doubleml.org/stable/index.html) para estimar o efeito médio de tratamento da elegibilidade 401(k), i.e. `e401`, e participação, i.e. `p401`, nos ativos financeiros líquidos `net_tfa`.
+
+## Estimando o Efeito Médio de Tratamento da Elegibilidade 401(k) nos Ativos Financeiros Líquidos
+
+Primeiro olhamos para o efeito de tratamento de `e401` nos ativos financeiros totais líquidos. Damos estimativas do ATE no modelo linear:
+
+$$Y = D \alpha + f(X)'\beta+ \epsilon$$
+
+onde $f(X)$ é um dicionário aplicado aos regressores brutos. $X$ contém variáveis sobre estado civil, status de dupla renda, status de pensão de benefício definido, participação em IRA, propriedade de casa, tamanho da família, educação, idade e renda.
+
+No seguinte, consideraremos dois modelos diferentes:
+
+1. **Especificação básica do modelo** que inclui os regressores brutos, i.e., $f(X) = X$, e
+2. **Especificação flexível do modelo**, onde $f(X)$ inclui os regressores brutos $X$ e os polinômios ortogonais de grau 2 para as variáveis tamanho da família, educação, idade e renda.
+
+Usaremos a especificação básica do modelo sempre que usarmos métodos não lineares, por exemplo árvores de regressão ou florestas aleatórias, e usaremos o modelo flexível para métodos lineares como o lasso. Existem, claro, múltiplas maneiras de como o modelo pode ser especificado ainda mais flexivelmente, por exemplo incluindo interações de variável e interação de ordem superior. No entanto, para fins de simplicidade, permanecemos com a especificação acima. Usuários que estão interessados em variar o modelo podem manipular a fórmula do modelo abaixo (`formula_flex`), por exemplo implementando a especificação original em [Chernozhukov et al. (2018)](https://arxiv.org/abs/1608.00060).
+
+No primeiro passo, reportamos estimativas do efeito médio de tratamento (ATE) da elegibilidade 401(k) nos ativos financeiros líquidos tanto no modelo de regressão parcialmente linear (PLR) quanto no modelo de regressão interativa (IRM) permitindo efeitos de tratamento heterogêneos.
+
+## O Backend de Dados: DoubleMLData
+
+Para começar nossa análise, inicializamos o backend de dados, i.e., uma nova instância de um objeto `DoubleMLData`. Aqui, implementamos manualmente o modelo de regressão usando a interface de fórmula do R. Um atalho seria especificar diretamente as opções `polynomial_features` e `instrument` ao chamar `fetch_401k()`.
+
+Para implementar ambos os modelos (básico e flexível), geramos dois backends de dados: `data_dml_base` e `data_dml_flex`.
+
+**Nota:** A especificação do modelo usando `polynomial_features` difere da usada em nosso exemplo.
+
+```{r, message = FALSE, warning = FALSE}
+
+# Configurar modelo básico: Especificar variáveis para data-backend
+features_base = c("age", "inc", "educ", "fsize",
+                  "marr", "twoearn", "db", "pira", "hown")
+
+# Inicializar DoubleMLData (data-backend do DoubleML)
+data_dml_base = DoubleMLData$new(data,
+                                 y_col = "net_tfa",
+                                 d_cols = "e401",
+                                 x_cols = features_base)
+
+print(data_dml_base)
+
+```
+
+```{r, message = FALSE, warning = FALSE}
+
+# Configurar um modelo de acordo com fórmula de regressão com polinômios
+formula_flex = formula(" ~ -1 + poly(age, 2, raw=TRUE) +
+                       poly(inc, 2, raw=TRUE) + poly(educ, 2, raw=TRUE) +
+                       poly(fsize, 2, raw=TRUE) + marr + twoearn +
+                       db + pira + hown")
+
+features_flex = data.frame(model.matrix(formula_flex, data))
+
+model_data = data.table("net_tfa" = data[, net_tfa],
+                        "e401" = data[, e401],
+                        features_flex)
+
+# Inicializar DoubleMLData (data-backend do DoubleML)
+data_dml_flex = DoubleMLData$new(model_data,
+                                 y_col = "net_tfa",
+                                 d_cols = "e401")
+
+print(data_dml_flex)
+
+```
+
+## Modelo de Regressão Parcialmente Linear (PLR)
+
+Começamos usando lasso para estimar as funções $g_0$ e $m_0$ no seguinte modelo PLR:
+
+$$Y = D\theta_0 + g_0(X) + \zeta, \quad E[\zeta \mid D,X]= 0$$
+$$D = m_0(X) + V, \quad E[V \mid X] = 0$$
+
+Para estimar o parâmetro causal $\theta_0$ aqui, usamos double machine learning com cross-fitting de 3 folds.
+
+A estimação dos componentes nuisance $g_0$ e $m_0$ é baseada no lasso com escolha validada cruzadamente do termo de penalização, $\lambda$, como fornecido pelo [pacote glmnet](https://glmnet.stanford.edu/reference/cv.glmnet.html). Carregamos o aprendiz usando a função `lrn()` do [mlr3](https://mlr3.mlr-org.com/). Hiperparâmetros e opções podem ser definidos durante a instanciação do aprendiz. Aqui especificamos que o lasso deve usar aquele valor de $\lambda$ que minimiza o erro quadrático médio validado cruzadamente que é baseado em validação cruzada de 5 folds.
+
+Para usar um aprendiz, os pacotes R subjacentes devem estar instalados. Neste caso, o [pacote glmnet](https://glmnet.stanford.edu/reference/cv.glmnet.html) precisa estar instalado. Além disso, a instalação do pacote [mlr3learners](https://mlr3learners.mlr-org.com/) é necessária.
+
+Começamos estimando o ATE no modelo básico e então repetimos a estimação no modelo flexível.
+
+```{r, message = FALSE, warning = FALSE}
+
+# Inicializar aprendizes
+set.seed(123)
+
+lasso = lrn("regr.cv_glmnet", nfolds = 5, s = "lambda.min")
+
+lasso_class = lrn("classif.cv_glmnet", nfolds = 5, s = "lambda.min")
+
+# Inicializar modelo DoubleMLPLR
+dml_plr_lasso = DoubleMLPLR$new(data_dml_base,
+                                ml_l = lasso,
+                                ml_m = lasso_class,
+                                n_folds = 3)
+
+dml_plr_lasso$fit()
+
+dml_plr_lasso$summary()
+
+```
+
+```{r, message = FALSE, warning = FALSE}
+
+# Inicializar aprendizes
+set.seed(123)
+
+lasso = lrn("regr.cv_glmnet", nfolds = 5, s = "lambda.min")
+
+lasso_class = lrn("classif.cv_glmnet", nfolds = 5, s = "lambda.min")
+
+# Inicializar modelo DoubleMLPLR
+dml_plr_lasso = DoubleMLPLR$new(data_dml_flex,
+                                ml_l = lasso,
+                                ml_m = lasso_class,
+                                n_folds = 3)
+
+dml_plr_lasso$fit()
+
+dml_plr_lasso$summary()
+
+```
+
+Alternativamente, podemos repetir este procedimento com outros métodos de aprendizado de máquina, por exemplo um aprendiz de floresta aleatória como fornecido pelo pacote [ranger](https://github.com/imbs-hl/ranger) para R. O site do pacote [mlr3extralearners](https://mlr3extralearners.mlr-org.com/articles/learners/list_learners.html) tem uma lista pesquisável de todos os aprendizes que estão disponíveis no [mlr3verse](https://mlr3verse.mlr-org.com/).
+
+```{r, message = FALSE, warning = FALSE}
+
+# Random Forest
+randomForest = lrn("regr.ranger", max.depth = 7,
+                   mtry = 3, min.node.size = 3)
+
+randomForest_class = lrn("classif.ranger", max.depth = 5,
+                         mtry = 4, min.node.size = 7)
+
+set.seed(123)
+
+dml_plr_forest = DoubleMLPLR$new(data_dml_base,
+                                 ml_l = randomForest,
+                                 ml_m = randomForest_class,
+                                 n_folds = 3)
+
+dml_plr_forest$fit()
+
+dml_plr_forest$summary()
+
+```
+
+Agora, vamos usar uma árvore de regressão como fornecida pelo pacote R [rpart](https://github.com/bethatkinson/rpart).
+
+```{r, message = FALSE, warning = FALSE}
+
+# Trees
+trees = lrn("regr.rpart", cp = 0.0047, minsplit = 203)
+
+trees_class = lrn("classif.rpart", cp = 0.0042, minsplit = 104)
+
+set.seed(123)
+
+dml_plr_tree = DoubleMLPLR$new(data_dml_base,
+                               ml_l = trees,
+                               ml_m = trees_class,
+                               n_folds = 3)
+
+dml_plr_tree$fit()
+
+dml_plr_tree$summary()
+
+```
+
+Também podemos experimentar com extreme gradient boosting como fornecido pelo [xgboost](https://xgboost.readthedocs.io/en/latest/).
+
+```{r, message = FALSE, warning = FALSE}
+
+# Boosted trees
+boost = lrn("regr.xgboost",
+            objective = "reg:squarederror",
+            eta = 0.1, nrounds = 35)
+
+boost_class = lrn("classif.xgboost",
+                  objective = "binary:logistic", eval_metric = "logloss",
+                  eta = 0.1, nrounds = 34)
+
+set.seed(123)
+
+dml_plr_boost = DoubleMLPLR$new(data_dml_base,
+                                ml_l = boost,
+                                ml_m = boost_class,
+                                n_folds = 3)
+
+dml_plr_boost$fit()
+
+dml_plr_boost$summary()
+
+```
+
+Vamos resumir os resultados:
+
+```{r, message = FALSE, warning = FALSE}
+
+confints = rbind(dml_plr_lasso$confint(), dml_plr_forest$confint(),
+                 dml_plr_tree$confint(), dml_plr_boost$confint())
+
+estimates = c(dml_plr_lasso$coef, dml_plr_forest$coef,
+              dml_plr_tree$coef, dml_plr_boost$coef)
+
+result_plr = data.table("model" = "PLR",
+                        "ML" = c("glmnet", "ranger", "rpart", "xgboost"),
+                        "Estimate" = estimates,
+                        "lower" = confints[,1],
+                        "upper" = confints[,2])
+
+print(result_plr)
+
+```
+
+```{r, message = FALSE, warning = FALSE}
+
+g_ci = ggplot(result_plr, aes(x = ML, y = Estimate, color = ML)) +
+  geom_point() +
+  geom_errorbar(aes(ymin = lower, ymax = upper, color = ML)) +
+  geom_hline(yintercept = 0, color = "grey") +
+  theme_minimal() + ylab("Coeficientes e intervalos de confiança 0.95") +
+  xlab("") +
+  theme(axis.text.x = element_text(angle = 90), legend.position = "none",
+        text = element_text(size = 20))
+
+print(g_ci)
+
+```
+
+## Modelo de Regressão Interativa (IRM)
+
+Em seguida, consideramos a estimação de efeitos médios de tratamento quando os efeitos de tratamento são totalmente heterogêneos:
+
+$$Y = g_0(D,X) + U, \quad E[U\mid X,D] = 0$$
+$$D = m_0(X) + V, \quad E[V\mid X] = 0$$
+
+Para reduzir o impacto desproporcional de pesos de escore de propensão extremos no modelo interativo, trimamos os escores de propensão que estão próximos aos limites.
+
+```{r, message = FALSE, warning = FALSE}
+
+set.seed(123)
+
+# Inicializar modelo DoubleMLIRM
+dml_irm_lasso = DoubleMLIRM$new(data_dml_flex,
+                                ml_g = lasso,
+                                ml_m = lasso_class,
+                                trimming_threshold = 0.01,
+                                n_folds = 3)
+
+dml_irm_lasso$fit()
+
+dml_irm_lasso$summary()
+
+```
+
+```{r, message = FALSE, warning = FALSE}
+
+# Inicializar Aprendiz
+randomForest = lrn("regr.ranger")
+
+randomForest_class = lrn("classif.ranger")
+
+# Random Forest
+set.seed(123)
+
+dml_irm_forest = DoubleMLIRM$new(data_dml_base,
+                                 ml_g = randomForest,
+                                 ml_m = randomForest_class,
+                                 trimming_threshold = 0.01,
+                                 n_folds = 3)
+
+# Definir parâmetros específicos de parte nuisance
+dml_irm_forest$set_ml_nuisance_params(
+  "ml_g0", "e401", list(max.depth = 6, mtry = 4, min.node.size = 7))
+
+dml_irm_forest$set_ml_nuisance_params(
+  "ml_g1", "e401", list(max.depth = 6, mtry = 3, min.node.size = 5))
+
+dml_irm_forest$set_ml_nuisance_params(
+  "ml_m", "e401", list(max.depth = 6, mtry = 3, min.node.size = 6))
+
+dml_irm_forest$fit()
+
+dml_irm_forest$summary()
+
+```
+
+```{r, message = FALSE, warning = FALSE}
+
+# Inicializar Aprendiz
+trees = lrn("regr.rpart")
+
+trees_class = lrn("classif.rpart")
+
+# Trees
+set.seed(123)
+
+dml_irm_tree = DoubleMLIRM$new(data_dml_base,
+                               ml_g = trees,
+                               ml_m = trees_class,
+                               trimming_threshold = 0.01,
+                               n_folds = 3)
+
+# Definir parâmetros específicos de parte nuisance
+dml_irm_tree$set_ml_nuisance_params(
+  "ml_g0", "e401", list(cp = 0.0016, minsplit = 74))
+
+dml_irm_tree$set_ml_nuisance_params(
+  "ml_g1", "e401", list(cp = 0.0018, minsplit = 70))
+
+dml_irm_tree$set_ml_nuisance_params(
+  "ml_m", "e401", list(cp = 0.0028, minsplit = 167))
+
+dml_irm_tree$fit()
+
+dml_irm_tree$summary()
+
+```
+
+```{r, message = FALSE, warning = FALSE}
+
+# Inicializar Aprendizes
+boost = lrn("regr.xgboost", objective = "reg:squarederror")
+
+boost_class = lrn("classif.xgboost", objective = "binary:logistic", eval_metric = "logloss")
+
+# Boosted Trees
+set.seed(123)
+
+dml_irm_boost = DoubleMLIRM$new(data_dml_base,
+                                ml_g = boost,
+                                ml_m = boost_class,
+                                trimming_threshold = 0.01,
+                                n_folds = 3)
+
+# Definir parâmetros específicos de parte nuisance
+dml_irm_boost$set_ml_nuisance_params(
+  "ml_g0", "e401", list(nrounds = 8, eta = 0.1))
+
+dml_irm_boost$set_ml_nuisance_params(
+  "ml_g1", "e401", list(nrounds = 29, eta = 0.1))
+
+dml_irm_boost$set_ml_nuisance_params(
+  "ml_m", "e401", list(nrounds = 23, eta = 0.1))
+
+dml_irm_boost$fit()
+
+dml_irm_boost$summary()
+
+```
+
+```{r, message = FALSE, warning = FALSE}
+
+confints = rbind(dml_irm_lasso$confint(), dml_irm_forest$confint(),
+                 dml_irm_tree$confint(), dml_irm_boost$confint())
+
+estimates = c(dml_irm_lasso$coef, dml_irm_forest$coef,
+              dml_irm_tree$coef, dml_irm_boost$coef)
+
+result_irm = data.table("model" = "IRM",
+                        "ML" = c("glmnet", "ranger", "rpart", "xgboost"),
+                        "Estimate" = estimates,
+                        "lower" = confints[,1],
+                        "upper" = confints[,2])
+
+print(result_irm)
+
+g_ci = ggplot(result_irm, aes(x = ML, y = Estimate, color = ML)) +
+  geom_point() +
+  geom_errorbar(aes(ymin = lower, ymax = upper, color = ML)) +
+  geom_hline(yintercept = 0, color = "grey") +
+  theme_minimal() + ylab("Coeficientes e intervalos de confiança 0.95") +
+  xlab("") +
+  theme(axis.text.x = element_text(angle = 90), legend.position = "none",
+        text = element_text(size = 20))
+
+print(g_ci)
+
+```
+
+Essas estimativas que flexivelmente levam em conta confundimento são substancialmente atenuadas em relação à estimativa baseline (19559) que não leva em conta confundimento. Elas sugerem efeitos causais muito menores da elegibilidade 401(k) nas participações de ativos financeiros.
+
+## Efeitos Médios de Tratamento Locais da Participação 401(k) nos Ativos Financeiros Líquidos
+
+## Modelo IV Interativo (IIVM)
+
+Nos exemplos acima, estimamos o efeito médio de tratamento da elegibilidade nas participações de ativos financeiros. Agora, consideramos a estimação de efeitos médios de tratamento locais (LATE) da participação usando elegibilidade como um instrumento para a decisão de participação. Sob suposições apropriadas, o LATE identifica o efeito de tratamento para os chamados compliers, i.e., indivíduos que somente participariam se elegíveis e caso contrário não participariam no programa.
+
+Como antes, $Y$ denota o resultado `net_tfa`, e $X$ é o vetor de covariáveis. Usamos `e401` como um instrumento binário para a variável de tratamento `p401`. Aqui o modelo de equação estrutural é:
+
+$$Y = g_0(Z,X) + U, \quad E[U\mid Z,X] = 0$$
+$$D = r_0(Z,X) + V, \quad E[V\mid Z, X] = 0$$
+$$Z = m_0(X) + \zeta, \quad E[\zeta \mid X] = 0$$
+
+```{r, message = FALSE, warning = FALSE}
+
+# Inicializar DoubleMLData com um instrumento
+# Modelo básico
+data_dml_base_iv = DoubleMLData$new(data,
+                                    y_col = "net_tfa",
+                                    d_cols = "p401",
+                                    x_cols = features_base,
+                                    z_cols = "e401")
+
+print(data_dml_base_iv)
+
+```
+
+```{r, message = FALSE, warning = FALSE}
+
+# Modelo flexível
+model_data = data.table("net_tfa" = data[, net_tfa],
+                        "e401" = data[, e401],
+                        "p401" = data[, p401],
+                        features_flex)
+
+data_dml_flex_iv = DoubleMLData$new(model_data,
+                                    y_col = "net_tfa",
+                                    d_cols = "p401",
+                                    z_cols = "e401")
+
+```
+
+```{r, message = FALSE, warning = FALSE}
+
+set.seed(123)
+
+dml_iivm_lasso = DoubleMLIIVM$new(data_dml_flex_iv,
+                                  ml_g = lasso,
+                                  ml_m = lasso_class,
+                                  ml_r = lasso_class,
+                                  n_folds = 3,
+                                  trimming_threshold = 0.01,
+                                  subgroups = list(always_takers = FALSE,
+                                                   never_takers = TRUE))
+
+dml_iivm_lasso$fit()
+
+dml_iivm_lasso$summary()
+
+```
+
+Novamente, repetimos o procedimento para os outros métodos de aprendizado de máquina:
+
+```{r, message = FALSE, warning = FALSE}
+
+# Inicializar Aprendiz
+randomForest = lrn("regr.ranger")
+
+randomForest_class = lrn("classif.ranger")
+
+# Random Forest
+set.seed(123)
+
+dml_iivm_forest = DoubleMLIIVM$new(data_dml_base_iv,
+                                   ml_g = randomForest,
+                                   ml_m = randomForest_class,
+                                   ml_r = randomForest_class,
+                                   n_folds = 3,
+                                   trimming_threshold = 0.01,
+                                   subgroups = list(always_takers = FALSE,
+                                                    never_takers = TRUE))
+
+# Definir parâmetros específicos de parte nuisance
+dml_iivm_forest$set_ml_nuisance_params(
+  "ml_g0", "p401",
+  list(max.depth = 6, mtry = 4, min.node.size = 7))
+
+dml_iivm_forest$set_ml_nuisance_params(
+  "ml_g1", "p401",
+  list(max.depth = 6, mtry = 3, min.node.size = 5))
+
+dml_iivm_forest$set_ml_nuisance_params(
+  "ml_m", "p401",
+  list(max.depth = 6, mtry = 3, min.node.size = 6))
+
+dml_iivm_forest$set_ml_nuisance_params(
+  "ml_r1", "p401",
+  list(max.depth = 4, mtry = 7, min.node.size = 6))
+
+dml_iivm_forest$fit()
+
+dml_iivm_forest$summary()
+
+```
+
+```{r, message = FALSE, warning = FALSE}
+
+# Inicializar Aprendiz
+trees = lrn("regr.rpart")
+
+trees_class = lrn("classif.rpart")
+
+# Trees
+set.seed(123)
+
+dml_iivm_tree = DoubleMLIIVM$new(data_dml_base_iv,
+                                 ml_g = trees,
+                                 ml_m = trees_class,
+                                 ml_r = trees_class,
+                                 n_folds = 3,
+                                 trimming_threshold = 0.01,
+                                 subgroups = list(always_takers = FALSE,
+                                                  never_takers = TRUE))
+
+# Definir parâmetros específicos de parte nuisance
+dml_iivm_tree$set_ml_nuisance_params(
+  "ml_g0", "p401",
+  list(cp = 0.0016, minsplit = 74))
+
+dml_iivm_tree$set_ml_nuisance_params(
+  "ml_g1", "p401",
+  list(cp = 0.0018, minsplit = 70))
+
+dml_iivm_tree$set_ml_nuisance_params(
+  "ml_m", "p401",
+  list(cp = 0.0028, minsplit = 167))
+
+dml_iivm_tree$set_ml_nuisance_params(
+  "ml_r1", "p401",
+  list(cp = 0.0576, minsplit = 55))
+
+dml_iivm_tree$fit()
+
+dml_iivm_tree$summary()
+
+```
+
+```{r, message = FALSE, warning = FALSE}
+
+# Inicializar Aprendiz
+boost = lrn("regr.xgboost", objective = "reg:squarederror")
+
+boost_class = lrn("classif.xgboost", objective = "binary:logistic", eval_metric = "logloss")
+
+# Boosted Trees
+set.seed(123)
+
+dml_iivm_boost = DoubleMLIIVM$new(data_dml_base_iv,
+                                  ml_g = boost,
+                                  ml_m = boost_class,
+                                  ml_r = boost_class,
+                                  n_folds = 3,
+                                  trimming_threshold = 0.01,
+                                  subgroups = list(always_takers = FALSE,
+                                                   never_takers = TRUE))
+
+# Definir parâmetros específicos de parte nuisance
+dml_iivm_boost$set_ml_nuisance_params(
+  "ml_g0", "p401",
+  list(nrounds = 9, eta = 0.1))
+
+dml_iivm_boost$set_ml_nuisance_params(
+  "ml_g1", "p401",
+  list(nrounds = 33, eta = 0.1))
+
+dml_iivm_boost$set_ml_nuisance_params(
+  "ml_m", "p401",
+  list(nrounds = 12, eta = 0.1))
+
+dml_iivm_boost$set_ml_nuisance_params(
+  "ml_r1", "p401",
+  list(nrounds = 25, eta = 0.1))
+
+dml_iivm_boost$fit()
+
+dml_iivm_boost$summary()
+
+```
+
+```{r, message = FALSE, warning = FALSE}
+
+confints = rbind(dml_iivm_lasso$confint(), dml_iivm_forest$confint(),
+                 dml_iivm_tree$confint(), dml_iivm_boost$confint())
+
+estimates = c(dml_iivm_lasso$coef, dml_iivm_forest$coef,
+              dml_iivm_tree$coef, dml_iivm_boost$coef)
+
+result_iivm = data.table("model" = "IIVM",
+                         "ML" = c("glmnet", "ranger", "rpart", "xgboost"),
+                         "Estimate" = estimates,
+                         "lower" = confints[,1],
+                         "upper" = confints[,2])
+
+print(result_iivm)
+
+g_ci = ggplot(result_iivm, aes(x = ML, y = Estimate, color = ML)) +
+  geom_point() +
+  geom_errorbar(aes(ymin = lower, ymax = upper, color = ML)) +
+  geom_hline(yintercept = 0, color = "grey") +
+  theme_minimal() + ylab("Coeficientes e intervalos de confiança 0.95") +
+  xlab("") +
+  theme(axis.text.x = element_text(angle = 90), legend.position = "none",
+        text = element_text(size = 20))
+
+print(g_ci)
+
+```
+
+## Resumo dos Resultados
+
+Para resumir, vamos mesclar todos os nossos resultados até agora e ilustrá-los em um gráfico.
+
+```{r, message = FALSE, warning = FALSE}
+
+summary_result = rbindlist(list(result_plr, result_irm, result_iivm))
+
+summary_result[, model := factor(model, levels = c("PLR", "IRM", "IIVM"))]
+
+```
+
+```{r, message = FALSE, warning = FALSE}
+
+g_all = ggplot(summary_result, aes(x = ML, y = Estimate, color = ML)) +
+  geom_point() +
+  geom_errorbar(aes(ymin = lower, ymax = upper, color = ML)) +
+  geom_hline(yintercept = 0, color = "grey") +
+  theme_minimal() + ylab("Coeficientes e intervalos de confiança 0.95") +
+  xlab("") +
+  theme(axis.text.x = element_text(angle = 90), legend.position = "none",
+        text = element_text(size = 20)) +
+  facet_wrap(model ~., ncol = 1)
+
+print(g_all)
+
+```
+
+Reportamos resultados baseados em quatro métodos ML para estimar as funções nuisance usadas na formação das equações estimadoras ortogonais. Encontramos novamente que as estimativas do efeito de tratamento são estáveis através dos métodos ML. As estimativas são altamente significativas, portanto rejeitaríamos a hipótese de que a participação em 401(k) não tem efeito na riqueza financeira.
+
+## Principais Conclusões
+
+1. **Viés de Confundimento**: As estimativas ingênuas (sem controle para confundimento) superestimam substancialmente o efeito:
+   - Efeito incondicional da elegibilidade: $19.559
+   - Efeito incondicional da participação: $27.372
+
+2. **Estimativas Ajustadas**: Os métodos DML que controlam para confundimento mostram efeitos muito menores:
+   - **PLR**: Efeito da elegibilidade entre $8.200 - $9.580
+   - **IRM**: Efeito da elegibilidade entre $8.000 - $8.850  
+   - **IIVM**: Efeito da participação (LATE) entre $11.800 - $12.800
+
+3. **Robustez**: Os resultados são consistentes através de diferentes métodos ML (glmnet, ranger, rpart, xgboost), demonstrando a robustez das estimativas DML.
+
+4. **Interpretação**: O LATE da participação ($≈12.000) é maior que o ATE da elegibilidade ($≈8.500), sugerindo que os compliers têm efeitos de tratamento mais altos que a população geral.
+
+## Agradecimento
+
+Gostaríamos de agradecer a [Jannis Kueck](https://www.dice.hhu.de/en/dice/people/professors-1/kueck) por compartilhar [o notebook kaggle](https://www.kaggle.com/janniskueck/pm5-401k). O conjunto de dados de pensão foi analisado em vários estudos, entre outros [Chernozhukov et al. (2018)](https://arxiv.org/abs/1608.00060).

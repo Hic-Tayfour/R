@@ -1,0 +1,451 @@
+---
+title: "R - Noções básicas de aprendizado de máquina duplo"
+author: "Hicham Munir Tayfour"
+output:
+  html_document:
+    theme: flatly       
+    toc: true           
+    toc_float: true     
+    code_folding: hide  
+    highlight: tango   
+---
+
+# R: Fundamentos do Double Machine Learning
+
+**Nota:** Este notebook tem um tempo de computação longo devido ao grande número de simulações.
+
+Este notebook contém as simulações detalhadas de acordo com a introdução ao double machine learning no [Guia do Usuário](https://docs.doubleml.org/stable/guide/basics.html) do pacote DoubleML.
+
+```{r, message = FALSE, warning = FALSE}
+
+library(data.table)
+
+library(ggplot2)
+
+library(mlr3)
+
+library(mlr3learners)
+
+library(data.table)
+
+library(DoubleML)
+
+lgr::get_logger("mlr3")$set_threshold("warn")
+
+options(repr.plot.width = 5, repr.plot.height = 4)
+
+```
+
+## Processo de Geração de Dados (DGP)
+
+Consideramos o seguinte modelo parcialmente linear:
+
+$$Y = D \theta_0 + g_0(X) + U, \quad \mathbb{E}[U|X,D] = 0,$$
+$$D = m_0(X) + V, \quad \mathbb{E}[V|X] = 0,$$
+
+com covariáveis $x_i \sim \mathcal{N}(0, \Sigma)$, onde $\Sigma$ é uma matriz com entradas $\Sigma_{kj} = 0.7^{|j-k|}$. Estamos interessados em realizar inferência válida sobre o parâmetro causal $\theta_0$. O parâmetro verdadeiro $\theta_0$ é definido como $0.5$ em nosso experimento de simulação.
+
+As funções nuisance são dadas por:
+
+$$g_0(X) = \mathbb{E}[Y|X], \quad m_0(X) = \mathbb{E}[D|X].$$
+
+Geramos `n_rep` replicações do processo de geração de dados com tamanho amostral `n_obs` e comparamos a performance de diferentes estimadores.
+
+```{r, message = FALSE, warning = FALSE}
+
+set.seed(1234)
+
+n_rep = 1000
+
+n_obs = 500
+
+n_vars = 5
+
+alpha = 0.5
+
+data = list()
+
+for (i_rep in seq_len(n_rep)) {
+  data[[i_rep]] = make_plr_CCDDHNR2018(alpha = alpha, n_obs = n_obs, dim_x = n_vars,
+                                       return_type = "data.frame")
+}
+
+```
+
+## Viés de Regularização em Abordagens ML Simples
+
+A inferência ingênua que é baseada em uma aplicação direta de métodos de aprendizado de máquina para estimar o parâmetro causal, $\theta_0$, é geralmente inválida. O uso de métodos de aprendizado de máquina introduz um viés que surge devido à regularização. Uma abordagem ML simples é dada dividindo aleatoriamente a amostra em duas partes. Na amostra auxiliar indexada por $i \in I^C$, a função nuisance $g_0(X)$ é estimada com um método ML, por exemplo um aprendiz de floresta aleatória. Dada a estimativa $\hat{g}_0(X)$, a estimativa final de $\theta_0$ é obtida como ($n=N/2$) usando a outra metade das observações indexadas com $i \in I$:
+
+$$\hat{\theta}_0 = \left( \sum_{i \in I} D_i^2 \right)^{-1} \sum_{i \in I} D_i (Y_i - \hat{g}_0(X_i)).$$
+
+Como isso corresponde a um score "não-ortogonal", que não é implementado no pacote DoubleML, precisamos definir um callable customizado.
+
+```{r, message = FALSE, warning = FALSE}
+
+non_orth_score = function(y, d, l_hat, m_hat, g_hat, smpls) {
+  u_hat = y - g_hat
+  psi_a = -1 * d * d
+  psi_b = d * u_hat
+  psis = list(psi_a = psi_a, psi_b = psi_b)
+  return(psis)
+}
+
+```
+
+Note que o estimador não é capaz de estimar $\hat{g}_0(X)$ diretamente, mas tem que ser baseado em uma estimativa preliminar de $\hat{m}_0(X)$. Todos os estimadores a seguir com `score="IV-type"` são baseados no mesmo procedimento preliminar.
+
+```{r, message = FALSE, warning = FALSE}
+
+set.seed(1111)
+
+ml_l = lrn("regr.xgboost", nrounds = 300, eta = 0.1)
+
+ml_m = lrn("regr.xgboost", nrounds = 300, eta = 0.1)
+
+ml_g = ml_l$clone()
+
+theta_nonorth = rep(NA, n_rep)
+
+se_nonorth = rep(NA, n_rep)
+
+for (i_rep in seq_len(n_rep)) {
+  cat(sprintf("Replication %d/%d", i_rep, n_rep), "\r", sep = "")
+  flush.console()
+  df = data[[i_rep]]
+  obj_dml_data = double_ml_data_from_data_frame(df, y_col = "y", d_cols = "d")
+  obj_dml_plr_nonorth = DoubleMLPLR$new(obj_dml_data,
+                                        ml_l, ml_m, ml_g,
+                                        n_folds = 2,
+                                        score = non_orth_score,
+                                        apply_cross_fitting = FALSE)
+  obj_dml_plr_nonorth$fit()
+  theta_nonorth[i_rep] = obj_dml_plr_nonorth$coef
+  se_nonorth[i_rep] = obj_dml_plr_nonorth$se
+}
+
+g_nonorth = ggplot(data.frame(theta_rescaled = (theta_nonorth - alpha) / se_nonorth)) +
+  geom_histogram(aes(y = after_stat(density), x = theta_rescaled, 
+                     colour = "Non-orthogonal ML", fill = "Non-orthogonal ML"),
+                 bins = 30, alpha = 0.3) +
+  geom_vline(aes(xintercept = 0), col = "black") +
+  suppressWarnings(geom_function(fun = dnorm, aes(colour = "N(0, 1)", fill = "N(0, 1)"))) +
+  scale_color_manual(name = '',
+                     breaks = c("Non-orthogonal ML", "N(0, 1)"),
+                     values = c("Non-orthogonal ML" = "dark blue", "N(0, 1)" = 'black')) +
+  scale_fill_manual(name = '',
+                    breaks = c("Non-orthogonal ML", "N(0, 1)"),
+                    values = c("Non-orthogonal ML" = "dark blue", "N(0, 1)" = NA)) +
+  xlim(c(-6.0, 6.0)) + xlab("") + ylab("") + theme_minimal()
+
+print(g_nonorth)
+
+```
+
+O viés de regularização na abordagem ML simples é causado pela convergência lenta de $\hat{\theta}_0$:
+
+$$\hat{\theta}_0 - \theta_0 = \underbrace{(\mathbb{E}_n[D_i^2])^{-1} \mathbb{E}_n[D_i U_i]}_{(a)} + \underbrace{(\mathbb{E}_n[D_i^2])^{-1} \mathbb{E}_n[D_i (g_0(X_i) - \hat{g}_0(X_i))]}_{(b)}$$
+
+i.e., mais lenta que $1/\sqrt{n}$. O fator condutor é o viés que surge ao aprender $g$ com uma floresta aleatória ou qualquer outra técnica ML. Uma ilustração heurística é dada por:
+
+- $(a)$ é aproximadamente Gaussiana sob condições moderadas. 
+- No entanto, $(b)$ (o viés de regularização) diverge em geral.
+
+## Superando o Viés de Regularização por Ortogonalização
+
+Para superar o viés de regularização, podemos remover parcialmente o efeito de $X$ de $D$ para obter o regressor ortogonalizado $V = D - m(X)$. Então usamos a estimativa final:
+
+$$\check{\theta}_0 = \left( \sum_{i=1}^n (D_i - \hat{m}_0(X_i))^2 \right)^{-1} \sum_{i=1}^n (D_i - \hat{m}_0(X_i)) (Y_i - \hat{g}_0(X_i)).$$
+
+A figura a seguir mostra a distribuição das estimativas resultantes $\hat{\theta}_0$ sem divisão da amostra. Novamente, estamos usando predições externas para evitar cross-fitting (para fins de demonstração).
+
+```{r, message = FALSE, warning = FALSE}
+
+set.seed(2222)
+
+theta_orth_nosplit = rep(NA, n_rep)
+
+se_orth_nosplit = rep(NA, n_rep)
+
+for (i_rep in seq_len(n_rep)) {
+  cat(sprintf("Replication %d/%d", i_rep, n_rep), "\r", sep = "")
+  flush.console()
+  df = data[[i_rep]]
+  obj_dml_data = double_ml_data_from_data_frame(df, y_col = "y", d_cols = "d")
+  obj_dml_plr_orth_nosplit = DoubleMLPLR$new(obj_dml_data,
+                                             ml_l, ml_m, ml_g,
+                                             n_folds = 1,
+                                             score = 'IV-type',
+                                             apply_cross_fitting = FALSE)
+  obj_dml_plr_orth_nosplit$fit()
+  theta_orth_nosplit[i_rep] = obj_dml_plr_orth_nosplit$coef
+  se_orth_nosplit[i_rep] = obj_dml_plr_orth_nosplit$se
+}
+
+g_nosplit = ggplot(data.frame(theta_rescaled = (theta_orth_nosplit - alpha) / se_orth_nosplit), 
+                   aes(x = theta_rescaled)) +
+  geom_histogram(aes(y = after_stat(density), x = theta_rescaled, 
+                     colour = "Double ML (no sample splitting)", 
+                     fill = "Double ML (no sample splitting)"),
+                 bins = 30, alpha = 0.3) +
+  geom_vline(aes(xintercept = 0), col = "black") +
+  suppressWarnings(geom_function(fun = dnorm, aes(colour = "N(0, 1)", fill = "N(0, 1)"))) +
+  scale_color_manual(name = '',
+                     breaks = c("Double ML (no sample splitting)", "N(0, 1)"),
+                     values = c("Double ML (no sample splitting)" = "dark orange", "N(0, 1)" = 'black')) +
+  scale_fill_manual(name = '',
+                    breaks = c("Double ML (no sample splitting)", "N(0, 1)"),
+                    values = c("Double ML (no sample splitting)" = "dark orange", "N(0, 1)" = NA)) +
+  xlim(c(-6.0, 6.0)) + xlab("") + ylab("") + theme_minimal()
+
+print(g_nosplit)
+
+```
+
+Se os modelos nuisance $\hat{g}_0()$ e $\hat{m}()$ são estimados em todo o conjunto de dados, que também é usado para obter a estimativa final $\check{\theta}_0$, outro viés é observado.
+
+## Divisão da Amostra para Remover Viés Induzido por Overfitting
+
+Usando divisão da amostra, i.e., estimar os modelos nuisance $\hat{g}_0()$ e $\hat{m}()$ em uma parte dos dados (dados de treino) e estimar $\check{\theta}_0$ na outra parte dos dados (dados de teste), supera o viés induzido por overfitting. Podemos explorar os benefícios do cross-fitting trocando o papel da amostra de treino e teste. Cross-fitting funciona bem empiricamente porque toda a amostra pode ser usada para estimação.
+
+A figura a seguir mostra a distribuição das estimativas resultantes $\hat{\theta}_0$ com score ortogonal e divisão da amostra.
+
+```{r, message = FALSE, warning = FALSE}
+
+set.seed(3333)
+
+theta_dml = rep(NA, n_rep)
+
+se_dml = rep(NA, n_rep)
+
+for (i_rep in seq_len(n_rep)) {
+  cat(sprintf("Replication %d/%d", i_rep, n_rep), "\r", sep = "")
+  flush.console()
+  df = data[[i_rep]]
+  obj_dml_data = double_ml_data_from_data_frame(df, y_col = "y", d_cols = "d")
+  obj_dml_plr = DoubleMLPLR$new(obj_dml_data,
+                                ml_l, ml_m, ml_g,
+                                n_folds = 2,
+                                score = 'IV-type')
+  obj_dml_plr$fit()
+  theta_dml[i_rep] = obj_dml_plr$coef
+  se_dml[i_rep] = obj_dml_plr$se
+}
+
+g_dml = ggplot(data.frame(theta_rescaled = (theta_dml - alpha) / se_dml), aes(x = theta_rescaled)) +
+  geom_histogram(aes(y = after_stat(density), x = theta_rescaled, 
+                     colour = "Double ML with cross-fitting", 
+                     fill = "Double ML with cross-fitting"),
+                 bins = 30, alpha = 0.3) +
+  geom_vline(aes(xintercept = 0), col = "black") +
+  suppressWarnings(geom_function(fun = dnorm, aes(colour = "N(0, 1)", fill = "N(0, 1)"))) +
+  scale_color_manual(name = '',
+                     breaks = c("Double ML with cross-fitting", "N(0, 1)"),
+                     values = c("Double ML with cross-fitting" = "dark green", "N(0, 1)" = 'black')) +
+  scale_fill_manual(name = '',
+                    breaks = c("Double ML with cross-fitting", "N(0, 1)"),
+                    values = c("Double ML with cross-fitting" = "dark green", "N(0, 1)" = NA)) +
+  xlim(c(-6.0, 6.0)) + xlab("") + ylab("") + theme_minimal()
+
+print(g_dml)
+
+```
+
+## Double/Debiased Machine Learning
+
+Para ilustrar os benefícios da etapa de predição auxiliar no framework DML, escrevemos o erro como:
+
+$$\check{\theta}_0 - \theta_0 = \underbrace{(\mathbb{E}_n[(D_i - \hat{m}_0(X_i))^2])^{-1} \mathbb{E}_n[(D_i - \hat{m}_0(X_i)) U_i]}_{(a)} + \underbrace{(\mathbb{E}_n[(D_i - \hat{m}_0(X_i))^2])^{-1} \mathbb{E}_n[(D_i - \hat{m}_0(X_i)) (g_0(X_i) - \hat{g}_0(X_i))]}_{(b)} + c^*$$
+
+Chernozhukov et al. (2018) argumenta que:
+
+- O primeiro termo $(a)$ será assintoticamente normalmente distribuído.
+- O segundo termo $(b)$ desaparece assintoticamente para muitos processos de geração de dados.
+- O terceiro termo $c^*$ desaparece em probabilidade se divisão da amostra for aplicada.
+
+Finalmente, vamos comparar todas as distribuições.
+
+```{r, message = FALSE, warning = FALSE}
+
+g_all = ggplot(data.frame(t_nonorth = (theta_nonorth - alpha) / se_nonorth,
+                          t_orth_nosplit = (theta_orth_nosplit - alpha) / se_orth_nosplit,
+                          t_dml = (theta_dml - alpha) / se_dml)) +
+  geom_histogram(aes(x = t_nonorth, y = after_stat(density), 
+                     colour = "Non-orthogonal ML", fill = "Non-orthogonal ML"),
+                 bins = 30, alpha = 0.3) +
+  geom_histogram(aes(x = t_orth_nosplit, y = after_stat(density), 
+                     colour = "Double ML (no sample splitting)", 
+                     fill = "Double ML (no sample splitting)"),
+                 bins = 30, alpha = 0.3) +
+  geom_histogram(aes(x = t_dml, y = after_stat(density), 
+                     colour = "Double ML with cross-fitting", 
+                     fill = "Double ML with cross-fitting"),
+                 bins = 30, alpha = 0.3) +
+  geom_vline(aes(xintercept = 0), col = "black") +
+  suppressWarnings(geom_function(fun = dnorm, aes(colour = "N(0, 1)", fill = "N(0, 1)"))) +
+  scale_color_manual(name = '',
+                     breaks = c("Non-orthogonal ML", "Double ML (no sample splitting)", 
+                                "Double ML with cross-fitting", "N(0, 1)"),
+                     values = c("Non-orthogonal ML" = "dark blue",
+                                "Double ML (no sample splitting)" = "dark orange",
+                                "Double ML with cross-fitting" = "dark green",
+                                "N(0, 1)" = 'black')) +
+  scale_fill_manual(name = '',
+                    breaks = c("Non-orthogonal ML", "Double ML (no sample splitting)", 
+                               "Double ML with cross-fitting", "N(0, 1)"),
+                    values = c("Non-orthogonal ML" = "dark blue",
+                               "Double ML (no sample splitting)" = "dark orange",
+                               "Double ML with cross-fitting" = "dark green",
+                               "N(0, 1)" = NA)) +
+  xlim(c(-6.0, 6.0)) + xlab("") + ylab("") + theme_minimal()
+
+print(g_all)
+
+```
+
+## Score de Partialling Out
+
+Outro estimador debiased, baseado na abordagem de partialling-out de Robinson (1988), é:
+
+$$\tilde{\theta}_0 = \left( \sum_{i=1}^n (D_i - \hat{m}_0(X_i))^2 \right)^{-1} \sum_{i=1}^n (D_i - \hat{m}_0(X_i)) (Y_i - \hat{\ell}_0(X_i))$$
+
+com $\ell_0(X_i) = E(Y|X)$. Todos os parâmetros nuisance para o estimador com `score='partialling out'` são funções de média condicional, que podem ser diretamente estimadas usando métodos ML. Esta é uma pequena vantagem sobre o estimador com `score='IV-type'`. 
+
+No seguinte, repetimos a análise acima com `score='partialling out'`. Em uma primeira parte da análise, estimamos $\theta_0$ sem divisão da amostra. Novamente observamos um viés de overfitting.
+
+A figura a seguir mostra a distribuição das estimativas resultantes $\hat{\theta}_0$ sem divisão da amostra.
+
+```{r, message = FALSE, warning = FALSE}
+
+set.seed(4444)
+
+theta_orth_po_nosplit = rep(NA, n_rep)
+
+se_orth_po_nosplit = rep(NA, n_rep)
+
+for (i_rep in seq_len(n_rep)) {
+  cat(sprintf("Replication %d/%d", i_rep, n_rep), "\r", sep = "")
+  flush.console()
+  df = data[[i_rep]]
+  obj_dml_data = double_ml_data_from_data_frame(df, y_col = "y", d_cols = "d")
+  obj_dml_plr_orth_nosplit = DoubleMLPLR$new(obj_dml_data,
+                                             ml_l, ml_m,
+                                             n_folds = 1,
+                                             score = 'partialling out',
+                                             apply_cross_fitting = FALSE)
+  obj_dml_plr_orth_nosplit$fit()
+  theta_orth_po_nosplit[i_rep] = obj_dml_plr_orth_nosplit$coef
+  se_orth_po_nosplit[i_rep] = obj_dml_plr_orth_nosplit$se
+}
+
+g_nosplit_po = ggplot(data.frame(theta_rescaled = (theta_orth_po_nosplit - alpha) / se_orth_po_nosplit), 
+                      aes(x = theta_rescaled)) +
+  geom_histogram(aes(y = after_stat(density), x = theta_rescaled, 
+                     colour = "Double ML (no sample splitting)", 
+                     fill = "Double ML (no sample splitting)"),
+                 bins = 30, alpha = 0.3) +
+  geom_vline(aes(xintercept = 0), col = "black") +
+  suppressWarnings(geom_function(fun = dnorm, aes(colour = "N(0, 1)", fill = "N(0, 1)"))) +
+  scale_color_manual(name = '',
+                     breaks = c("Double ML (no sample splitting)", "N(0, 1)"),
+                     values = c("Double ML (no sample splitting)" = "dark orange", "N(0, 1)" = 'black')) +
+  scale_fill_manual(name = '',
+                    breaks = c("Double ML (no sample splitting)", "N(0, 1)"),
+                    values = c("Double ML (no sample splitting)" = "dark orange", "N(0, 1)" = NA)) +
+  xlim(c(-6.0, 6.0)) + xlab("") + ylab("") + theme_minimal()
+
+print(g_nosplit_po)
+
+```
+
+Usando divisão da amostra, supera o viés induzido por overfitting. Novamente, a implementação aplica automaticamente cross-fitting.
+
+```{r, message = FALSE, warning = FALSE}
+
+set.seed(5555)
+
+theta_dml_po = rep(NA, n_rep)
+
+se_dml_po = rep(NA, n_rep)
+
+for (i_rep in seq_len(n_rep)) {
+  cat(sprintf("Replication %d/%d", i_rep, n_rep), "\r", sep = "")
+  flush.console()
+  df = data[[i_rep]]
+  obj_dml_data = double_ml_data_from_data_frame(df, y_col = "y", d_cols = "d")
+  obj_dml_plr = DoubleMLPLR$new(obj_dml_data,
+                                ml_l, ml_m,
+                                n_folds = 2,
+                                score = 'partialling out')
+  obj_dml_plr$fit()
+  theta_dml_po[i_rep] = obj_dml_plr$coef
+  se_dml_po[i_rep] = obj_dml_plr$se
+}
+
+g_dml_po = ggplot(data.frame(theta_rescaled = (theta_dml_po - alpha) / se_dml_po), aes(x = theta_rescaled)) +
+  geom_histogram(aes(y = after_stat(density), x = theta_rescaled, 
+                     colour = "Double ML with cross-fitting", 
+                     fill = "Double ML with cross-fitting"),
+                 bins = 30, alpha = 0.3) +
+  geom_vline(aes(xintercept = 0), col = "black") +
+  suppressWarnings(geom_function(fun = dnorm, aes(colour = "N(0, 1)", fill = "N(0, 1)"))) +
+  scale_color_manual(name = '',
+                     breaks = c("Double ML with cross-fitting", "N(0, 1)"),
+                     values = c("Double ML with cross-fitting" = "dark green", "N(0, 1)" = 'black')) +
+  scale_fill_manual(name = '',
+                    breaks = c("Double ML with cross-fitting", "N(0, 1)"),
+                    values = c("Double ML with cross-fitting" = "dark green", "N(0, 1)" = NA)) +
+  xlim(c(-6.0, 6.0)) + xlab("") + ylab("") + theme_minimal()
+
+print(g_dml_po)
+
+```
+
+Finalmente, vamos comparar todas as distribuições.
+
+```{r, message = FALSE, warning = FALSE}
+
+g_all_po = ggplot(data.frame(t_nonorth = (theta_nonorth - alpha) / se_nonorth,
+                             t_orth_nosplit = (theta_orth_po_nosplit - alpha) / se_orth_po_nosplit,
+                             t_dml = (theta_dml_po - alpha) / se_dml_po)) +
+  geom_histogram(aes(x = t_nonorth, y = after_stat(density), 
+                     colour = "Non-orthogonal ML", fill = "Non-orthogonal ML"),
+                 bins = 30, alpha = 0.3) +
+  geom_histogram(aes(x = t_orth_nosplit, y = after_stat(density), 
+                     colour = "Double ML (no sample splitting)", 
+                     fill = "Double ML (no sample splitting)"),
+                 bins = 30, alpha = 0.3) +
+  geom_histogram(aes(x = t_dml, y = after_stat(density), 
+                     colour = "Double ML with cross-fitting", 
+                     fill = "Double ML with cross-fitting"),
+                 bins = 30, alpha = 0.3) +
+  geom_vline(aes(xintercept = 0), col = "black") +
+  suppressWarnings(geom_function(fun = dnorm, aes(colour = "N(0, 1)", fill = "N(0, 1)"))) +
+  scale_color_manual(name = '',
+                     breaks = c("Non-orthogonal ML", "Double ML (no sample splitting)", 
+                                "Double ML with cross-fitting", "N(0, 1)"),
+                     values = c("Non-orthogonal ML" = "dark blue",
+                                "Double ML (no sample splitting)" = "dark orange",
+                                "Double ML with cross-fitting" = "dark green",
+                                "N(0, 1)" = 'black')) +
+  scale_fill_manual(name = '',
+                    breaks = c("Non-orthogonal ML", "Double ML (no sample splitting)", 
+                               "Double ML with cross-fitting", "N(0, 1)"),
+                    values = c("Non-orthogonal ML" = "dark blue",
+                               "Double ML (no sample splitting)" = "dark orange",
+                               "Double ML with cross-fitting" = "dark green",
+                               "N(0, 1)" = NA)) +
+  xlim(c(-6.0, 6.0)) + xlab("") + ylab("") + theme_minimal()
+
+print(g_all_po)
+
+```
+
+## Resumo dos Resultados
+
+Este tutorial demonstrou três aspectos fundamentais do Double Machine Learning:
+
+1. **Viés de Regularização**: Abordagens ML ingênuas introduzem viés que impede inferência válida
+2. **Ortogonalização**: O uso de scores ortogonais de Neyman reduz a sensibilidade ao viés de estimação das funções nuisance
+3. **Cross-fitting**: A divisão da amostra com cross-fitting elimina o viés de overfitting e permite o uso de toda a amostra
+
+Os histogramas mostram claramente que apenas o Double ML com cross-fitting produz distribuições que se aproximam da distribuição normal padrão, validando a teoria de inferência assintótica.

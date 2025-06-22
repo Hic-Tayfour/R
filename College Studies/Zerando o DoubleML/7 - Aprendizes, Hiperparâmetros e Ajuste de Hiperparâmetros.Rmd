@@ -1,0 +1,494 @@
+---
+title: "7 - Aprendizes, Hiperparâmetros e Ajuste de Hiperparâmetros"
+author: "Hicham Munir Tayfour"
+output:
+  html_document:
+    theme: flatly       
+    toc: true           
+    toc_float: true     
+    code_folding: hide  
+    highlight: tango  
+---
+
+# 7. Aprendizes, Hiperparâmetros e Ajuste de Hiperparâmetros
+
+A estimação de um modelo de double/debiased machine learning envolve a estimação de várias funções nuisance com estimadores de aprendizado de máquina. Tais aprendizes são implementados em vários pacotes Python e R. A implementação do [DoubleML](../index.html#doubleml-package) é baseada nos meta-pacotes [scikit-learn](https://scikit-learn.org/) para Python e [mlr3](https://mlr3.mlr-org.com/) para R.
+
+As interfaces para especificar os aprendizes, definir hiperparâmetros e ajustar hiperparâmetros são descritas no seguinte para R.
+
+## 7.1 - R: Aprendizes e Hiperparâmetros
+
+### 7.1.1 - Requisitos Mínimos para Aprendizes
+
+O requisito mínimo para um aprendiz ser usado para modelos nuisance no pacote [DoubleML](../index.html#doubleml-package) é:
+
+- **A implementação como um aprendiz** para regressão ou classificação no pacote [mlr3](https://mlr3.mlr-org.com/) ou seus pacotes de extensão [mlr3learners](https://mlr3learners.mlr-org.com/) e [mlr3extralearners](https://mlr3extralearners.mlr-org.com/). Um guia sobre como adicionar um aprendiz é fornecido no [capítulo sobre extensão de aprendizes no livro mlr3](https://mlr3book.mlr-org.com/chapters/chapter10/advanced_technical_aspects_of_mlr3.html#sec-extending).
+
+- **O pacote [mlr3](https://mlr3.mlr-org.com/)** garante que os aprendizes satisfaçam algumas funcionalidades essenciais. Para especificar um aprendiz específico no [DoubleML](../index.html#doubleml-package), os usuários podem passar objetos da classe [Learner](https://mlr3.mlr-org.com/reference/Learner.html). Uma maneira rápida de construir esses objetos é usar a função [lrn()](https://mlr3.mlr-org.com/reference/mlr_sugar.html) do [mlr3](https://mlr3.mlr-org.com/). Uma introdução aos aprendizes no [mlr3](https://mlr3.mlr-org.com/) é fornecida no [capítulo sobre aprendizes do livro mlr3](https://mlr3book.mlr-org.com/chapters/chapter2/data_and_basic_modeling.html#sec-learners).
+
+- **Também é possível** passar aprendizes que foram construídos a partir de um pipeline com o pacote [mlr3pipelines](https://mlr3pipelines.mlr-org.com/).
+
+- **Os modelos [DoubleML::DoubleMLIRM](https://docs.doubleml.org/r/stable/reference/DoubleMLIRM.html) e [DoubleML::DoubleMLIIVM](https://docs.doubleml.org/r/stable/reference/DoubleMLIIVM.html)** requerem classificadores. Os usuários também podem especificar classificadores no [DoubleML::DoubleMLPLR](https://docs.doubleml.org/r/stable/reference/DoubleMLPLR.html) em casos com variáveis de tratamento binárias.
+
+- **Hiperparâmetros de aprendizes** podem ser definidos na instanciação no [mlr3](https://mlr3.mlr-org.com/) ou após a instanciação usando o método `set_ml_nuisance_params()`.
+
+Uma lista interativa de aprendizes fornecidos nos pacotes [mlr3](https://mlr3.mlr-org.com/) e de extensão pode ser encontrada no [site do pacote mlr3extralearners](https://mlr3extralearners.mlr-org.com/articles/learners/list_learners.html).
+
+### 7.1.2 - Especificação de Aprendizes e Definição de Hiperparâmetros
+
+Os aprendizes são definidos durante a inicialização das classes de modelo [DoubleML](../index.html#doubleml-package): [DoubleML::DoubleMLPLR](https://docs.doubleml.org/r/stable/reference/DoubleMLPLR.html), [DoubleML::DoubleMLPLIV](https://docs.doubleml.org/r/stable/reference/DoubleMLPLIV.html), [DoubleML::DoubleMLIRM](https://docs.doubleml.org/r/stable/reference/DoubleMLIRM.html) e [DoubleML::DoubleMLIIVM](https://docs.doubleml.org/r/stable/reference/DoubleMLIIVM.html).
+
+Vamos simular alguns dados e considerar o modelo de regressão parcialmente linear. Precisamos especificar aprendizes para as funções nuisance $g_0(X) = E[Y|X]$ e $m_0(X) = E[D|X]$, por exemplo [LearnerRegrRanger](https://mlr3learners.mlr-org.com/reference/mlr_learners_regr.ranger.html) (`lrn("regr.ranger")`) para regressão com florestas aleatórias baseadas no pacote [ranger](https://github.com/imbs-hl/ranger) para R.
+
+```{r, message = FALSE, warning = FALSE}
+
+library(DoubleML)
+
+library(mlr3)
+
+library(mlr3learners)
+
+library(data.table)
+
+lgr::get_logger("mlr3")$set_threshold("warn")
+
+# configurar um aprendiz mlr3
+learner = lrn("regr.ranger")
+
+ml_l = learner$clone()
+
+ml_m = learner$clone()
+
+set.seed(3141)
+
+data = make_plr_CCDDHNR2018(alpha = 0.5, return_type = 'data.table')
+
+obj_dml_data = DoubleMLData$new(data, y_col = "y", d_cols = "d")
+
+dml_plr_obj = DoubleMLPLR$new(obj_dml_data, ml_l, ml_m)
+
+dml_plr_obj$fit()
+
+dml_plr_obj$summary()
+
+```
+
+Sem especificação adicional dos hiperparâmetros, valores padrão são usados. Para definir hiperparâmetros:
+
+- **Podemos usar aprendizes pré-parametrizados**, como `lrn("regr.ranger", num.trees=10)`.
+- **Alternativamente**, hiperparâmetros podem ser definidos após a inicialização via o método `set_ml_nuisance_params(learner, treat_var, params, set_fold_specific)`.
+
+```{r, message = FALSE, warning = FALSE}
+
+set.seed(3141)
+
+ml_l = lrn("regr.ranger", num.trees = 10)
+
+ml_m = lrn("regr.ranger")
+
+obj_dml_data = DoubleMLData$new(data, y_col = "y", d_cols = "d")
+
+dml_plr_obj = DoubleMLPLR$new(obj_dml_data, ml_l, ml_m)
+
+dml_plr_obj$fit()
+
+dml_plr_obj$summary()
+
+```
+
+```{r, message = FALSE, warning = FALSE}
+
+set.seed(3141)
+
+ml_l = lrn("regr.ranger")
+
+dml_plr_obj = DoubleMLPLR$new(obj_dml_data, ml_l, ml_m)
+
+dml_plr_obj$set_ml_nuisance_params("ml_l", "d", list("num.trees" = 10))
+
+dml_plr_obj$fit()
+
+dml_plr_obj$summary()
+
+```
+
+**Definindo hiperparâmetros específicos por variável de tratamento ou por fold:**
+
+- **No caso de múltiplos tratamentos**, o método `set_ml_nuisance_params(learner, treat_var, params, set_fold_specific)` pode ser usado para definir diferentes hiperparâmetros para diferentes variáveis de tratamento.
+
+- **O método `set_ml_nuisance_params(learner, treat_var, params, set_fold_specific)`** aceita listas para `params`. A estrutura da lista depende de se os mesmos parâmetros devem ser fornecidos para todos os folds ou se valores separados são passados para folds específicos.
+
+- **Passagem global de parâmetros:** Os valores em `params` são usados para estimação em todos os folds. A lista nomeada no argumento `params` deve ter entradas com nomes correspondentes aos parâmetros dos aprendizes. É necessário que a opção `set_fold_specific` seja definida como `FALSE` (padrão).
+
+- **Passagem específica por fold:** `params` é uma lista aninhada. A lista externa precisa ter comprimento `n_rep` e a lista interna comprimento `n_folds`. A lista mais interna deve ter entradas nomeadas que correspondam aos parâmetros do aprendiz. É necessário que a opção `set_fold_specific` seja definida como `TRUE`. Além disso, a passagem específica por fold é suportada apenas se todos os parâmetros forem definidos específicos por fold.
+
+A definição externa de parâmetros substituirá parâmetros definidos anteriormente. Para verificar a escolha de parâmetros, acesse os campos `$learner` e `$params`.
+
+```{r, message = FALSE, warning = FALSE}
+
+set.seed(3141)
+
+ml_l = lrn("regr.ranger")
+
+ml_m = lrn("regr.ranger")
+
+obj_dml_data = DoubleMLData$new(data, y_col = "y", d_cols = "d")
+
+n_rep = 2
+
+n_folds = 3
+
+dml_plr_obj = DoubleMLPLR$new(obj_dml_data, ml_l, ml_m, n_rep = n_rep, n_folds = n_folds)
+
+# Definir globalmente
+params = list("num.trees" = 10)
+
+dml_plr_obj$set_ml_nuisance_params("ml_l", "d", params = params)
+
+dml_plr_obj$set_ml_nuisance_params("ml_m", "d", params = params)
+
+print(dml_plr_obj$learner)
+
+print(dml_plr_obj$params)
+
+dml_plr_obj$fit()
+
+dml_plr_obj$summary()
+
+```
+
+O exemplo a seguir ilustra como definir parâmetros para cada fold:
+
+```{r, message = FALSE, warning = FALSE}
+
+learner = lrn("regr.ranger")
+
+ml_l = learner$clone()
+
+ml_m = learner$clone()
+
+dml_plr_obj = DoubleMLPLR$new(obj_dml_data, ml_l, ml_m, n_rep = n_rep, n_folds = n_folds)
+
+# Definir valores para cada fold
+params_exact = rep(list(rep(list(params), n_folds)), n_rep)
+
+dml_plr_obj$set_ml_nuisance_params("ml_l", "d", params = params_exact, set_fold_specific = TRUE)
+
+dml_plr_obj$set_ml_nuisance_params("ml_m", "d", params = params_exact, set_fold_specific = TRUE)
+
+print(dml_plr_obj$learner)
+
+print(dml_plr_obj$params)
+
+dml_plr_obj$fit()
+
+dml_plr_obj$summary()
+
+```
+
+### 7.1.3 - Uso de Pipelines para Construção de Aprendizes
+
+Os usuários também podem especificar aprendizes que foram construídos a partir de um pipeline usando o pacote [mlr3pipelines](https://mlr3pipelines.mlr-org.com/). Em geral, pipelines podem ser usados para realizar pré-processamento de dados, seleção de características, combinar aprendizes e até mesmo para realizar ajuste de hiperparâmetros. No seguinte, fornecemos dois exemplos sobre como construir um único aprendiz e como empilhar diferentes aprendizes via um pipeline. Para uma introdução mais detalhada ao [mlr3pipelines](https://mlr3pipelines.mlr-org.com/), referimos ao [Capítulo de Pipelines no livro mlr3](https://mlr3book.mlr-org.com/chapters/chapter7/sequential_pipelines.html). Além disso, um notebook sobre como usar [mlr3pipelines](https://mlr3pipelines.mlr-org.com/) em combinação com [DoubleML](../index.html#doubleml-package) está disponível na galeria de exemplos.
+
+```{r, message = FALSE, warning = FALSE}
+
+library(mlr3pipelines)
+
+set.seed(3141)
+
+# Definir aprendiz de floresta aleatória em um pipeline
+single_learner_pipeline = po("learner", lrn("regr.ranger", num.trees = 10))
+
+# Usar pipeline para criar uma nova instância de um aprendiz
+ml_g = as_learner(single_learner_pipeline)
+
+ml_m = as_learner(single_learner_pipeline)
+
+obj_dml_data = DoubleMLData$new(data, y_col = "y", d_cols = "d")
+
+n_rep = 2
+
+n_folds = 3
+
+dml_plr_obj = DoubleMLPLR$new(obj_dml_data, ml_g, ml_m, n_rep = n_rep, n_folds = n_folds)
+
+print(dml_plr_obj$learner)
+
+dml_plr_obj$fit()
+
+dml_plr_obj$summary()
+
+```
+
+```{r, message = FALSE, warning = FALSE}
+
+set.seed(3141)
+
+# Definir aprendiz de ensemble em um pipeline
+ensemble_learner_pipeline = gunion(list(
+  po("learner", lrn("regr.cv_glmnet", s = "lambda.min")),
+  po("learner", lrn("regr.ranger")),
+  po("learner", lrn("regr.rpart", cp = 0.01)))) %>>%
+  po("regravg", 3)
+
+# Usar pipeline para criar uma nova instância de um aprendiz
+ml_g = as_learner(ensemble_learner_pipeline)
+
+ml_m = as_learner(ensemble_learner_pipeline)
+
+obj_dml_data = DoubleMLData$new(data, y_col = "y", d_cols = "d")
+
+n_rep = 2
+
+n_folds = 3
+
+dml_plr_obj = DoubleMLPLR$new(obj_dml_data, ml_g, ml_m, n_rep = n_rep, n_folds = n_folds)
+
+print(dml_plr_obj$learner)
+
+dml_plr_obj$fit()
+
+dml_plr_obj$summary()
+
+```
+
+### 7.1.4 - Ajuste de Hiperparâmetros
+
+O ajuste de parâmetros de aprendizes para as funções nuisance dos modelos [DoubleML](../index.html#doubleml-package) pode ser feito via o método `tune()`.
+
+O método `tune()` passa várias opções e parâmetros para a interface de ajuste fornecida pelo pacote [mlr3tuning](https://mlr3tuning.mlr-org.com/). O [livro mlr3](https://mlr3book.mlr-org.com/) fornece uma [introdução passo a passo ao ajuste de parâmetros](https://mlr3book.mlr-org.com/chapters/chapter4/hyperparameter_optimization.html).
+
+Para ilustrar o ajuste de parâmetros, geramos dados de um modelo de regressão parcialmente linear esparso.
+
+```{r, message = FALSE, warning = FALSE}
+
+library(DoubleML)
+
+library(mlr3)
+
+library(data.table)
+
+set.seed(3141)
+
+n_obs = 200
+
+n_vars = 200
+
+theta = 3
+
+X = matrix(stats::rnorm(n_obs * n_vars), nrow = n_obs, ncol = n_vars)
+
+d = X[, 1:3, drop = FALSE] %*% c(5, 5, 5) + stats::rnorm(n_obs)
+
+y = theta * d + X[, 1:3, drop = FALSE] %*% c(5, 5, 5) + stats::rnorm(n_obs)
+
+dml_data = double_ml_data_from_matrix(X = X, y = y, d = d)
+
+```
+
+O ajuste de hiperparâmetros é realizado de acordo com as opções passadas através de uma lista nomeada `tune_settings`. As entradas na lista especificam opções durante o ajuste de parâmetros com [mlr3tuning](https://mlr3tuning.mlr-org.com/):
+
+- **`terminator`** é um [objeto Terminator](https://bbotk.mlr-org.com/reference/Terminator.html) passado para [mlr3tuning](https://mlr3tuning.mlr-org.com/) que gerencia o orçamento para resolver o problema de ajuste.
+
+- **`algorithm`** é um objeto da classe [Tuner](https://mlr3tuning.mlr-org.com/reference/Tuner.html) e especifica o algoritmo de ajuste. Alternativamente, `algorithm` pode ser um `character()` que é usado como argumento na chamada wrapper [mlr3tuning](https://mlr3tuning.mlr-org.com/) [tnr(algorithm)](https://mlr3tuning.mlr-org.com/reference/tnr.html). [O capítulo correspondente no livro mlr3](https://mlr3book.mlr-org.com/chapters/chapter4/hyperparameter_optimization.html#sec-tuner) ilustra como a classe [Tuner](https://mlr3tuning.mlr-org.com/reference/Tuner.html) suporta busca em grade, busca aleatória, recozimento simulado generalizado e otimização não linear.
+
+- **`rsmp_tune`** é um objeto da classe [resampling mlr3](https://mlr3.mlr-org.com/reference/Resampling.html) que especifica o método de reamostragem para avaliação, por exemplo `rsmp("cv", folds = 5)` implementa validação cruzada de 5 folds. `rsmp("holdout", ratio = 0.8)` implementa uma avaliação baseada em uma amostra de holdout que contém 20% das observações. Por padrão, validação cruzada de 5 folds é realizada.
+
+- **`measure`** é uma lista nomeada contendo as medidas usadas para ajuste dos componentes nuisance. Os nomes das entradas devem corresponder aos nomes dos aprendizes (veja o método `learner_names()`). As entradas na lista devem ser objetos da classe [Measure](https://mlr3.mlr-org.com/reference/Measure.html) ou chaves passadas para [msr()](https://mlr3.mlr-org.com/reference/mlr_sugar.html). Se `measure` não for fornecida pelo usuário, medidas padrão são usadas, i.e., erro quadrático médio para modelos de regressão e erro de classificação para resultados binários.
+
+No exemplo a seguir, ajustamos o parâmetro de penalização $\lambda$ (`lambda`) para lasso com o pacote R [glmnet](https://glmnet.stanford.edu/). Para ajustar o valor de `lambda`, uma busca em grade é realizada sobre uma grade de valores que varia de `0.05` a `0.1` com uma resolução de 10. Usar uma resolução de 10 divide a grade de valores em 10 valores igualmente espaçados variando de um mínimo de `0.05` a um máximo de `0.1`. Para avaliar a performance preditiva em ambas as partes nuisance, o erro quadrático médio validado cruzadamente é usado.
+
+Definindo a opção `tune_on_folds=FALSE`, o ajuste é realizado em toda a amostra. Portanto, os erros validados cruzadamente são obtidos de uma divisão aleatória de toda a amostra em 5 folds. Como resultado, um conjunto de valores `lambda` é obtido que são posteriormente usados no estágio de ajuste para todos os folds.
+
+Alternativamente, definir a opção `tune_on_folds=TRUE` atribuiria o esquema de reamostragem de ajuste `rsmp_tune` a cada fold. Por exemplo, se definíssemos `n_folds=2` na inicialização do objeto `DoubleMLPLR` e usássemos um erro validado cruzadamente de 5 folds para ajuste, cada um dos dois folds seria dividido em 5 subfolds e o erro seria avaliado nesses subfolds.
+
+```{r, message = FALSE, warning = FALSE}
+
+library(DoubleML)
+
+library(mlr3)
+
+library(data.table)
+
+library(mlr3learners)
+
+library(mlr3tuning)
+
+library(paradox)
+
+lgr::get_logger("mlr3")$set_threshold("warn")
+
+lgr::get_logger("bbotk")$set_threshold("warn")
+
+set.seed(1234)
+
+ml_l = lrn("regr.glmnet")
+
+ml_m = lrn("regr.glmnet")
+
+dml_plr_obj = DoubleMLPLR$new(dml_data, ml_l, ml_m)
+
+par_grids = list(
+  "ml_l" = ps(lambda = p_dbl(lower = 0.05, upper = 0.1)),
+  "ml_m" = ps(lambda = p_dbl(lower = 0.05, upper = 0.1)))
+
+tune_settings = list(terminator = trm("evals", n_evals = 100),
+                     algorithm = tnr("grid_search", resolution = 10),
+                     rsmp_tune = rsmp("cv", folds = 5),
+                     measure = list("ml_l" = msr("regr.mse"),
+                                    "ml_m" = msr("regr.mse")))
+
+dml_plr_obj$tune(param_set = par_grids, tune_settings = tune_settings, tune_on_fold = TRUE)
+
+print(dml_plr_obj$params)
+
+dml_plr_obj$fit()
+
+dml_plr_obj$summary()
+
+```
+
+O ajuste de hiperparâmetros também pode ser feito com métodos mais sofisticados, por exemplo, usando caminhos de ajuste internos dos aprendizes. Por exemplo, o aprendiz [regr.cv_glmnet](https://mlr3learners.mlr-org.com/reference/mlr_learners_regr.cv_glmnet.html) realiza uma escolha internamente validada cruzadamente do parâmetro `lambda`.
+
+Alternativamente, as funcionalidades poderosas do pacote [mlr3tuning](https://mlr3tuning.mlr-org.com/) podem ser usadas para ajuste externo de parâmetros das partes nuisance. Os parâmetros escolhidos otimamente podem então ser passados para os modelos [DoubleML](../index.html#doubleml-package) usando o método `set_ml_nuisance_params()`.
+
+```{r, message = FALSE, warning = FALSE}
+
+library(DoubleML)
+
+library(mlr3)
+
+library(data.table)
+
+library(mlr3learners)
+
+library(mlr3tuning)
+
+lgr::get_logger("mlr3")$set_threshold("warn")
+
+lgr::get_logger("bbotk")$set_threshold("warn")
+
+set.seed(1234)
+
+ml_l = lrn("regr.cv_glmnet", s = "lambda.min")
+
+ml_m = lrn("regr.cv_glmnet", s = "lambda.min")
+
+dml_plr_obj = DoubleMLPLR$new(dml_data, ml_l, ml_m)
+
+dml_plr_obj$fit()
+
+dml_plr_obj$summary()
+
+```
+
+O seguinte chunk de código ilustra outro exemplo para ajuste global de parâmetros com florestas aleatórias como fornecido pelo pacote [ranger](https://github.com/imbs-hl/ranger). Neste exemplo, usamos busca aleatória para encontrar parâmetros ótimos `mtry` e `max.depth` de uma floresta aleatória. A avaliação é baseada em validação cruzada de 3 folds.
+
+```{r, message = FALSE, warning = FALSE}
+
+library(DoubleML)
+
+library(mlr3)
+
+library(mlr3learners)
+
+library(data.table)
+
+library(mlr3tuning)
+
+library(paradox)
+
+lgr::get_logger("mlr3")$set_threshold("warn")
+
+lgr::get_logger("bbotk")$set_threshold("warn")
+
+# configurar um aprendiz mlr3
+learner = lrn("regr.ranger")
+
+ml_l = learner$clone()
+
+ml_m = learner$clone()
+
+set.seed(3141)
+
+obj_dml_data = make_plr_CCDDHNR2018(alpha = 0.5)
+
+dml_plr_obj = DoubleMLPLR$new(obj_dml_data, ml_l, ml_m)
+
+# configurar uma lista de grades de parâmetros
+param_grid = list("ml_l" = ps(mtry = p_int(lower = 2, upper = 20),
+                              max.depth = p_int(lower = 2, upper = 5)),
+                  "ml_m" = ps(mtry = p_int(lower = 2, upper = 20),
+                              max.depth = p_int(lower = 2, upper = 5)))
+
+tune_settings = list(terminator = mlr3tuning::trm("evals", n_evals = 20),
+                     algorithm = tnr("random_search"),
+                     rsmp_tune = rsmp("cv", folds = 3),
+                     measure = list("ml_l" = msr("regr.mse"),
+                                    "ml_m" = msr("regr.mse")))
+
+dml_plr_obj$tune(param_set = param_grid, tune_settings = tune_settings, tune_on_folds = FALSE)
+
+print(dml_plr_obj$params)
+
+dml_plr_obj$fit()
+
+dml_plr_obj$summary()
+
+```
+
+### 7.1.5 - Ajuste de Hiperparâmetros com Pipelines
+
+Como uma alternativa à abordagem de ajuste apresentada anteriormente, é possível basear o ajuste de parâmetros em um pipeline como fornecido pelo pacote [mlr3pipelines](https://mlr3pipelines.mlr-org.com/). A ideia básica desta abordagem é definir um aprendiz via um pipeline e então realizar o ajuste via o `tune()`. Vamos repetir brevemente o exemplo do lasso de cima. Em geral, a abordagem baseada em pipeline pode ser usada para encontrar valores ótimos não apenas para os parâmetros de um ou múltiplos aprendizes, mas também para outros parâmetros, que estão, por exemplo, envolvidos no pré-processamento de dados. Referimos a mais detalhes fornecidos no [Capítulo de Pipelines no livro mlr3](https://mlr3book.mlr-org.com/chapters/chapter7/sequential_pipelines.html).
+
+```{r, message = FALSE, warning = FALSE}
+
+library(DoubleML)
+
+library(mlr3)
+
+library(mlr3tuning)
+
+library(mlr3pipelines)
+
+lgr::get_logger("mlr3")$set_threshold("warn")
+
+lgr::get_logger("bbotk")$set_threshold("warn")
+
+# Definir aprendiz em um pipeline
+set.seed(1234)
+
+lasso_pipe = po("learner", learner = lrn("regr.glmnet"))
+
+ml_g = as_learner(lasso_pipe)
+
+ml_m = as_learner(lasso_pipe)
+
+# Instanciar um objeto DoubleML
+dml_plr_obj = DoubleMLPLR$new(dml_data, ml_g, ml_m)
+
+# Grade de parâmetros para lambda
+par_grids = ps(regr.glmnet.lambda = p_dbl(lower = 0.05, upper = 0.1))
+
+tune_settings = list(terminator = trm("evals", n_evals = 100),
+                     algorithm = tnr("grid_search", resolution = 10),
+                     rsmp_tune = rsmp("cv", folds = 5),
+                     measure = list("ml_g" = msr("regr.mse"),
+                                    "ml_m" = msr("regr.mse")))
+
+dml_plr_obj$tune(param_set = list("ml_g" = par_grids,
+                                  "ml_m" = par_grids),
+                 tune_settings = tune_settings,
+                 tune_on_fold = TRUE)
+
+dml_plr_obj$fit()
+
+dml_plr_obj$summary()
+
+```
+
+#### 7.1.5.1 - Referências
+
+Lang, M., Binder, M., Richter, J., Schratz, P., Pfisterer, F., Coors, S., Au, Q., Casalicchio, G., Kotthoff, L., Bischl, B. (2019), mlr3: A modern object-oriented machine learning framework in R. Journal of Open Source Software, [doi:10.21105/joss.01903](https://doi.org/10.21105/joss.01903).
+
+Becker, M., Binder, M., Bischl, B., Lang, M., Pfisterer, F., Reich, N.G., Richter, J., Schratz, P., Sonabend, R. (2020), mlr3 book, disponível em [https://mlr3book.mlr-org.com](https://mlr3book.mlr-org.com).

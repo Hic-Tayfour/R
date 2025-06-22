@@ -1,0 +1,709 @@
+---
+title: "4 - Efeitos Heterogêneos de Tratamento"
+author: "Hicham Munir Tayfour"
+output:
+  html_document:
+    theme: flatly       
+    toc: true           
+    toc_float: true     
+    code_folding: hide  
+    highlight: tango  
+---
+
+A maioria das soluções implementadas foca nos modelos [IRM](https://docs.doubleml.org/stable/guide/models.html#irm-model) ou [IIVM](https://docs.doubleml.org/stable/guide/models.html#iivm-model); no caso dos modelos [PLR](https://docs.doubleml.org/stable/guide/models.html#plr-model) e [PLIV](https://docs.doubleml.org/stable/guide/models.html#pliv-model), os efeitos heterogêneos do tratamento geralmente podem ser modelados via construção de variáveis (feature construction).
+
+## 4.1 - Efeitos Médios de Tratamento por Grupo (GATEs)
+
+As classes `DoubleMLIRM` e `DoubleMLPLR` contêm o método `gate()`, que permite a estimação e\
+construção de intervalos de confiança para GATEs após o ajuste do objeto `DoubleML`.\
+Para estimar GATEs, o usuário deve especificar um `DataFrame` do pandas contendo os grupos\
+(codificados como dummies ou uma coluna com strings). Isso construirá e ajustará um objeto `DoubleMLBLP`.\
+Os intervalos de confiança podem então ser construídos via o método `confint()`.\
+Intervalos de confiança válidos conjuntamente serão baseados em um bootstrap com multiplicador gaussiano.
+
+### 4.1.1 - GATEs para modelos IRM
+
+**Efeitos Médios do Tratamento por Grupo (GATEs)** para modelos `DoubleMLIRM` consideram os parâmetros-alvo
+
+$$
+\theta_{0,k} = \mathbb{E}[Y(1) - Y(0) \mid G_k], \quad k = 1, \dots, K.
+$$
+
+onde $G_k$ denota um indicador de grupo e $Y(d)$ o desfecho potencial com $d \in \{0, 1\}$.
+
+Estimativas pontuais e intervalos de confiança podem ser obtidos via os métodos `gate()` e `confint()`.\
+Observe que, para uma interpretação direta, os grupos devem ser mutuamente exclusivos.
+
+``` python
+
+import numpy as np
+
+import pandas as pd
+
+import doubleml as dml
+
+from doubleml.datasets import make_irm_data
+
+from sklearn.ensemble import RandomForestRegressor, RandomForestClassifier
+
+ml_g = RandomForestRegressor(n_estimators=100, max_features=5, max_depth=5, min_samples_leaf=2)
+
+ml_m = RandomForestClassifier(n_estimators=100, max_features=5, max_depth=5, min_samples_leaf=2)
+
+np.random.seed(3333)
+
+data = make_irm_data(theta=0.5, n_obs=500, dim_x=10, return_type='DataFrame')
+
+obj_dml_data = dml.DoubleMLData(data, 'y', 'd')
+
+dml_irm_obj = dml.DoubleMLIRM(obj_dml_data, ml_g, ml_m)
+
+_ = dml_irm_obj.fit()
+
+# define groups
+np.random.seed(42)
+
+groups = pd.DataFrame(np.random.choice(3, 500), columns=['Group'], dtype=str)
+
+print(groups.head())
+  Group
+0     2
+1     0
+2     2
+3     2
+4     0
+
+gate_obj = dml_irm_obj.gate(groups=groups)
+
+ci = gate_obj.confint()
+
+print(ci)
+            2.5 %    effect    97.5 %
+Group_0  0.344440  0.792972  1.241503
+Group_1  0.047288  0.647864  1.248441
+Group_2  0.132248  0.545930  0.959613
+```
+
+Um notebook mais detalhado sobre GATEs com modelos `DoubleMLIRM` está disponível na\
+[example gallery](https://docs.doubleml.org/stable/examples/index.html#examplegallery).
+
+### 4.1.2 - GATEs para modelos PLR
+
+**Efeitos Médios do Tratamento por Grupo (GATEs)** para modelos `DoubleMLPLR` consideram uma versão ligeiramente ajustada do modelo `DoubleMLPLR`.\
+Em vez de considerar um efeito constante $\theta_0$ para todas as observações, o modelo ajustado permite um efeito diferente baseado em grupos.
+
+$$
+Y = D\theta_0(G_k) + g_0(X) + \zeta,\quad \mathbb{E}(\zeta \mid D, X) = 0,  
+$$
+
+$$
+D = m_0(X) + V,\quad \mathbb{E}(V \mid X) = 0,
+$$
+
+onde $G_k$ para $k = 1, \dots, K$ denota um indicador de grupo onde os grupos podem depender das variáveis confundidoras $X$.
+
+Estimativas pontuais e intervalos de confiança podem ser obtidos via os métodos `gate()` e `confint()`.\
+Observe que, para uma interpretação direta, os grupos devem ser mutuamente exclusivos.
+
+``` python
+import numpy as np
+
+import pandas as pd
+
+import doubleml as dml
+
+from doubleml.datasets import make_plr_CCDDHNR2018
+
+from sklearn.ensemble import RandomForestRegressor
+
+ml_g = RandomForestRegressor(n_estimators=100, max_features=20, max_depth=5, min_samples_leaf=2)
+
+ml_m = RandomForestRegressor(n_estimators=100, max_features=20, max_depth=5, min_samples_leaf=2)
+
+np.random.seed(3333)
+
+dml_data = make_plr_CCDDHNR2018(alpha=0.5, n_obs=500, dim_x=20)
+
+dml_plr_obj = dml.DoubleMLPLR(dml_data, ml_g, ml_m)
+
+_ = dml_plr_obj.fit()
+
+# define groups
+np.random.seed(42)
+
+groups = pd.DataFrame(np.random.choice(3, 500), columns=['Group'], dtype=str)
+
+print(groups.head())
+  Group
+0     2
+1     0
+2     2
+3     2
+4     0
+
+gate_obj = dml_plr_obj.gate(groups=groups)
+
+ci = gate_obj.confint()
+
+print(ci)
+            2.5 %    effect    97.5 %
+Group_0  0.497964  0.644113  0.790261
+Group_1  0.247617  0.395268  0.542919
+Group_2  0.452114  0.593981  0.735848
+```
+
+Um notebook mais detalhado sobre GATEs com modelos `DoubleMLPLR` está disponível na\
+[example gallery](https://docs.doubleml.org/stable/examples/index.html#examplegallery).
+
+## 4.2 - Efeitos Médios de Tratamento Condicional (CATEs)
+
+As classes `DoubleMLIRM` e `DoubleMLPLR` contêm o método `cate()`, que permite a estimação e\
+construção de intervalos de confiança para CATEs após o ajuste do objeto `DoubleML`.\
+Para estimar CATEs, o usuário deve especificar um `DataFrame` do pandas contendo a base\
+(por exemplo, B-splines) para os efeitos condicionais do tratamento.\
+Isso construirá e ajustará um objeto `DoubleMLBLP`.\
+Os intervalos de confiança podem então ser construídos via o método `confint()`.\
+Intervalos de confiança válidos conjuntamente serão baseados em um bootstrap com multiplicador gaussiano.
+
+### 4.2.1 - CATEs para modelos IRM
+
+**Efeitos Médios Condicionais do Tratamento (CATEs)** para modelos `DoubleMLIRM` consideram os parâmetros-alvo
+
+$$
+\theta_0(x) = \mathbb{E}[Y(1) - Y(0) \mid X = x]
+$$
+
+para uma variável de baixa dimensão $X$, onde $Y(d)$ é o desfecho potencial com $d \in \{0, 1\}$.
+
+Estimativas pontuais e intervalos de confiança podem ser obtidos via os métodos `gate()` e `confint()`.
+
+``` python
+
+import numpy as np
+
+import pandas as pd
+
+import patsy
+
+import doubleml as dml
+
+from doubleml.datasets import make_irm_data
+
+from sklearn.ensemble import RandomForestRegressor
+
+ml_g = RandomForestRegressor(n_estimators=100, max_features=10, max_depth=5, min_samples_leaf=2)
+
+ml_m = RandomForestClassifier(n_estimators=100, max_features=10, max_depth=5, min_samples_leaf=2)
+
+np.random.seed(3333)
+
+data = make_irm_data(theta=0.5, n_obs=500, dim_x=10, return_type='DataFrame')
+
+obj_dml_data = dml.DoubleMLData(data, 'y', 'd')
+
+dml_irm_obj = dml.DoubleMLIRM(obj_dml_data, ml_g, ml_m)
+
+_ = dml_irm_obj.fit()
+
+# define a basis with respect to the first variable
+design_matrix = patsy.dmatrix("bs(x, df=5, degree=2)", {"x":obj_dml_data.data["X1"]})
+
+spline_basis = pd.DataFrame(design_matrix)
+
+print(spline_basis.head())
+     0         1         2         3         4    5
+0  1.0  0.068700  0.819223  0.112078  0.000000  0.0
+1  1.0  0.000000  0.377147  0.621359  0.001494  0.0
+2  1.0  0.179101  0.007421  0.000000  0.000000  0.0
+3  1.0  0.000000  0.018092  0.849427  0.132481  0.0
+4  1.0  0.562390  0.216943  0.000000  0.000000  0.0
+
+cate_obj = dml_irm_obj.cate(basis=spline_basis)
+
+ci = cate_obj.confint(basis=spline_basis)
+
+print(ci.head())
+      2.5 %    effect    97.5 %
+0 -0.602322  0.100208  0.802738
+1  0.287123  0.754692  1.222261
+2 -3.856758 -1.772444  0.311869
+3  0.829764  1.343639  1.857515
+4 -2.373451 -1.171696  0.030059
+```
+
+Um notebook mais detalhado sobre CATEs para modelos `DoubleMLIRM` está disponível na\
+[example gallery](https://docs.doubleml.org/stable/examples/index.html#examplegallery).\
+Os exemplos também incluem a construção de uma base bidimensional com B-splines.
+
+### 4.2.2 - CATEs para modelos PLR
+
+**Efeitos Médios Condicionais do Tratamento (CATEs)** para modelos `DoubleMLPLR` consideram uma versão\
+ligeiramente ajustada do modelo `DoubleMLPLR`. Em vez de considerar um efeito constante $\theta_0$\
+para todas as observações, o modelo ajustado permite um efeito diferente baseado nos grupos.
+
+$$
+Y = D\theta_0(X) + g_0(X) + \zeta, \quad \mathbb{E}(\zeta \mid D, X) = 0,  
+$$
+
+$$
+D = m_0(X) + V, \quad \mathbb{E}(V \mid X) = 0,
+$$
+
+onde $\theta_0(X)$ denota o efeito heterogêneo do tratamento.
+
+Estimativas pontuais e intervalos de confiança podem ser obtidos via os métodos `gate()` e `confint()`.
+
+``` python
+import numpy as np
+
+import pandas as pd
+
+import patsy
+
+import doubleml as dml
+
+from doubleml.datasets import make_plr_CCDDHNR2018
+
+from sklearn.ensemble import RandomForestRegressor, RandomForestClassifier
+
+ml_g = RandomForestRegressor(n_estimators=100, max_features=20, max_depth=5, min_samples_leaf=2)
+
+ml_m = RandomForestRegressor(n_estimators=100, max_features=20, max_depth=5, min_samples_leaf=2)
+
+np.random.seed(3333)
+
+dml_data = make_plr_CCDDHNR2018(alpha=0.5, n_obs=500, dim_x=20)
+
+dml_plr_obj = dml.DoubleMLPLR(dml_data, ml_g, ml_m)
+
+_ = dml_plr_obj.fit()
+
+# define a basis with respect to the first variable
+design_matrix = patsy.dmatrix("bs(x, df=5, degree=2)", {"x":obj_dml_data.data["X1"]})
+
+spline_basis = pd.DataFrame(design_matrix)
+
+print(spline_basis.head())
+     0         1         2         3         4    5
+0  1.0  0.068700  0.819223  0.112078  0.000000  0.0
+1  1.0  0.000000  0.377147  0.621359  0.001494  0.0
+2  1.0  0.179101  0.007421  0.000000  0.000000  0.0
+3  1.0  0.000000  0.018092  0.849427  0.132481  0.0
+4  1.0  0.562390  0.216943  0.000000  0.000000  0.0
+
+cate_obj = dml_plr_obj.cate(basis=spline_basis)
+
+ci = cate_obj.confint(basis=spline_basis)
+
+print(ci.head())
+      2.5 %    effect    97.5 %
+0  0.355627  0.542648  0.729668
+1  0.418969  0.553754  0.688540
+2 -0.046525  0.529468  1.105461
+3  0.415556  0.569449  0.723342
+4  0.256082  0.461412  0.666742
+```
+
+Um notebook mais detalhado sobre CATEs para modelos `DoubleMLPLR` está disponível na\
+[example gallery](https://docs.doubleml.org/stable/examples/index.html#examplegallery).
+
+**Teoria**: No modelo acima, tem-se
+
+$$
+\mathbb{E}[Y \mid X] = \mathbb{E}[\theta_0(X) D \mid X] + \mathbb{E}[g_0(X) \mid X] + \underbrace{\mathbb{E}[\zeta \mid X]}_{= \mathbb{E}[\mathbb{E}[\zeta \mid D, X] \mid X] = 0}
+$$
+
+$$
+= \theta_0(X)\mathbb{E}[D \mid X] + g_0(X)
+$$
+
+de forma que
+
+$$
+\underbrace{Y - \mathbb{E}[Y \mid X]}_{=: \tilde{Y}} = \theta_0(X) \underbrace{(D - \mathbb{E}[D \mid X])}_{=: \tilde{D}} + \varepsilon.
+$$
+
+Observe que para as $\sigma$-álgebras geradas $\sigma(\tilde{D}) \subseteq \sigma(D, X)$, o que implica
+
+$$
+\mathbb{E}[\varepsilon \mid \tilde{D}] = \mathbb{E}[\mathbb{E}[\varepsilon \mid X, D] \mid \tilde{D}] = 0,
+$$
+
+e consequentemente
+
+$$
+\mathbb{E}[\tilde{Y} \mid \tilde{D}] = \theta_0(X) \tilde{D}.
+$$
+
+Consequentemente, $\theta_0(X)$ pode ser estimado por meio da regressão de $\tilde{Y}$ sobre $\tilde{D}$:
+
+$$
+\theta_0(X) = \arg\min_{\theta(X) \in \Theta} \mathbb{E}[(\tilde{Y} - \theta(X)\tilde{D})^2].
+$$ A implementação `DoubleML` aproxima o efeito $\theta_0(X)$ por uma projeção linear sobre\
+uma base fornecida $\phi(X)$:
+
+$$
+\theta_0(X) \approx \beta_0^\top \phi(X)
+$$
+
+onde $\beta_0$ são os coeficientes a serem estimados. A cobertura dos intervalos de confiança\
+deve incluir a aproximação $\beta_0^\top \phi(X)$.
+
+## 4.3 - Efeitos Médios de Tratamento Ponderados
+
+A classe `DoubleMLIRM` permite especificar pesos via o argumento `weights` na inicialização do\
+objeto `DoubleMLIRM`. Dado um conjunto de pesos, $\omega(Y, D, X)$, o modelo identifica o\
+efeito médio do tratamento ponderado
+
+$$
+\theta_0 = \mathbb{E}[(g_0(1, X) - g_0(0, X)) \omega(Y, D, X)].
+$$
+
+A interpretação depende da escolha dos pesos. Os exemplos mais simples incluem:
+
+-   $\omega(Y, D, X) = 1$ corresponde ao efeito médio do tratamento (ATE)
+-   $\omega(Y, D, X) = \frac{\mathbb{1}\{X \in G\}}{\mathbb{P}(X \in G)}$ corresponde ao efeito médio do tratamento por grupo (GATE) para o grupo $G$
+-   $\omega(Y, D, X) = \pi(X)$ corresponde ao valor médio de uma política $\pi$, onde $0 \leq \pi \leq 1$
+
+onde os pesos $\omega(Y, D, X)$ dependem apenas das variáveis $X$.
+
+Nesses casos, os pesos podem ser especificados como um array via o argumento `weights`\
+na inicialização do objeto `DoubleMLIRM`.
+
+``` python
+
+import numpy as np
+
+import pandas as pd
+
+import doubleml as dml
+
+from doubleml.datasets import make_irm_data
+
+from sklearn.ensemble import RandomForestRegressor
+
+ml_g = RandomForestRegressor(n_estimators=100, max_features=10, max_depth=5, min_samples_leaf=2)
+
+ml_m = RandomForestClassifier(n_estimators=100, max_features=10, max_depth=5, min_samples_leaf=2)
+
+np.random.seed(3333)
+
+data = make_irm_data(theta=0.5, n_obs=500, dim_x=10, return_type='DataFrame')
+
+obj_dml_data = dml.DoubleMLData(data, 'y', 'd')
+
+weights = np.ones(500)
+
+dml_irm_obj = dml.DoubleMLIRM(obj_dml_data, ml_g, ml_m, weights=weights)
+
+_ = dml_irm_obj.fit()
+
+print(dml_irm_obj.summary)
+       coef  std err         t     P>|t|     2.5 %    97.5 %
+d  0.599297   0.1887  3.175931  0.001494  0.229452  0.969141
+```
+
+Se os pesos não dependem apenas das variáveis $X$, mas também do tratamento $D$,\
+a estimação torna-se mais complexa. Para identificar corretamente o parâmetro, é necessário\
+especificar não apenas os pesos $\omega(Y, D, X)$, mas também sua esperança condicional
+
+$$
+\bar{\omega}(X) = \mathbb{E}[\omega(Y, D, X) \mid X]
+$$
+
+Um exemplo comum é o efeito médio do tratamento sobre os tratados (ATTE), que pode ser identificado ao definir:
+
+-   $\omega(Y, D, X) = \frac{D}{\mathbb{P}(D = 1)}$
+-   $\bar{\omega}(X) = \frac{\mathbb{E}[D \mid X]}{\mathbb{P}(D = 1)} = \frac{m_0(X)}{\mathbb{P}(D = 1)}$
+
+o que depende do score de propensão $m_0(X)$.\
+Nesse caso, os pesos podem ser especificados como um `dictionary` no argumento `weights`\
+durante a inicialização do objeto `DoubleMLIRM`.
+
+Outro exemplo importante é a análise de sensibilidade para efeitos médios do tratamento por grupo\
+nos tratados (GATET). Nesse caso, os pesos seriam definidos como:
+
+-   $\omega(Y, D, X) = \frac{\mathbb{1}\{D = 1, X \in G\}}{\mathbb{P}(D = 1, X \in G)} = \frac{D \cdot \mathbb{1}\{X \in G\}}{\mathbb{P}(D = 1, X \in G)}$
+-   $\bar{\omega}(X) = \frac{\mathbb{E}[D \cdot \mathbb{1}\{X \in G\} \mid X]}{\mathbb{P}(D = 1, X \in G)} = \frac{m_0(X) \cdot \mathbb{1}\{X \in G\}}{\mathbb{P}(D = 1, X \in G)}$
+
+Para simplificar a especificação dos pesos, o `DoubleMLIRM` com `score='ATTE'` aceita\
+pesos binários, que devem corresponder a $\mathbb{1}\{X \in G\}$.\
+Isso utiliza automaticamente o score de propensão $m(X)$ para construir os pesos mencionados\
+acima (por exemplo, pesos iguais a 1 referem-se ao efeito médio do tratamento sobre os tratados).
+
+Um notebook mais detalhado sobre efeitos médios ponderados do tratamento para análise de sensibilidade em GATE está disponível na [example gallery](https://docs.doubleml.org/stable/examples/index.html#examplegallery).
+
+## 4.4 - Quantis
+
+O pacote [DoubleML](https://docs.doubleml.org/stable/index.html#doubleml-package) inclui estimação de quantis (locais) para desfechos potenciais nos modelos [IRM](https://docs.doubleml.org/stable/guide/models.html#irm-model) e [IIVM](https://docs.doubleml.org/stable/guide/models.html#iivm-model).
+
+### 4.4.1 - Quantis Potenciais (PQs)
+
+Para um quantil $\tau \in (0, 1)$, os parâmetros-alvo $\theta_{\tau}(d)$ de interesse são os\
+**quantis potenciais (PQs)**,
+
+$$
+\mathbb{P}(Y(d) \leq \theta_{\tau}(d)) = \tau,
+$$
+
+e os **quantis potenciais locais (LPQs)**,
+
+$$
+\mathbb{P}(Y(d) \leq \theta_{\tau}(d) \mid \text{Compliers}) = \tau.
+$$
+
+onde $Y(d)$ denota o desfecho potencial com $d \in \{0, 1\}$.
+
+`DoubleMLPQ` implementa a estimação de quantis potenciais. A estimação é feita via seu método `fit()`:
+
+``` python
+import numpy as np
+
+import doubleml as dml
+
+from doubleml.datasets import make_irm_data
+
+from sklearn.ensemble import RandomForestClassifier
+
+np.random.seed(3141)
+
+ml_g = RandomForestClassifier(n_estimators=100, max_features=20, max_depth=10, min_samples_leaf=2)
+
+ml_m = RandomForestClassifier(n_estimators=100, max_features=20, max_depth=10, min_samples_leaf=2)
+
+data = make_irm_data(theta=0.5, n_obs=500, dim_x=20, return_type='DataFrame')
+
+obj_dml_data = dml.DoubleMLData(data, 'y', 'd')
+
+dml_pq_obj = dml.DoubleMLPQ(obj_dml_data, ml_g, ml_m, treatment=1, quantile=0.5)
+
+dml_pq_obj.fit().summary
+Out[97]: 
+       coef   std err         t     P>|t|     2.5 %    97.5 %
+d  0.553878  0.149858  3.696011  0.000219  0.260161  0.847595
+```
+
+`DoubleMLLPQ` implementa a estimação de quantis potenciais locais, onde o argumento `treatment`\
+indica o desfecho potencial. A estimação é feita via seu método `fit()`:
+
+``` python
+
+import numpy as np
+
+import doubleml as dml
+
+from doubleml.datasets import make_iivm_data
+
+from sklearn.ensemble import RandomForestClassifier
+
+np.random.seed(3141)
+
+ml_g = RandomForestClassifier(n_estimators=100, max_features=20, max_depth=10, min_samples_leaf=2)
+
+ml_m = RandomForestClassifier(n_estimators=100, max_features=20, max_depth=10, min_samples_leaf=2)
+
+data = make_iivm_data(theta=0.5, n_obs=2000, dim_x=20, return_type='DataFrame')
+
+obj_dml_data = dml.DoubleMLData(data, 'y', 'd', z_cols='z')
+
+dml_lpq_obj = dml.DoubleMLLPQ(obj_dml_data, ml_g, ml_m, treatment=1, quantile=0.5)
+
+dml_lpq_obj.fit().summary
+Out[108]: 
+       coef  std err         t     P>|t|     2.5 %    97.5 %
+d  0.696224  0.61728  1.127889  0.259367 -0.513624  1.906072
+```
+
+### 4.4.2 - Efeitos de Tratamento em Quantis (QTEs)
+
+Para um quantil $\tau \in (0, 1)$, o parâmetro-alvo $\theta_\tau$ de interesse é o **efeito de tratamento quantílico (QTE)**,
+
+$$
+\theta_\tau = \theta_\tau(1) - \theta_\tau(0)
+$$
+
+onde $\theta_\tau(d)$ denota o quantil potencial correspondente.
+
+Analogamente, o **efeito de tratamento quantílico local (LQTE)** pode ser definido como a diferença entre os quantis potenciais locais correspondentes.
+
+`DoubleMLQTE` implementa a estimação de efeitos de tratamento quantílicos. A estimação é realizada via seu método `fit()`:
+
+``` python
+import numpy as np
+
+import doubleml as dml
+
+from doubleml.datasets import make_irm_data
+
+from sklearn.ensemble import RandomForestClassifier
+
+np.random.seed(3141)
+
+ml_g = RandomForestClassifier(n_estimators=100, max_features=20, max_depth=10, min_samples_leaf=2)
+
+ml_m = RandomForestClassifier(n_estimators=100, max_features=20, max_depth=10, min_samples_leaf=2)
+
+data = make_irm_data(theta=0.5, n_obs=500, dim_x=20, return_type='DataFrame')
+
+obj_dml_data = dml.DoubleMLData(data, 'y', 'd')
+
+dml_qte_obj = dml.DoubleMLQTE(obj_dml_data, ml_g, ml_m, score='PQ', quantiles=[0.25, 0.5, 0.75])
+
+dml_qte_obj.fit().summary
+Out[119]: 
+          coef   std err         t     P>|t|     2.5 %    97.5 %
+0.25  0.274825  0.347310  0.791297  0.428771 -0.405890  0.955541
+0.50  0.449150  0.192539  2.332782  0.019660  0.071782  0.826519
+0.75  0.709606  0.193308  3.670867  0.000242  0.330731  1.088482
+```
+
+Para estimar efeitos quantílicos locais, o argumento `score` deve ser definido como `'LPQ'`.\
+Um notebook detalhado sobre PQs e QTEs está disponível na [example gallery](https://docs.doubleml.org/stable/examples/index.html#examplegallery).
+
+## 4.5 - Valor Condicional em Risco (CVaR)
+
+O pacote [DoubleML](https://docs.doubleml.org/stable/index.html#doubleml-package) inclui estimação do valor em risco condicional (*conditional value at risk*) para modelos [IRM](https://docs.doubleml.org/stable/guide/models.html#irm-model).
+
+### 4.5.1 - CVaR dos Resultados Potenciais
+
+Para um quantil $\tau \in (0, 1)$, os parâmetros-alvo $\theta_\tau(d)$ de interesse são os\
+**valores condicionais em risco (CVaRs)** dos desfechos potenciais,
+
+$$
+\theta_\tau(d) = \frac{\mathbb{E}[Y(d)\mathbb{1}\{F_{Y(d)}(Y(d)) \geq \tau\}]}{1 - \tau},
+$$
+
+onde $Y(d)$ denota o desfecho potencial com $d \in \{0, 1\}$ e $F_{Y(d)}(x)$ a função de distribuição acumulada (cdf) correspondente de $Y(d)$.
+
+`DoubleMLCVAR` implementa a estimação do valor condicional em risco para desfechos potenciais,\
+onde o argumento `treatment` indica o desfecho potencial.\
+A estimação é realizada via seu método `fit()`:
+
+``` python
+import numpy as np
+
+import doubleml as dml
+
+from doubleml.datasets import make_irm_data
+
+from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
+
+np.random.seed(3141)
+
+ml_g = RandomForestRegressor(n_estimators=100, max_features=20, max_depth=10, min_samples_leaf=2)
+
+ml_m = RandomForestClassifier(n_estimators=100, max_features=20, max_depth=10, min_samples_leaf=2)
+
+data = make_irm_data(theta=0.5, n_obs=500, dim_x=20, return_type='DataFrame')
+
+obj_dml_data = dml.DoubleMLData(data, 'y', 'd')
+
+dml_cvar_obj = dml.DoubleMLCVAR(obj_dml_data, ml_g, ml_m, treatment=1, quantile=0.5)
+
+dml_cvar_obj.fit().summary
+Out[130]: 
+       coef   std err         t         P>|t|     2.5 %    97.5 %
+d  1.588364  0.096616  16.43989  9.909942e-61  1.398999  1.777728
+```
+
+### 4.5.2 - Efeitos de Tratamento no CVaR
+
+Para um quantil $\tau \in (0, 1)$, o parâmetro alvo $\theta_\tau$ de interesse são os **efeitos de tratamento no valor condicional em risco**,
+
+$$\theta_\tau = \theta_\tau(1) - \theta_\tau(0)$$
+
+onde $\theta_\tau(d)$ denota os valores condicionais correspondentes em risco dos resultados potenciais.
+
+`DoubleMLQTE` implementa a estimação do efeito de tratamento CVaR, se o argumento `score` foi definido como `'CVaR'` (o padrão é `'PQ'`). A estimação é conduzida via seu método `fit()`:
+
+``` python
+
+import numpy as np
+
+import doubleml as dml
+
+from doubleml.datasets import make_irm_data
+
+from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
+
+np.random.seed(3141)
+
+ml_g = RandomForestRegressor(n_estimators=100, max_features=20, max_depth=10, min_samples_leaf=2)
+
+ml_m = RandomForestClassifier(n_estimators=100, max_features=20, max_depth=10, min_samples_leaf=2)
+
+data = make_irm_data(theta=0.5, n_obs=500, dim_x=20, return_type='DataFrame')
+
+obj_dml_data = dml.DoubleMLData(data, 'y', 'd')
+
+dml_cvar_obj = dml.DoubleMLQTE(obj_dml_data, ml_g, ml_m, score='CVaR', quantiles=[0.25, 0.5, 0.75])
+
+dml_cvar_obj.fit().summary
+Out[141]: 
+          coef   std err         t         P>|t|     2.5 %    97.5 %
+0.25  0.474731  0.246624  1.924921  5.423921e-02 -0.008642  0.958105
+0.50  0.691911  0.143495  4.821855  1.422293e-06  0.410667  0.973156
+0.75  1.001714  0.166375  6.020819  1.735369e-09  0.675625  1.327803
+```
+
+Um notebook detalhado sobre estimação CVaR para resultados potenciais e efeitos de tratamento está disponível na [galeria de exemplos](https://docs.doubleml.org/stable/examples/index.html#examplegallery).
+
+## 4.6 - Aprendizado de Políticas com Árvores
+
+**Policy Learning** considera encontrar uma política de decisão ótima. Consideramos políticas binárias determinísticas, que são definidas como um mapeamento
+
+$$\pi : X \mapsto \{0, 1\}.$$
+
+Usando o componente de score $\psi_b(W_i, \hat{\eta})$ do score [IRM](https://docs.doubleml.org/stable/guide/models.html#irm-model), podemos encontrar a política ótima de tratamento resolvendo o problema de classificação ponderada
+
+$$\hat{\pi} = \arg\max_{\pi \in \Pi} \frac{1}{n} \sum_{i=1}^{n} (2\pi(X_i) - 1)\psi_b(W_i, \hat{\eta}),$$
+
+onde $\Pi$ denota uma classe de política, que definimos como árvores de classificação depth-$m$. Assim, estimamos splits nas características $X$ que refletem a heterogeneidade do efeito de tratamento e consequentemente maximizam a soma dos efeitos de tratamento individuais estimados de todos os indivíduos atribuindo diferentes tratamentos.
+
+A classe `DoubleMLIRM` contém o método `policy_tree()`, que habilita a estimação de uma árvore de política usando classificação ponderada após ajustar o objeto `DoubleMLIRM`. Para estimar uma árvore de política, o usuário deve especificar um `DataFrame` pandas contendo as covariáveis nas quais a política baseará as decisões de tratamento. Estas podem ser tanto as covariáveis originais usadas na estimação `DoubleMLIRM`, ou um subconjunto, ou novas covariáveis. Isso construirá e ajustará um objeto `DoubleMLPolicyTree`. Um gráfico das regras de decisão pode ser exibido pelo método `plot_tree()`. O método `predict()` habilita a aplicação da política estimada em novos dados. O parâmetro `depth`, que tem padrão `2`, pode ser usado para ajustar a profundidade máxima da árvore.
+
+``` python
+import numpy as np
+
+import pandas as pd
+
+import doubleml as dml
+
+from doubleml.datasets import make_irm_data
+
+from sklearn.ensemble import RandomForestRegressor, RandomForestClassifier
+
+ml_g = RandomForestRegressor(n_estimators=100, max_features=10, max_depth=5, min_samples_leaf=2)
+
+ml_m = RandomForestClassifier(n_estimators=100, max_features=10, max_depth=5, min_samples_leaf=2)
+
+np.random.seed(3333)
+
+data = make_irm_data(theta=0.5, n_obs=500, dim_x=10, return_type='DataFrame')
+
+obj_dml_data = dml.DoubleMLData(data, 'y', 'd')
+
+dml_irm_obj = dml.DoubleMLIRM(obj_dml_data, ml_g, ml_m)
+
+_ = dml_irm_obj.fit()
+
+# define features to learn policy on
+np.random.seed(42)
+
+features = data[["X1","X2","X3"]]
+
+print(features.head())
+         X1        X2        X3
+0 -0.368577 -0.688886  0.793315
+1  0.078426 -1.028731  0.755885
+2 -2.899021 -1.294123 -0.884821
+3  0.502005  0.902920 -0.158726
+4 -1.843018  0.170705  0.712846
+
+# fits a tree of depth 2
+policy_tree_obj = dml_irm_obj.policy_tree(features=features)
+
+policy_tree_obj.plot_tree();
+```
+
+Um notebook mais detalhado sobre Policy Trees está disponível na [galeria de exemplos](https://docs.doubleml.org/stable/examples/index.html#examplegallery).

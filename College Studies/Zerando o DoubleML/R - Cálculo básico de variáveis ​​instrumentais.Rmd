@@ -1,0 +1,94 @@
+---
+title: "R - Cálculo básico de variáveis instrumentais"
+author: "Hicham Munir Tayfour"
+output:
+  html_document:
+    theme: flatly       
+    toc: true           
+    toc_float: true     
+    code_folding: hide  
+    highlight: tango  
+---
+
+Neste exemplo, mostramos como utilizar a funcionalidade de Variáveis Instrumentais (IVs) do pacote `DoubleML` em um cenário básico, ilustrado no grafo abaixo, onde:
+
+-   `Z` é o instrumento\
+-   `C` é um vetor de confundidores não observados\
+-   `D` é a variável de decisão ou tratamento\
+-   `Y` é o desfecho (outcome)
+
+Vamos primeiro gerar dados sintéticos usando modelos lineares compatíveis com o diagrama, e depois utilizar o pacote `DoubleML` para estimar o efeito causal de `D` em `Y`.
+
+> Assumimos que você possui conhecimento básico sobre variáveis instrumentais e regressão linear.
+
+```{r message = FALSE, warning = FALSE}
+library(DoubleML)
+library(mlr3learners)
+
+set.seed(1234)
+options(warn=-1)
+```
+
+# Gráfico Acíclico Dirigido com Variáveis Instrumentais (IV - DAG)
+
+![IV DAG](https://docs.doubleml.org/stable/_images/basic_iv_example_nb.png)
+
+# Simulação de Dados
+
+O código abaixo gera `n` observações com um confundidor binário. A variável de tratamento também é binária, enquanto o desfecho segue um modelo linear contínuo.
+
+O parâmetro que queremos recuperar com IV é `decision_effect`, ou seja, o impacto da variável de decisão sobre o desfecho.
+
+```{r message = FALSE, warning = FALSE}
+n <- 10000
+decision_effect <- -2
+instrument_effect <- 0.7
+
+confounder <- rbinom(n, 1, 0.3)
+instrument <- rbinom(n, 1, 0.5)
+decision <- as.numeric(runif(n) <= instrument_effect * instrument + 0.4 * confounder)
+outcome <- 30 + decision_effect * decision + 10 * confounder + rnorm(n, sd = 2)
+
+df <- data.frame(instrument, decision, outcome)
+```
+
+# Estimação Ingênua
+
+Se estimarmos diretamente o impacto de `decision` sobre `outcome` (via diferença de médias), obtemos uma estimativa **enviesada**:
+
+```{r message = FALSE, warning = FALSE}
+mean(df[df$decision == 1, 'outcome']) - mean(df[df$decision == 0, 'outcome'])
+```
+
+# Usando o DoubleML
+
+O `DoubleML` assume que há pelo menos um confundidor **observável**. Por isso, criamos uma variável fictícia chamada `obs_confounders`, que não possui informação real.
+
+Precisamos também definir os modelos de Machine Learning que serão usados para estimar as diferentes relações:
+
+-   `ml_g`: modela a relação entre o desfecho (`outcome`) e os instrumentos + confundidores observados
+-   `ml_m`: modela a relação entre os confundidores observados e os instrumentos
+-   `ml_r`: modela a relação entre a decisão e os instrumentos + confundidores observados
+
+```{r message = FALSE, warning = FALSE}
+df['obs_confounders'] <- 1
+
+obj_dml_data <- DoubleMLData$new(
+  df, y_col = "outcome", d_col = "decision",
+  z_cols = "instrument", x_cols = "obs_confounders"
+)
+
+ml_g <- lrn("regr.lm")           # Regressão linear para outcome
+ml_m <- lrn("classif.log_reg")  # Regressão logística para instrumento
+ml_r <- ml_m$clone()            # Regressão logística para decisão
+
+iv_2 <- DoubleMLIIVM$new(obj_dml_data, ml_g, ml_m, ml_r)
+result <- iv_2$fit()
+result
+```
+
+A estimativa do efeito causal usando IV e DoubleML é **não enviesada**.
+
+# Referências
+
+Ruiz de Villa, A. *Causal Inference for Data Science*, Manning Publications, 2024.

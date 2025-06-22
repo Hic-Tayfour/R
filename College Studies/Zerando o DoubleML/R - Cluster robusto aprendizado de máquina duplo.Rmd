@@ -1,0 +1,443 @@
+---
+title: "R - Cluster robusto aprendizado de máquina duplo"
+author: "Hicham Munir Tayfour"
+output:
+  html_document:
+    theme: flatly       
+    toc: true           
+    toc_float: true     
+    code_folding: hide  
+    highlight: tango  
+---
+
+# Motivação
+
+Em muitas aplicações empíricas, os erros exibem uma estrutura de cluster de modo que a suposição usual de i.i.d. não se sustenta mais. Para realizar inferência estatística válida, os pesquisadores devem levar em conta a clusterização. Neste notebook, enfatizaremos brevemente as consequências dos dados clusterizados na inferência baseada na abordagem de aprendizado de máquina duplo (DML) conforme considerado em [Chiang et al. (2021)](https://doi.org/10.1080/07350015.2021.1895815). Demonstraremos como os usuários do pacote [DoubleML](https://docs.doubleml.org/stable/index.html) podem contabilizar clusterização unidimensional e bidimensional em suas análises.
+
+Erros clusterizados em termos de uma ou múltiplas dimensões podem surgir em muitas aplicações empíricas. Por exemplo, em um estudo transversal, os erros podem estar correlacionados (i) dentro de regiões (clusterização unidimensional) ou (ii) dentro de regiões e indústrias ao mesmo tempo (clusterização bidimensional). Outro exemplo de clusterização bidimensional, discutido em [Chiang et al. (2021)](https://doi.org/10.1080/07350015.2021.1895815), refere-se a dados de participação de mercado com participações de mercado sendo sujeitas a choques no nível de mercado e produto ao mesmo tempo. Referimos a [Cameron et al. (2011)](https://doi.org/10.1198/jbes.2010.07136) para uma introdução à clusterização multiway e uma lista ilustrativa de exemplos empíricos.
+
+# Clusterização e Aprendizado de Máquina Duplamente Robusto
+
+A clusterização cria um desafio para a abordagem de aprendizado de máquina duplo (DML) em termos de:
+
+1. **Ajuste necessário das fórmulas** usadas para estimação da matriz de covariância da variância, erros padrão, valores-p, etc., e
+2. **Esquema de reamostragem ajustado** para o algoritmo de cross-fitting.
+
+O primeiro ponto se aplica igualmente a modelos estatísticos clássicos, por exemplo, um modelo de regressão linear (veja, por exemplo [Cameron et al. 2011](https://doi.org/10.1198/jbes.2010.07136)). O segundo ponto surge porque a clusterização implica uma correlação de erros das amostras de treinamento e teste se o procedimento padrão de cross-fitting sugerido em [Chernozhukov et al. (2018)](https://doi.org/10.1111/ectj.12097) fosse empregado.
+
+A abordagem DML se baseia em divisões de amostra independentes em partições que são usadas para treinamento dos learners de aprendizado de máquina (ML) e geração de predições que são eventualmente usadas para resolver a função score. Para uma motivação da necessidade de divisão de amostra, referimos ao exemplo ilustrativo no [guia do usuário](https://docs.doubleml.org/stable/guide/basics.html#sample-splitting-to-remove-bias-induced-by-overfitting) bem como à explicação em [Chernozhukov et al. (2018)](https://doi.org/10.1111/ectj.12097).
+
+Para alcançar divisões de dados independentes em um cenário com clusterização unidimensional ou multidimensional, [Chiang et al. (2021)](https://doi.org/10.1080/07350015.2021.1895815) desenvolvem um procedimento atualizado de divisão de amostra em $K$-folds que garante divisões de amostra independentes: O conjunto de dados é dividido em partições disjuntas em termos de todas as dimensões de clusterização. Por exemplo, em uma situação com clusterização bidimensional, os dados são divididos em $K^2$ folds. Os modelos de aprendizado de máquina são então treinados em um fold específico e usados para geração de predições em amostras de validação. Assim, o procedimento de divisão de amostra garante que as amostras de validação não contenham observações dos mesmos clusters usados para treinamento.
+
+```{r, message = FALSE, warning = FALSE}
+library('hdm')
+library('DoubleML')
+library('mlr3')
+library('mlr3learners')
+# suprimir mensagens do pacote mlr3 durante o ajuste
+lgr::get_logger("mlr3")$set_threshold("warn")
+library('ggplot2')
+library('reshape2')
+library('gridExtra')
+```
+
+# Um Exemplo Motivador: DML com Clusterização Bidimensional Robusta
+
+Na primeira parte, mostramos como o aprendizado de máquina duplo robusto a clusterização bidimensional (DML) ([Chiang et al. 2021](https://doi.org/10.1080/07350015.2021.1895815)) pode ser implementado com o pacote [DoubleML](https://docs.doubleml.org/stable/index.html). [Chiang et al. (2021)](https://doi.org/10.1080/07350015.2021.1895815) consideram dados com duplo índice
+
+$$\lbrace W_{ij}: i \in \lbrace 1, \ldots, N \rbrace, j \in \lbrace 1, \ldots, M \rbrace \rbrace$$
+
+e o modelo de regressão IV parcialmente linear (PLIV)
+
+## Simulação de dados com clusterização bidimensional
+
+Usamos o processo gerador de dados PLIV descrito na Seção 4.1 de [Chiang et al. (2021)](https://doi.org/10.1080/07350015.2021.1895815). O DGP é definido como:
+
+$$X_{ij} = \alpha_{ij}^X + \alpha_{i}^X + \alpha_{j}^X + \varepsilon_{ij}^X$$
+
+com
+
+$$V_{ij} = \alpha_{ij}^V + \alpha_{i}^V + \alpha_{j}^V + \varepsilon_{ij}^V$$
+
+onde $\alpha_{ij}^X, \alpha_{i}^X, \alpha_{j}^X \sim \mathcal{N}(0, \Sigma)$ onde $\Sigma$ é uma matriz $p_x \times p_x$ com entradas $\Sigma_{kj} = s_X^{|j-k|}$. Além disso,
+
+$$D_{ij} = \pi_{10} Z_{ij} + \pi_{20}^T X_{ij} + V_{ij}$$
+
+e $\alpha_{ij}^V, \alpha_{i}^V, \alpha_{j}^V \sim \mathcal{N}(0, 1)$.
+
+Dados deste DGP podem ser gerados com a função [make_pliv_multiway_cluster_CKMS2021()](https://docs.doubleml.org/r/stable/reference/make_pliv_multiway_cluster_CKMS2021.html) do [DoubleML](https://docs.doubleml.org/stable/index.html). Analogamente a [Chiang et al. (2021, Seção 5)](https://doi.org/10.1080/07350015.2021.1895815) usamos a seguinte configuração de parâmetros: $\theta=1.0$, $N=M=25$, $p_x=100$, $\pi_{10}=1.0$, $\omega_X = \omega_{\varepsilon} = \omega_V = \omega_v = (0.25, 0.25)$, $s_X = s_{\varepsilon v} = 0.25$ e as $j$-ésimas entradas dos vetores $p_x$ $\zeta_0 = \pi_{20} = \xi_0$ são $(\zeta_{0})_j = 0.5^j$. Estes também são os valores padrão de [make_pliv_multiway_cluster_CKMS2021()](https://docs.doubleml.org/r/stable/reference/make_pliv_multiway_cluster_CKMS2021.html).
+
+```{r, message = FALSE, warning = FALSE}
+# Definir os parâmetros de simulação
+N = 25 # número de observações (primeira dimensão)
+M = 25 # número de observações (segunda dimensão)
+dim_X = 100 # dimensão de X
+set.seed(3141) # definir semente
+obj_dml_data = make_pliv_multiway_cluster_CKMS2021(N, M, dim_X)
+```
+
+## Backend de Dados para Dados com Cluster
+
+A implementação do aprendizado de máquina duplo robusto a clusters é baseada em um backend de dados especial chamado [DoubleMLClusterData](https://docs.doubleml.org/r/stable/reference/DoubleMLClusterData.html). Comparado ao backend de dados padrão [DoubleMLData](https://docs.doubleml.org/r/stable/reference/DoubleMLData.html), os usuários podem especificar as variáveis de clusterização durante a instanciação de um objeto [DoubleMLClusterData](https://docs.doubleml.org/r/stable/reference/DoubleMLClusterData.html). O framework de estimação subsequentemente levará em conta as opções de clusterização fornecidas.
+
+```{r, message = FALSE, warning = FALSE}
+# Os dados simulados são do tipo DoubleMLClusterData
+print(obj_dml_data)
+```
+
+```{r, message = FALSE, warning = FALSE}
+# As variáveis de cluster fazem parte do DataFrame
+head(obj_dml_data$data)
+```
+
+## Inicializar objetos da classe `DoubleMLPLIV`
+
+```{r, message = FALSE, warning = FALSE}
+# Definir métodos de aprendizado de máquina para l, m & r
+ml_l = lrn("regr.cv_glmnet", nfolds = 10, s = "lambda.min")
+ml_m = lrn("regr.cv_glmnet", nfolds = 10, s = "lambda.min")
+ml_r = lrn("regr.cv_glmnet", nfolds = 10, s = "lambda.min")
+
+# inicializar o objeto DoubleMLPLIV
+dml_pliv_obj = DoubleMLPLIV$new(obj_dml_data,
+                                ml_l, ml_m, ml_r,
+                                n_folds=3)
+```
+
+```{r, message = FALSE, warning = FALSE}
+print(dml_pliv_obj)
+```
+
+## Cross Fitting Robusto a Clusters
+
+Um elemento chave do DML robusto a clusters ([Chiang et al. 2021](https://doi.org/10.1080/07350015.2021.1895815)) é uma divisão de amostra especial usada para o cross-fitting. No caso de clusterização bidimensional, assumimos $N$ clusters na primeira dimensão e $M$ clusters na segunda dimensão.
+
+Para cross-fitting em $K$-folds, [Chiang et al. (2021)](https://doi.org/10.1080/07350015.2021.1895815) propuseram particionar aleatoriamente $[N]:=\{1,\ldots,N\}$ em $K$ subconjuntos $\{I_1, \ldots, I_K\}$ e $[M]:=\{1,\ldots,M\}$ em $K$ subconjuntos $\{J_1, \ldots, J_K\}$. Efetivamente, considera-se então $K^2$ folds. Basicamente para cada $(k, \ell) \in \{1, \ldots, K\} \times \{1, \ldots, K\}$, as funções nuisance são estimadas para todas as observações com duplo índice em $([N]\setminus I_k) \times ([M]\setminus J_\ell)$, i.e.,
+
+$$\hat{\eta}_{k,\ell} = \arg\min_{\eta \in \mathcal{H}} \sum_{(i,j) \in ([N]\setminus I_k) \times ([M]\setminus J_\ell)} \rho(W_{ij}, \eta)$$
+
+O parâmetro causal é então estimado como usual resolvendo uma condição de momento com uma função score ortogonal de Neyman. Para aprendizado de máquina duplo robusto a clusterização bidimensional com algoritmo [DML2](https://docs.doubleml.org/stable/guide/algorithms.html#algorithm-dml2) isso resulta em resolver
+
+$$\frac{1}{N \cdot M} \sum_{k=1}^K \sum_{\ell=1}^K \sum_{(i,j) \in I_k \times J_\ell} \psi(W_{ij}; \tilde{\theta}_0, \hat{\eta}_{k,\ell}) = 0$$
+
+para $\tilde{\theta}_0$. Aqui $|I_k|$ denota a cardinalidade, i.e., o número de clusters no $k$-ésimo fold para a primeira variável de cluster.
+
+Podemos visualizar a divisão de amostra das $N \cdot M = 625$ observações em $K \cdot K = 9$ folds. O seguinte mapa de calor ilustra o conjunto de dados particionado que é dividido em $K=9$ folds. O eixo horizontal corresponde aos índices dos folds e o eixo vertical aos índices das observações. Um campo azul indica que a observação $i$ é usada para ajustar a parte nuisance, vermelho indica que o fold é usado para geração de predição e branco significa que uma observação é deixada de fora da divisão de amostra.
+
+Por exemplo, a primeira observação como mostrada na parte inferior da figura é usada para treinamento das partes nuisance no primeiro, segundo, quarto e quinto fold e usada para geração das predições no fold nove. Ao mesmo tempo a observação é deixada de fora do procedimento de divisão de amostra nos folds três, seis, sete e oito.
+
+```{r, message = FALSE, warning = FALSE}
+# A função plt_smpls é definida no final do Notebook
+plt_smpls(dml_pliv_obj$smpls[[1]], dml_pliv_obj$n_folds)
+```
+
+Se visualizarmos a divisão de amostra em termos das variáveis de cluster, o particionamento dos dados em $9$ folds $I_k \times J_\ell$ fica claro. Os identificadores para a primeira variável de cluster $[N]:=\{1,\ldots,N\}$ foram particionados aleatoriamente em $K=3$ folds denotados por $\{I_1, I_2, I_3\}$ e os identificadores para a segunda variável de cluster $[M]:=\{1,\ldots,M\}$ também foram particionados aleatoriamente em $K=3$ folds denotados por $\{J_1, J_2, J_3\}$. Considerando cada combinação $I_k \times J_\ell$ para $1 \leq k, \ell \leq K = 3$ efetivamente baseamos o cross-fitting em $9$ folds.
+
+Agora queremos focar no sub-gráfico superior esquerdo mostrando o particionamento dos dados de cluster para o primeiro fold. O eixo $x$ corresponde à primeira variável de cluster e o eixo $y$ à segunda variável de cluster. Observações com variáveis de cluster $(i,j) \in I_k \times J_\ell$ são usadas para estimação do parâmetro alvo $\tilde{\theta}_0$ resolvendo uma função score ortogonal de Neyman. Para estimação da função nuisance, usamos apenas observações onde nem a primeira variável de cluster está em $I_k$ nem a segunda variável de cluster está em $J_\ell$, i.e., usamos observações indexadas por $(i,j)\in ([N]\setminus I_k) \times ([M]\setminus J_\ell)$ para estimar as funções nuisance.
+
+Desta forma garantimos que nunca há observações do mesmo cluster (primeira e/ou segunda dimensão de cluster) na amostra para a estimação da função nuisance (azul) e ao mesmo tempo na amostra para resolver a função score (vermelho). Como resultado desta divisão de amostra especial proposta por [Chiang et al. (2021)](https://doi.org/10.1080/07350015.2021.1895815), as observações no score (vermelho) e amostra nuisance (azul) podem ser consideradas independentes e a abordagem padrão de cross-fitting para aprendizado de máquina duplo pode ser aplicada.
+
+```{r, message = FALSE, warning = FALSE}
+# A função plt_smpls_cluster é definida no final do Notebook
+options(repr.plot.width = 12, repr.plot.height = 10)
+plots = plt_smpls_cluster(dml_pliv_obj$smpls_cluster[[1]],
+                         dml_pliv_obj$n_folds,
+                         sqrt(dml_pliv_obj$n_folds))
+grid.arrange(grobs=plots, ncol = 3, nrow = 3)
+```
+
+## Erros-Padrão Robustos a Clusters
+
+Na classe base abstrata `DoubleML` a estimação de erros padrão robustos a clusters é implementada para todos os modelos de aprendizado de máquina duplo suportados. É baseada na suposição de uma função score ortogonal de Neyman linear. Usamos a notação $n \wedge m := \min\{n,m\}$. Para a variância assintótica de $\sqrt{\underline{C}}(\tilde{\theta_0} - \theta_0)$ com $\underline{C} := N \wedge M$ [Chiang et al. (2021)](https://doi.org/10.1080/07350015.2021.1895815) então propõem o seguinte estimador
+
+$$\hat{\sigma}^2 = \left( \frac{1}{N \cdot M} \sum_{i=1}^N \sum_{j=1}^M \hat{\psi}_a(W_{ij}) \right)^{-2} \hat{J}$$
+
+onde
+
+$$\hat{J} = \frac{1}{N \wedge M} \left[ \sum_{i=1}^N \left( \sum_{j=1}^M \hat{\psi}(W_{ij}) \right)^2 + \sum_{j=1}^M \left( \sum_{i=1}^N \hat{\psi}(W_{ij}) \right)^2 - \left( \sum_{i=1}^N \sum_{j=1}^M \hat{\psi}(W_{ij}) \right)^2 \right]$$
+
+e
+
+$$\hat{\psi}(W_{ij}) = \psi(W_{ij}; \tilde{\theta}_0, \hat{\eta})$$
+
+Um intervalo de confiança $(1-\alpha)$ é então dado por ([Chiang et al. 2021](https://doi.org/10.1080/07350015.2021.1895815))
+
+$$\left[ \tilde{\theta}_0 \pm \Phi^{-1}(1-\alpha/2) \frac{\hat{\sigma}}{\sqrt{\underline{C}}} \right]$$
+
+com $\underline{C} = N \wedge M$.
+
+```{r, message = FALSE, warning = FALSE}
+# Estimar o modelo PLIV com aprendizado de máquina duplo robusto a clusters
+dml_pliv_obj$fit()
+dml_pliv_obj$summary()
+```
+
+# (Unidimensional) DML Robusto a Clusters
+
+Usamos novamente o processo gerador de dados PLIV descrito na Seção 4.1 de [Chiang et al. (2021)](https://doi.org/10.1080/07350015.2021.1895815). Para obter dados clusterizados unidimensionalmente, definimos os seguintes pesos como zero:
+
+$$\omega_X = \omega_{\varepsilon} = \omega_V = \omega_v = (0.25, 0)$$
+
+Novamente podemos simular estes dados com [make_pliv_multiway_cluster_CKMS2021()](https://docs.doubleml.org/r/stable/reference/make_pliv_multiway_cluster_CKMS2021.html). Para preparar o backend de dados para clusterização unidimensional, temos apenas que alterar o `cluster_cols` para ser `'cluster_var_i'`.
+
+```{r, message = FALSE, warning = FALSE}
+obj_dml_data = make_pliv_multiway_cluster_CKMS2021(N, M, dim_X,
+                                                   omega_X = c(0.25, 0),
+                                                   omega_epsilon = c(0.25, 0),
+                                                   omega_v = c(0.25, 0),
+                                                   omega_V = c(0.25, 0))
+```
+
+```{r, message = FALSE, warning = FALSE}
+obj_dml_data$cluster_cols = 'cluster_var_i'
+print(obj_dml_data)
+```
+
+```{r, message = FALSE, warning = FALSE}
+# Definir métodos de aprendizado de máquina para l, m & r
+ml_l = lrn("regr.cv_glmnet", nfolds = 10, s = "lambda.min")
+ml_m = lrn("regr.cv_glmnet", nfolds = 10, s = "lambda.min")
+ml_r = lrn("regr.cv_glmnet", nfolds = 10, s = "lambda.min")
+
+# inicializar o objeto DoubleMLPLIV
+dml_pliv_obj = DoubleMLPLIV$new(obj_dml_data,
+                                ml_l, ml_m, ml_r,
+                                n_folds=3)
+```
+
+```{r, message = FALSE, warning = FALSE}
+dml_pliv_obj$fit()
+dml_pliv_obj$summary()
+```
+
+# Aplicação com Dados Reais
+
+Como uma aplicação com dados reais revisitamos o exemplo de demanda do consumidor de [Chiang et al. (2021)](https://doi.org/10.1080/07350015.2021.1895815). Os dados de automóveis dos EUA de [Berry, Levinsohn, and Pakes (1995)](https://doi.org/10.2307/2171802) são obtidos do pacote R [hdm](https://cran.r-project.org/web/packages/hdm/index.html). Neste exemplo, consideramos diferentes especificações para as dimensões de cluster.
+
+## Carregar e Processar Dados
+
+```{r, message = FALSE, warning = FALSE}
+## Preparar os dados BLP
+data(BLP);
+blp_data <- BLP$BLP;
+blp_data$price <- blp_data$price + 11.761
+blp_data$log_p = log(blp_data$price)
+```
+
+```{r, message = FALSE, warning = FALSE}
+x_cols = c('hpwt', 'air', 'mpd', 'space')
+head(blp_data[x_cols])
+```
+
+```{r, message = FALSE, warning = FALSE}
+iv_vars = as.data.frame(hdm:::constructIV(blp_data$firm.id,
+                                         blp_data$cdid,
+                                         blp_data$id,
+                                         blp_data[x_cols]))
+```
+
+```{r, message = FALSE, warning = FALSE}
+formula = formula(paste0(" ~ -1 + (hpwt + air + mpd + space)^2",
+                        "+ I(hpwt^2)*(air + mpd + space)",
+                        "+ I(air^2)*(hpwt + mpd + space)",
+                        "+ I(mpd^2)*(hpwt + air + space)",
+                        "+ I(space^2)*(hpwt + air + mpd)",
+                        "+ I(space^2) + I(hpwt^3) + I(air^3) + I(mpd^3) + I(space^3)"))
+data_transf = data.frame(model.matrix(formula, blp_data))
+names(data_transf)
+```
+
+```{r, message = FALSE, warning = FALSE}
+y_col = 'y'
+d_col = 'log_p'
+cluster_cols = c('model.id', 'cdid')
+all_z_cols = c('sum.other.hpwt', 'sum.other.mpd', 'sum.other.space')
+z_col = all_z_cols[1]
+```
+
+```{r, message = FALSE, warning = FALSE}
+dml_df = cbind(blp_data[c(y_col, d_col, cluster_cols)],
+               data_transf,
+               iv_vars[all_z_cols])
+```
+
+## Inicializar objeto `DoubleMLClusterData`
+
+```{r, message = FALSE, warning = FALSE}
+dml_data = DoubleMLClusterData$new(dml_df,
+                                   y_col=y_col,
+                                   d_cols=d_col,
+                                   z_cols=z_col,
+                                   cluster_cols=cluster_cols,
+                                   x_cols=names(data_transf))
+```
+
+```{r, message = FALSE, warning = FALSE}
+print(dml_data)
+```
+
+```{r, message = FALSE, warning = FALSE}
+lasso = lrn("regr.cv_glmnet", nfolds = 10, s = "lambda.min")
+```
+
+```{r, message = FALSE, warning = FALSE}
+coef_df = data.frame(matrix(NA_real_, ncol = 4, nrow = 1))
+colnames(coef_df) = c('zero-way', 'one-way-product', 'one-way-market', 'two-way')
+rownames(coef_df) = all_z_cols[1]
+se_df = coef_df
+n_rep = 10
+```
+
+## Clusterização Bidimensional com Respeito a Produto e Mercado
+
+```{r, message = FALSE, warning = FALSE}
+set.seed(1111)
+dml_data$z_cols = z_col
+dml_data$cluster_cols = c('model.id', 'cdid')
+dml_pliv = DoubleMLPLIV$new(dml_data,
+                           lasso, lasso, lasso,
+                           n_folds=2, n_rep=n_rep)
+dml_pliv$fit()
+coef_df[1, 4] = dml_pliv$coef
+se_df[1, 4] = dml_pliv$se
+```
+
+## Clusterização Unidimensional com Respeito ao Produto
+
+```{r, message = FALSE, warning = FALSE}
+set.seed(2222)
+dml_data$z_cols = z_col
+dml_data$cluster_cols = 'model.id'
+dml_pliv = DoubleMLPLIV$new(dml_data,
+                           lasso, lasso, lasso,
+                           n_folds=4, n_rep=n_rep)
+dml_pliv$fit()
+coef_df[1, 2] = dml_pliv$coef
+se_df[1, 2] = dml_pliv$se
+```
+
+## Clusterização Unidimensional com Respeito ao Mercado
+
+```{r, message = FALSE, warning = FALSE}
+set.seed(3333)
+dml_data$z_cols = z_col
+dml_data$cluster_cols = 'cdid'
+dml_pliv = DoubleMLPLIV$new(dml_data,
+                           lasso, lasso, lasso,
+                           n_folds=4, n_rep=n_rep)
+dml_pliv$fit()
+coef_df[1, 3] = dml_pliv$coef
+se_df[1, 3] = dml_pliv$se
+```
+
+## Sem Clusterização / Clusterização Nula
+
+```{r, message = FALSE, warning = FALSE}
+dml_data = DoubleMLData$new(dml_df,
+                           y_col=y_col,
+                           d_cols=d_col,
+                           z_cols=z_col,
+                           x_cols=names(data_transf))
+```
+
+```{r, message = FALSE, warning = FALSE}
+print(dml_data)
+```
+
+```{r, message = FALSE, warning = FALSE}
+set.seed(4444)
+dml_data$z_cols = z_col
+dml_pliv = DoubleMLPLIV$new(dml_data,
+                           lasso, lasso, lasso,
+                           n_folds=4, n_rep=n_rep)
+dml_pliv$fit()
+coef_df[1, 1] = dml_pliv$coef
+se_df[1, 1] = dml_pliv$se
+```
+
+## Resultados da Aplicação
+
+```{r, message = FALSE, warning = FALSE}
+coef_df
+```
+
+```{r, message = FALSE, warning = FALSE}
+se_df
+```
+
+Os resultados mostram como os erros padrão aumentam quando consideramos estruturas de clusterização mais complexas:
+
+- **Zero-way**: Erros padrão menores (assumindo independência)
+- **One-way-product**: Erros padrão moderados (clusterização por produto)
+- **One-way-market**: Erros padrão moderados (clusterização por mercado)  
+- **Two-way**: Erros padrão maiores (clusterização bidimensional)
+
+Isso reflete a importância de considerar a estrutura de dependência adequada nos dados para realizar inferência estatística válida.
+
+# Referências
+
+Berry, S., Levinsohn, J., and Pakes, A. (1995), Automobile Prices in Market Equilibrium, Econometrica: Journal of the Econometric Society, 63, 841-890, doi: [10.2307/2171802](https://doi.org/10.2307/2171802).
+
+Cameron, A. C., Gelbach, J. B. and Miller, D. L. (2011), Robust Inference with Multiway Clustering, Journal of Business & Economic Statistics, 29:2, 238-249, doi: [10.1198/jbes.2010.07136](https://doi.org/10.1198/jbes.2010.07136).
+
+Chernozhukov, V., Chetverikov, D., Demirer, M., Duflo, E., Hansen, C., Newey, W. and Robins, J. (2018), Double/debiased machine learning for treatment and structural parameters. The Econometrics Journal, 21: C1-C68, doi: [10.1111/ectj.12097](https://doi.org/10.1111/ectj.12097).
+
+Chiang, H. D., Kato K., Ma, Y. and Sasaki, Y. (2021), Multiway Cluster Robust Double/Debiased Machine Learning, Journal of Business & Economic Statistics, doi: [10.1080/07350015.2021.1895815](https://doi.org/10.1080/07350015.2021.1895815), arXiv: [1909.03489](https://arxiv.org/abs/1909.03489).
+
+# Definir Funções Auxiliares para Plotagem
+
+```{r, message = FALSE, warning = FALSE}
+library(RColorBrewer)
+coul <- rev(colorRampPalette(brewer.pal(8, "RdBu"))(3))
+options(repr.plot.width = 10, repr.plot.height = 10)
+
+plt_smpls = function(smpls, n_folds) {
+  df = matrix(0, nrow = N*M, ncol = n_folds)
+  for (i_fold in 1:n_folds){
+    df[smpls$train_ids[[i_fold]], i_fold] = -1
+    df[smpls$test_ids[[i_fold]], i_fold] = 1
+  }
+  heatmap(df, Rowv=NA, Colv=NA, col=coul, cexRow=1.5, cexCol=1.5, scale='none')
+}
+
+plt_smpls_cluster = function(smpls_cluster, n_folds, n_folds_per_cluster) {
+  plots = list()
+  for (i_fold in 1:n_folds){
+    mat = matrix(0, nrow = M, ncol = N)
+    for (k in smpls_cluster$train_ids[[i_fold]][[1]]) {
+      for (l in smpls_cluster$train_ids[[i_fold]][[2]]) {
+        mat[k, l] = -1
+      }
+    }
+    for (k in smpls_cluster$test_ids[[i_fold]][[1]]) {
+      for (l in smpls_cluster$test_ids[[i_fold]][[2]]) {
+        mat[k, l] = 1
+      }
+    }
+    l = (i_fold-1) %% n_folds_per_cluster + 1
+    k = ((i_fold-1) %/% n_folds_per_cluster)+1
+    df = data.frame(mat)
+    cols = names(df)
+    names(df) = 1:N
+    df$id = 1:N
+    df_plot = melt(df, id.var = 'id')
+    df_plot$value = factor(df_plot$value)
+    plots[[i_fold]] = ggplot(data = df_plot, aes(x=id, y=variable)) +
+      geom_tile(aes(fill=value), colour = "grey50") +
+      scale_fill_manual(values = c("darkblue", "white", "darkred")) +
+      theme(text = element_text(size=15))
+    
+    if (k == 3) {
+      plots[[i_fold]] = plots[[i_fold]] + xlab(expression(paste('Segunda Variável de Cluster ', l)))
+    } else {
+      plots[[i_fold]] = plots[[i_fold]] + xlab('')
+    }
+    if (l == 1) {
+      plots[[i_fold]] = plots[[i_fold]] + ylab(expression(paste('Primeira Variável de Cluster ', k)))
+    } else {
+      plots[[i_fold]] = plots[[i_fold]] + ylab('')
+    }
+  }
+  return(plots)
+}
+```

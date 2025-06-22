@@ -1,0 +1,247 @@
+---
+title: "9 - Divisão de Amostras, Cross-Fitting e Cross-Fitting Repetido"
+author: "Hicham Munir Tayfour"
+output:
+  html_document:
+    theme: flatly       
+    toc: true           
+    toc_float: true     
+    code_folding: hide  
+    highlight: tango  
+---
+
+# 9. Divisão da Amostra, Cross-Fitting e Cross-Fitting Repetido
+
+A divisão da amostra e a aplicação de cross-fitting são uma parte central do double/debiased machine learning (DML). Para todos os modelos DML `DoubleMLPLR`, `DoubleMLPLIV`, `DoubleMLIRM` e `DoubleMLIIVM`, a especificação é feita via os parâmetros `n_folds` e `n_rep`.
+
+Técnicas avançadas de reamostragem podem ser obtidas via os parâmetros booleanos `draw_sample_splitting` e `apply_cross_fitting` bem como os métodos `draw_sample_splitting()` e `set_sample_splitting()`.
+
+Como exemplo, consideramos um modelo de regressão parcialmente linear (PLR) implementado em `DoubleMLPLR`.
+
+```{r, message = FALSE, warning = FALSE}
+
+library(DoubleML)
+
+library(mlr3)
+
+lgr::get_logger("mlr3")$set_threshold("warn")
+
+library(mlr3learners)
+
+library(data.table)
+
+learner = lrn("regr.ranger", num.trees = 100, mtry = 20, min.node.size = 2, max.depth = 5)
+
+ml_l = learner
+
+ml_m = learner
+
+data = make_plr_CCDDHNR2018(alpha = 0.5, n_obs = 100, return_type = "data.table")
+
+obj_dml_data = DoubleMLData$new(data, y_col = "y", d_cols = "d")
+
+```
+
+## 9.1 - Cross-Fitting com K Partições (K Folds) {#cross-fitting-com-k-partições-k-folds}
+
+A configuração padrão é `n_folds = 5` e `n_rep = 1`, i.e., $K=5$ folds e nenhum cross-fitting repetido.
+
+```{r, message = FALSE, warning = FALSE}
+
+dml_plr_obj = DoubleMLPLR$new(obj_dml_data, ml_l, ml_m, n_folds = 5, n_rep = 1)
+
+print(dml_plr_obj$n_folds)
+
+print(dml_plr_obj$n_rep)
+
+```
+
+Durante a inicialização de um modelo DML como `DoubleMLPLR`, uma partição aleatória $K$-fold $(I_k)_{k=1}^{K}$ dos índices de observação é gerada. A partição aleatória $K$-fold é armazenada no atributo `smpls` do objeto modelo DML.
+
+```{r, message = FALSE, warning = FALSE}
+
+print(dml_plr_obj$smpls)
+
+```
+
+Para cada $k \in [K] = \lbrace 1, \ldots, K\rbrace$ o estimador ML nuisance é baseado nas observações de todos os outros $k-1$ folds. Os valores dos dois componentes da função score $\psi_a(W_i; \hat{\eta}_0)$ e $\psi_b(W_i; \hat{\eta}_0)$ para cada índice de observação $i \in I_k$ são computados e armazenados nos atributos `psi_a` e `psi_b`.
+
+```{r, message = FALSE, warning = FALSE}
+
+dml_plr_obj$fit()
+
+print(dml_plr_obj$psi_a[1:5, ,1])
+
+print(dml_plr_obj$psi_b[1:5, ,1])
+
+```
+
+## 9.2 - Cross-Fitting Repetido com K Partições e M Repetições
+
+Cross-fitting repetido é obtido escolhendo um valor $M>1$ para o número de repetições `n_rep`. Isso resulta em $M$ partições aleatórias $K$-fold sendo sorteadas.
+
+```{r, message = FALSE, warning = FALSE}
+
+dml_plr_obj = DoubleMLPLR$new(obj_dml_data, ml_l, ml_m, n_folds = 5, n_rep = 10)
+
+print(dml_plr_obj$n_folds)
+
+print(dml_plr_obj$n_rep)
+
+```
+
+Para cada uma das $M$ partições, os modelos ML nuisance são estimados e as funções score computadas como descrito em [Cross-fitting com K folds](#cross-fitting-com-k-partições-k-folds). Os valores resultantes das funções score são armazenados em arrays 3-dimensionais `psi_a` e `psi_b`, onde o índice de linha corresponde ao índice de observação $i \in [N] = \lbrace 1, \ldots, N\rbrace$ e o índice de coluna à partição $m \in [M] = \lbrace 1, \ldots, M\rbrace$. A terceira dimensão refere-se à variável de tratamento e torna-se não-singleton no caso de múltiplas variáveis de tratamento.
+
+```{r, message = FALSE, warning = FALSE}
+
+dml_plr_obj$fit()
+
+print(dml_plr_obj$psi_a[1:5, ,1])
+
+print(dml_plr_obj$psi_b[1:5, ,1])
+
+```
+
+Estimamos o parâmetro causal $\tilde{\theta}_{0,m}$ para cada uma das $M$ partições com um algoritmo DML como descrito em [Algoritmos de double machine learning](algorithms.html#algorithms). Erros padrão são obtidos como descrito em [Estimativa de variância e intervalos de confiança](se_confint.html#se-confint).
+
+A agregação das estimativas do parâmetro causal e seus erros padrão é feita usando a mediana. A estimativa do parâmetro causal $\tilde{\theta}_{0}$ é armazenada no atributo `coef` e o erro padrão assintótico $\hat{\sigma}/\sqrt{N}$ em `se`.
+
+No R, os intervalos de confiança e valores-p são baseados na agregação da mediana (baseado em Chernozhukov et al., 2018). A estimativa do erro padrão assintótico $\hat{\sigma}/\sqrt{N}$ é então baseada nos intervalos de confiança agregados pela mediana com valor crítico $1.96$, i.e.,
+
+$$\hat{\sigma}/\sqrt{N} = \frac{\text{IC}_{\text{upper}} - \text{IC}_{\text{lower}}}{2 \times 1.96}$$
+
+onde $\text{IC}_{\text{upper}}$ e $\text{IC}_{\text{lower}}$ são os limites superior e inferior do intervalo de confiança agregado pela mediana.
+
+```{r, message = FALSE, warning = FALSE}
+
+print(dml_plr_obj$coef)
+
+print(dml_plr_obj$se)
+
+```
+
+As estimativas de parâmetros $(\tilde{\theta}_{0,m})_{m \in [M]}$ e erros padrão assintóticos $(\hat{\sigma}_m/\sqrt{N})_{m \in [M]}$ para cada uma das $M$ partições são armazenadas nos atributos `all_coef` e `all_se`, respectivamente.
+
+```{r, message = FALSE, warning = FALSE}
+
+print(dml_plr_obj$all_coef)
+
+print(dml_plr_obj$all_se)
+
+```
+
+## 9.3 - Fornecimento Externo de uma Divisão / Partição da Amostra
+
+Todos os modelos DML permitem que uma partição seja fornecida externamente via o método `set_sample_splitting()`.
+
+No R, podemos usar o esquema de reamostragem de validação cruzada do mlr3 para gerar uma divisão da amostra e fornecê-la ao objeto modelo DML. Note que definindo `draw_sample_splitting = FALSE` pode-se prevenir que uma partição seja sorteada durante a inicialização do objeto modelo DML.
+
+As seguintes chamadas são equivalentes. No primeiro código de exemplo, usamos a interface padrão e sorteamos a divisão da amostra com $K=4$ folds durante a inicialização do objeto `DoubleMLPLR`.
+
+```{r, message = FALSE, warning = FALSE}
+
+set.seed(314)
+
+dml_plr_obj_internal = DoubleMLPLR$new(obj_dml_data, ml_l, ml_m, n_folds = 4)
+
+dml_plr_obj_internal$fit()
+
+dml_plr_obj_internal$summary()
+
+```
+
+No segundo código de exemplo, usamos o esquema de reamostragem de validação cruzada do mlr3 e definimos a partição via o método `set_sample_splitting()`.
+
+```{r, message = FALSE, warning = FALSE}
+
+dml_plr_obj_external = DoubleMLPLR$new(obj_dml_data, ml_l, ml_m, draw_sample_splitting = FALSE)
+
+set.seed(314)
+
+# configurar uma tarefa e esquema de reamostragem de validação cruzada no mlr3
+my_task = Task$new("help task", "regr", data)
+
+my_sampling = rsmp("cv", folds = 4)$instantiate(my_task)
+
+train_ids = lapply(1:4, function(x) my_sampling$train_set(x))
+
+test_ids = lapply(1:4, function(x) my_sampling$test_set(x))
+
+smpls = list(list(train_ids = train_ids, test_ids = test_ids))
+
+dml_plr_obj_external$set_sample_splitting(smpls)
+
+dml_plr_obj_external$fit()
+
+dml_plr_obj_external$summary()
+
+```
+
+## 9.4 - Divisão da Amostra sem Cross-Fitting
+
+A flag booleana `apply_cross_fitting` permite estimar modelos DML sem aplicar cross-fitting. Isso resulta em dividir aleatoriamente a amostra em duas partes. A primeira metade dos dados é usada para a estimação dos modelos ML nuisance e a segunda metade para estimar o parâmetro causal.
+
+Note que cross-fitting funciona bem empiricamente e é recomendado para remover viés induzido por overfitting, veja também [Divisão da amostra para remover viés induzido por overfitting](basics.html#bias-overfitting).
+
+```{r, message = FALSE, warning = FALSE}
+
+dml_plr_obj_external = DoubleMLPLR$new(obj_dml_data, ml_l, ml_m,
+                                       n_folds = 2, apply_cross_fitting = FALSE)
+
+dml_plr_obj_external$fit()
+
+dml_plr_obj_external$summary()
+
+```
+
+Note que para dividir dados de forma desigual em conjuntos de treino e teste, a interface para definir externamente a divisão da amostra via `set_sample_splitting()` precisa ser aplicada, como por exemplo:
+
+```{r, message = FALSE, warning = FALSE}
+
+dml_plr_obj_external = DoubleMLPLR$new(obj_dml_data, ml_l, ml_m,
+                                       n_folds = 2, apply_cross_fitting = FALSE,
+                                       draw_sample_splitting = FALSE)
+
+set.seed(314)
+
+# configurar uma tarefa e esquema de reamostragem holdout no mlr3
+my_task = Task$new("help task", "regr", data)
+
+my_sampling = rsmp("holdout", ratio = 0.8)$instantiate(my_task)
+
+train_ids = list(my_sampling$train_set(1))
+
+test_ids = list(my_sampling$test_set(1))
+
+smpls = list(list(train_ids = train_ids, test_ids = test_ids))
+
+dml_plr_obj_external$set_sample_splitting(smpls)
+
+dml_plr_obj_external$fit()
+
+dml_plr_obj_external$summary()
+
+```
+
+## 9.5 - Estimação de Modelos DML sem Divisão da Amostra
+
+A implementação dos modelos DML permite a estimação sem divisão da amostra, i.e., todas as observações são usadas para aprender os modelos nuisance bem como para a estimação do parâmetro causal. Note que esta abordagem geralmente resulta em viés e portanto não é recomendada sem justificativa teórica apropriada, veja também [Divisão da amostra para remover viés induzido por overfitting](basics.html#bias-overfitting).
+
+**Nota:** A flag `apply_cross_fitting` está descontinuada para o pacote Python. Para evitar cross-fitting, use a opção de definir [predições externas](learners.html#ext-pred). Adicionalmente, o número de folds `n_folds` é esperado ser pelo menos 2.
+
+```{r, message = FALSE, warning = FALSE}
+
+dml_plr_no_split = DoubleMLPLR$new(obj_dml_data, ml_l, ml_m,
+                                   n_folds = 1, apply_cross_fitting = FALSE)
+
+set.seed(314)
+
+dml_plr_no_split$fit()
+
+dml_plr_no_split$summary()
+
+```
+
+## 9.6 - Referências
+
+Chernozhukov, Victor and Demirer, Mert and Duflo, Esther and Fernández-Val, Iván (2018), Generic Machine Learning Inference on Heterogeneous Treatment Effects in Randomized Experiments, with an Application to Immunization in India, National Bureau of Economic Research, [doi: 10.3386/w24678](https://dx.doi.org/10.3386/w24678).

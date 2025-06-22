@@ -1,0 +1,256 @@
+---
+title: "R - Modelos de Seleção de Amostra"
+author: "Hicham Munir Tayfour"
+output:
+  html_document:
+    theme: flatly       
+    toc: true           
+    toc_float: true     
+    code_folding: hide  
+    highlight: tango  
+---
+
+Neste exemplo, ilustramos como o pacote [DoubleML](https://docs.doubleml.org/stable/index.html) pode ser usado para estimar o efeito médio do tratamento (ATE) sob seleção amostral ou atrito de desfecho. A estimação é baseada em um DGP simulado do Apêndice E de [Bia, Huber e Lafférs (2023)](https://doi.org/10.1080/07350015.2023.2271071).
+
+Considere o seguinte DGP:
+
+$$Y_i = D_i \theta_0 + X_i' \beta_0 + \varepsilon_i$$
+
+onde $Y_i$ é observado se $S_i=1$ com
+
+$$S_i^* = \gamma_0 Y_i + Z_i' \delta_0 + \upsilon_i$$
+
+$$S_i = \mathbf{1}\{S_i^* > 0\}$$
+
+Seja $D_i\in\{0,1\}$ o status de tratamento da unidade $i$ e seja $Y_{i}$ o desfecho de interesse da unidade $i$. Usando a notação de resultados potenciais, podemos escrever $Y_{i}(d)$ para o resultado potencial da unidade $i$ e status de tratamento $d$. Além disso, seja $X_i$ um vetor de covariáveis pré-tratamento.
+
+```{r, message = FALSE, warning = FALSE}
+library(DoubleML)
+library(mlr3)
+library(ggplot2)
+# suprimir mensagens durante o ajuste
+lgr::get_logger("mlr3")$set_threshold("warn")
+```
+
+# Desfecho Ausente ao Acaso (MAR)
+
+Agora considere o primeiro cenário, no qual os desfechos estão ausentes ao acaso (MAR), de acordo com as suposições em [Bia, Huber e Lafférs (2023)](https://doi.org/10.1080/07350015.2023.2271071). Seja a matriz de covariância $\sigma^2_X$ tal que $a_{ij} = 0.5^{|i - j|}$, $\gamma_0 = 0$, $\sigma^2_{\varepsilon, \upsilon} = \begin{pmatrix} 1 & 0 \\ 0 & 1 \end{pmatrix}$ e finalmente, seja o vetor de coeficientes $\beta_0$ que se assemelha a um decaimento quadrático da importância dos coeficientes; $\beta_{0,j} = 0.4/j^2$ para $j = 1, \ldots, p$.
+
+## Dados
+
+Usaremos o processo gerador de dados implementado `make_ssm_data` para gerar dados de acordo com a simulação no Apêndice E de [Bia, Huber e Lafférs (2023)](https://doi.org/10.1080/07350015.2023.2271071). O ATE verdadeiro neste DGP é igual a $\theta_0=1$ (pode ser alterado definindo o parâmetro `theta`).
+
+O processo gerador de dados `make_ssm_data` por configurações padrão já retorna um objeto `DoubleMLData` (no entanto, pode retornar um DataFrame pandas ou um array NumPy se `return_type` for especificado adequadamente). Neste primeiro cenário, estamos estimando o ATE sob ausência ao acaso, então definimos `mar=TRUE`. O indicador de seleção `S` pode ser definido via `s_col`.
+
+```{r, message = FALSE, warning = FALSE}
+set.seed(3141)
+n_obs = 2000
+df = make_ssm_data(n_obs=n_obs, mar=TRUE, return_type="data.table")
+dml_data = DoubleMLData$new(df, y_col="y", d_cols="d", s_col="s")
+dml_data
+```
+
+## Estimação
+
+Para estimar o ATE sob seleção amostral, usaremos a classe `DoubleMLSSM`.
+
+Como para todas as classes `DoubleML`, temos que especificar learners, que devem ser inicializados primeiro. Dado o decaimento quadrático simulado da importância dos coeficientes, a regressão Lasso deve ser uma opção adequada (como para escores de propensão, isso será uma Regressão Logística penalizada com $\ell_1$).
+
+O learner `ml_g` é usado para ajustar expectativas condicionais do desfecho $\mathbb{E}[Y_i|D_i, S_i, X_i]$, enquanto os learners `ml_m` e `ml_pi` serão usados para estimar os escores de propensão de tratamento e seleção $P(D_i=1|X_i)$ e $P(S_i=1|D_i, X_i)$.
+
+```{r, message = FALSE, warning = FALSE}
+ml_g = lrn("regr.cv_glmnet", nfolds = 5, s = "lambda.min")
+ml_m = lrn("classif.cv_glmnet", nfolds = 5, s = "lambda.min")
+ml_pi = lrn("classif.cv_glmnet", nfolds = 5, s = "lambda.min")
+```
+
+A classe `DoubleMLSSM` pode ser usada como qualquer outra classe `DoubleML`.
+
+O score é definido como `score='missing-at-random'`, uma vez que os parâmetros do DGP foram definidos para satisfazer as suposições de desfechos ausentes ao acaso. Além disso, como a simulação em [Bia, Huber e Lafférs (2023)](https://doi.org/10.1080/07350015.2023.2271071) usa normalização de pesos de probabilidade inversa, aplicaremos a mesma configuração com `normalize_ipw=TRUE`.
+
+Após a inicialização, temos que chamar o método `fit()` para estimar os elementos nuisance.
+
+```{r, message = FALSE, warning = FALSE}
+dml_ssm = DoubleMLSSM$new(dml_data, ml_g, ml_m, ml_pi, score="missing-at-random",
+                         normalize_ipw = TRUE)
+dml_ssm$fit()
+print(dml_ssm)
+```
+
+Intervalos de confiança em diferentes níveis podem ser obtidos via:
+
+```{r, message = FALSE, warning = FALSE}
+print(dml_ssm$confint(level = 0.9))
+```
+
+## Distribuição das Estimativas do ATE
+
+Aqui, adicionamos uma pequena simulação onde geramos múltiplos conjuntos de dados, estimamos o ATE e coletamos os resultados (isso pode levar algum tempo).
+
+```{r, message = FALSE, warning = FALSE}
+n_rep = 200
+ATE = 1.0
+ATE_estimates = rep(NA, n_rep)
+set.seed(42)
+
+for (i_rep in seq_len(n_rep)) {
+  if (i_rep %% (n_rep %/% 10) == 0) {
+    print(paste0("Iteração: ", i_rep, "/", n_rep))
+  }
+  dml_data = make_ssm_data(n_obs=n_obs, mar=TRUE)
+  dml_ssm = DoubleMLSSM$new(dml_data, ml_g, ml_m, ml_pi, 
+                           score='missing-at-random', normalize_ipw=TRUE)
+  dml_ssm$fit()
+  ATE_estimates[i_rep] = dml_ssm$coef
+}
+```
+
+A distribuição das estimativas assume a seguinte forma:
+
+```{r, message = FALSE, warning = FALSE}
+# Gráfico de densidade das ATE_estimates com ggplot
+ggplot(data.frame(ATE_estimates), aes(x = ATE_estimates)) +
+  geom_density(fill = "blue", alpha = 0.5) +
+  geom_vline(aes(xintercept = ATE), color = "red", linetype = "dashed") +
+  labs(title = "Gráfico de Densidade das Estimativas do ATE (MAR)",
+       x = "Estimativas do ATE",
+       y = "Densidade") +
+  theme_minimal()
+```
+
+# Desfecho Ausente sob Não Resposta Não Ignorável
+
+Agora considere um cenário diferente, no qual os desfechos estão ausentes sob suposições de não resposta não ignorável em [Bia, Huber e Lafférs (2023)](https://doi.org/10.1080/07350015.2023.2271071). Seja a matriz de covariância $\sigma^2_X$ novamente tal que $a_{ij} = 0.5^{|i - j|}$, mas agora $\gamma_0 = 1$ e $\sigma^2_{\varepsilon, \upsilon} = \begin{pmatrix} 1 & 0.8 \\ 0.8 & 1 \end{pmatrix}$ para mostrar uma forte correlação entre $\varepsilon$ e $\upsilon$. Seja o vetor de coeficientes $\beta$ novamente se assemelhar a um decaimento quadrático da importância dos coeficientes; $\beta_{0,j} = 0.4/j^2$ para $j = 1, \ldots, p$.
+
+O grafo acíclico direcionado (DAG) mostra a estrutura do modelo causal:
+
+**Estrutura Causal:**
+- $Z$ → $S$ (instrumento afeta seleção)
+- $Y$ → $S$ (desfecho afeta seleção - não ignorável)
+- $X$ → $\{D, Y, S\}$ (covariáveis afetam tratamento, desfecho e seleção)
+- $D$ → $Y$ (tratamento afeta desfecho)
+
+## Dados
+
+Usaremos novamente o processo gerador de dados implementado `make_ssm_data` para gerar dados de acordo com a simulação no Apêndice E de [Bia, Huber e Lafférs (2023)](https://doi.org/10.1080/07350015.2023.2271071). Deixaremos novamente o ATE padrão igual a $\theta_0=1$.
+
+Neste cenário, estamos estimando o ATE sob não resposta não ignorável, então definimos `mar=FALSE`. Novamente, o indicador de seleção `S` pode ser definido via `s_col`. Além disso, precisamos especificar um instrumento via `z_col`.
+
+```{r, message = FALSE, warning = FALSE}
+set.seed(3141)
+n_obs = 8000
+df = make_ssm_data(n_obs=n_obs, mar=FALSE, return_type="data.table")
+dml_data = DoubleMLData$new(df, y_col="y", d_cols="d", z_cols = "z", s_col="s")
+print(dml_data)
+```
+
+## Estimação
+
+Usaremos novamente a classe `DoubleMLSSM`.
+
+Além disso, deixaremos os learners para todas as funções nuisance serem os mesmos do primeiro cenário, pois o decaimento quadrático simulado da importância dos coeficientes ainda se mantém.
+
+Agora o learner `ml_g` é usado para ajustar expectativas condicionais do desfecho $\mathbb{E}[Y_i|D_i, S_i, X_i, \Pi_i]$, enquanto os learners `ml_m` e `ml_pi` serão usados para estimar os escores de propensão de tratamento e seleção $P(D_i=1|X_i, \Pi_i)$ e $P(S_i=1|D_i, X_i, Z_i)$.
+
+```{r, message = FALSE, warning = FALSE}
+ml_g = lrn("regr.cv_glmnet", nfolds = 5, s = "lambda.min")
+ml_m = lrn("classif.cv_glmnet", nfolds = 5, s = "lambda.min")
+ml_pi = lrn("classif.cv_glmnet", nfolds = 5, s = "lambda.min")
+```
+
+O score agora é definido como `'nonignorable'`, uma vez que os parâmetros do DGP foram definidos para satisfazer as suposições de desfechos ausentes sob não resposta não ignorável.
+
+```{r, message = FALSE, warning = FALSE}
+dml_ssm = DoubleMLSSM$new(dml_data, ml_g, ml_m, ml_pi, score="nonignorable")
+dml_ssm$fit()
+print(dml_ssm)
+```
+
+## Distribuição das Estimativas do ATE
+
+Aqui adicionamos novamente uma pequena simulação onde geramos múltiplos conjuntos de dados, estimamos o ATE e coletamos os resultados (isso pode levar algum tempo).
+
+```{r, message = FALSE, warning = FALSE}
+n_rep = 100
+ATE = 1.0
+ATE_estimates_nonig = rep(NA, n_rep)
+set.seed(42)
+
+for (i_rep in seq_len(n_rep)) {
+  if (i_rep %% (n_rep %/% 10) == 0) {
+    print(paste0("Iteração: ", i_rep, "/", n_rep))
+  }
+  dml_data = make_ssm_data(n_obs=n_obs, mar=FALSE)
+  dml_ssm = DoubleMLSSM$new(dml_data, ml_g, ml_m, ml_pi, score='nonignorable')
+  dml_ssm$fit()
+  ATE_estimates_nonig[i_rep] = dml_ssm$coef
+}
+```
+
+E plotamos a distribuição das estimativas:
+
+```{r, message = FALSE, warning = FALSE}
+# Gráfico de densidade das ATE_estimates com ggplot
+ggplot(data.frame(ATE_estimates = ATE_estimates_nonig), aes(x = ATE_estimates)) +
+  geom_density(fill = "blue", alpha = 0.5) +
+  geom_vline(aes(xintercept = ATE), color = "red", linetype = "dashed") +
+  labs(title = "Gráfico de Densidade das Estimativas do ATE (Não Ignorável)",
+       x = "Estimativas do ATE",
+       y = "Densidade") +
+  theme_minimal()
+```
+
+## Comparação dos Resultados
+
+Para comparar os dois cenários, podemos criar um gráfico conjunto:
+
+```{r, message = FALSE, warning = FALSE}
+# Criar dataframe combinado para comparação
+df_combined = data.frame(
+  estimates = c(ATE_estimates, ATE_estimates_nonig),
+  method = c(rep("MAR", length(ATE_estimates)), 
+            rep("Não Ignorável", length(ATE_estimates_nonig)))
+)
+
+# Gráfico comparativo
+ggplot(df_combined, aes(x = estimates, fill = method)) +
+  geom_density(alpha = 0.6) +
+  geom_vline(aes(xintercept = ATE), color = "red", linetype = "dashed") +
+  labs(title = "Comparação das Distribuições das Estimativas do ATE",
+       x = "Estimativas do ATE",
+       y = "Densidade",
+       fill = "Método") +
+  theme_minimal() +
+  scale_fill_manual(values = c("MAR" = "blue", "Não Ignorável" = "green"))
+```
+
+## Resumo dos Resultados
+
+```{r, message = FALSE, warning = FALSE}
+# Estatísticas descritivas
+cat("Estatísticas das Estimativas ATE:\n")
+cat("==================================\n")
+cat(sprintf("MAR - Média: %.4f, Desvio Padrão: %.4f\n", 
+           mean(ATE_estimates, na.rm = TRUE), 
+           sd(ATE_estimates, na.rm = TRUE)))
+cat(sprintf("Não Ignorável - Média: %.4f, Desvio Padrão: %.4f\n", 
+           mean(ATE_estimates_nonig, na.rm = TRUE), 
+           sd(ATE_estimates_nonig, na.rm = TRUE)))
+cat(sprintf("ATE Verdadeiro: %.4f\n", ATE))
+```
+
+## Interpretação dos Resultados
+
+1. **Missing at Random (MAR)**: Quando a seleção amostral não depende do desfecho não observado (apenas de variáveis observadas), o método DML consegue estimar o ATE de forma não viesada.
+
+2. **Não Resposta Não Ignorável**: Quando a seleção depende do próprio desfecho (mesmo após condicionar em variáveis observadas), precisamos de instrumentos e métodos mais sofisticados para identificação causal.
+
+3. **Importância dos Instrumentos**: No caso não ignorável, a variável instrumental $Z$ é crucial para identificação, pois afeta a seleção mas não diretamente o desfecho.
+
+4. **Robustez do DML**: O framework Double Machine Learning se adapta a ambos os cenários, ajustando automaticamente as funções score adequadas para cada situação.
+
+Este exemplo demonstra a flexibilidade do pacote DoubleML para lidar com problemas complexos de seleção amostral, uma questão fundamental em muitas aplicações empíricas onde nem todas as unidades têm desfechos observados.
+
+## Referências
+
+Bia, M., Huber, M., & Lafférs, L. (2023). Double machine learning for sample selection models. *Journal of Business & Economic Statistics*, doi: [10.1080/07350015.2023.2271071](https://doi.org/10.1080/07350015.2023.2271071).

@@ -1,0 +1,125 @@
+---
+title: "2 - Backend de Dados"
+author: "Hicham Munir Tayfour"
+output:
+  html_document:
+    theme: flatly       
+    toc: true           
+    toc_float: true     
+    code_folding: hide  
+    highlight: tango    
+---
+
+O DoubleML geralmente fornece interfaces para dataframes e também para arrays.
+
+## 2.1. DoubleMLData
+
+O uso de ambas as interfaces é demonstrado a seguir. Baixamos o conjunto de dados Bonus do experimento Pennsylvania Reemployment Bonus.
+
+::: callout-note
+-   Em Python usamos `pandas.DataFrame` e `numpy.ndarray`. Os dados podem ser obtidos via `doubleml.datasets.fetch_bonus()`.
+-   Em R usamos `data.table::data.table()`, `data.frame()`, e `matrix()`. Os dados podem ser obtidos via `DoubleML::fetch_bonus()`
+:::
+
+```{r message = FALSE, warning = FALSE}
+library(DoubleML)
+
+# Carregar dados como data.table
+dt_bonus = fetch_bonus(return_type = "data.table")
+head(dt_bonus)
+
+# Carregar dados como data.frame
+df_bonus = fetch_bonus(return_type = "data.frame")
+head(df_bonus)
+```
+
+### 2.1.1. DoubleMLData a partir de dataframes
+
+A classe DoubleMLData serve como backend de dados e pode ser inicializada a partir de um dataframe especificando a coluna `y_col='inuidur1'` que serve como variável de resultado, a(s) coluna(s) `d_cols = 'tg'` que serve(m) como variável(is) de tratamento e as colunas `x_cols` especificando os confundidores.
+
+::: callout-note
+-   Em Python usamos `pandas.DataFrame` e a referência da API pode ser encontrada em `doubleml.DoubleMLData`.
+-   Em R usamos `data.table::data.table()` e a referência da API pode ser encontrada em `DoubleML::DoubleMLData`.
+-   Para inicialização a partir da classe base R `data.frame()`, a referência da API pode ser encontrada em `DoubleML::double_ml_data_from_data_frame()`.
+:::
+
+```{r message = FALSE, warning = FALSE}
+# Especificar os dados e as variáveis para o modelo causal
+
+# A partir de objeto data.table
+obj_dml_data_bonus = DoubleMLData$new(dt_bonus,
+                            y_col = "inuidur1",
+                            d_cols = "tg",
+                            x_cols = c("female", "black", "othrace", "dep1", "dep2",
+                                      "q2", "q3", "q4", "q5", "q6", "agelt35", "agegt54",
+                                      "durable", "lusd", "husd"),
+                            use_other_treat_as_covariate=TRUE)
+obj_dml_data_bonus
+
+# A partir de objeto data.frame
+obj_dml_data_bonus_df = double_ml_data_from_data_frame(df_bonus,
+                            y_col = "inuidur1",
+                            d_cols = "tg",
+                            x_cols = c("female", "black", "othrace", "dep1", "dep2",
+                                      "q2", "q3", "q4", "q5", "q6", "agelt35", "agegt54",
+                                      "durable", "lusd", "husd"),
+                            use_other_treat_as_covariate=TRUE)
+obj_dml_data_bonus_df
+```
+
+**Comentários sobre especificações detalhadas:**
+
+-   Se `x_cols` não for especificado, todas as variáveis (colunas do dataframe) que não sejam especificadas como variável de resultado `y_col`, nem variáveis de tratamento `d_cols`, nem variáveis instrumentais `z_cols` são usadas como covariáveis.
+
+-   No caso de múltiplas variáveis de tratamento, o booleano `use_other_treat_as_covariate` indica se as outras variáveis de tratamento devem ser adicionadas como covariáveis em cada tarefa de aprendizado específica da variável de tratamento.
+
+-   Variáveis instrumentais para modelos IV devem ser fornecidas como `z_cols`.
+
+### 2.1.2. DoubleMLData a partir de arrays e matrizes
+
+Para introduzir a interface de array, geramos um conjunto de dados consistindo de variáveis de confundimento X, uma variável de resultado y e uma variável de tratamento d.
+
+::: callout-note
+-   Em Python usamos `numpy.ndarray` e a referência da API pode ser encontrada em `doubleml.DoubleMLData.from_arrays()`.
+-   Em R usamos a classe base R `matrix()` e a referência da API pode ser encontrada em `DoubleML::double_ml_data_from_matrix()`.
+:::
+
+```{r message = FALSE, warning = FALSE}
+# Gerar dados
+set.seed(3141)
+n_obs = 500
+n_vars = 100
+theta = 3
+X = matrix(stats::rnorm(n_obs * n_vars), nrow = n_obs, ncol = n_vars)
+d = X[, 1:3, drop = FALSE] %*% c(5, 5, 5) + stats::rnorm(n_obs)
+y = theta * d + X[, 1:3, drop = FALSE] %*% c(5, 5, 5) + stats::rnorm(n_obs)
+```
+
+Para especificar os dados e as variáveis para o modelo causal a partir de arrays, chamamos:
+
+```{r message = FALSE, warning = FALSE}
+library(DoubleML)
+
+obj_dml_data_sim = double_ml_data_from_matrix(X = X, y = y, d = d)
+obj_dml_data_sim
+```
+
+## 2.2. Tipos de Dados Especiais
+
+A classe DoubleMLData é estendida pelas seguintes classes para suportar tipos de dados especiais ou permitir parâmetros adicionais.
+
+### 2.2.1. DoubleMLPanelData
+
+A classe DoubleMLPanelData serve como backend de dados para modelos DiD e pode ser inicializada a partir de um dataframe. A classe é uma subclasse de DoubleMLData e herda todos os métodos e atributos. Além disso, fornece métodos e atributos adicionais para lidar com dados em painel:
+
+-   `id_col`: coluna com identificadores únicos para cada unidade
+-   `t_col`: coluna para especificar os períodos de tempo da observação
+-   `datetime_unit`: unidade dos períodos de tempo (por exemplo, 'Y', 'M', 'D', 'h', 'm', 's')
+
+::: callout-note
+A coluna `t_col` pode conter valores float, int ou datetime.
+:::
+
+::: callout-warning
+**Nota**: A implementação em R para DoubleMLPanelData ainda não está disponível na versão atual do pacote DoubleML. Esta funcionalidade está atualmente disponível apenas em Python para modelos de Diferenças-em-Diferenças (DiD).
+:::

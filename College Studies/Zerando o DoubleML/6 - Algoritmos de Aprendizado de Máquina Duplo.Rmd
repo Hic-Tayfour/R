@@ -1,0 +1,125 @@
+---
+title: "6 - Algoritmos de Aprendizado de Máquina Duplo"
+author: "Hicham Munir Tayfour"
+output:
+  html_document:
+    theme: flatly       
+    toc: true           
+    toc_float: true     
+    code_folding: hide  
+    highlight: tango  
+---
+
+# 6. Algoritmos de Double Machine Learning
+
+O pacote DoubleML vem com dois algoritmos diferentes para obter estimativas DML.
+
+**Nota:** O argumento `dml_procedure` está descontinuado no pacote Python. Geralmente, a segunda versão do algoritmo DML2 é recomendada para obter estimativas mais estáveis.
+
+## 6.1 - Algoritmo DML1
+
+O algoritmo `dml_procedure='dml1'` pode ser resumido como:
+
+**Entradas:** Escolha um modelo (PLR, PLIV, IRM, IIVM), forneça dados $(W_i)_{i=1}^{N}$, uma função score ortogonal de Neyman $\psi(W; \theta, \eta)$ e especifique método(s) de aprendizado de máquina para a(s) função(ões) nuisance $\eta$.
+
+**Treinar preditores ML nos folds:** Tome uma partição aleatória $K$-fold $(I_k)_{k=1}^{K}$ dos índices de observação $[N] = \lbrace 1, \ldots, N\rbrace$ tal que o tamanho de cada fold $I_k$ seja $n=N/K$. Para cada $k \in [K] = \lbrace 1, \ldots, K\rbrace$, construa um estimador de aprendizado de máquina de alta qualidade
+
+$$\hat{\eta}_{0,k} = \hat{\eta}_{0,k}\big((W_i)_{i\not\in I_k}\big)$$
+
+de $\eta_0$, onde $x \mapsto \hat{\eta}_{0,k}(x)$ depende apenas do subconjunto de dados $(W_i)_{i\not\in I_k}$.
+
+**Estimar parâmetro causal:** Para cada $k \in [K]$, construa o estimador $\check{\theta}_{0,k}$ como a solução da equação
+
+$$\frac{1}{n} \sum_{i \in I_k} \psi(W_i; \check{\theta}_{0,k}, \hat{\eta}_{0,k}) = 0.$$
+
+A estimativa do parâmetro causal é obtida via agregação
+
+$$\tilde{\theta}_0 = \frac{1}{K} \sum_{k=1}^{K} \check{\theta}_{0,k}.$$
+
+**Saídas:** A estimativa do parâmetro causal $\tilde{\theta}_0$ bem como os valores da função score avaliada são retornados.
+
+## 6.2 - Algoritmo DML2
+
+O algoritmo `dml_procedure='dml2'` pode ser resumido como:
+
+**Entradas:** Escolha um modelo (PLR, PLIV, IRM, IIVM), forneça dados $(W_i)_{i=1}^{N}$, uma função score ortogonal de Neyman $\psi(W; \theta, \eta)$ e especifique método(s) de aprendizado de máquina para a(s) função(ões) nuisance $\eta$.
+
+**Treinar preditores ML nos folds:** Tome uma partição aleatória $K$-fold $(I_k)_{k=1}^{K}$ dos índices de observação $[N] = \lbrace 1, \ldots, N\rbrace$ tal que o tamanho de cada fold $I_k$ seja $n=N/K$. Para cada $k \in [K] = \lbrace 1, \ldots, K\rbrace$, construa um estimador de aprendizado de máquina de alta qualidade
+
+$$\hat{\eta}_{0,k} = \hat{\eta}_{0,k}\big((W_i)_{i\not\in I_k}\big)$$
+
+de $\eta_0$, onde $x \mapsto \hat{\eta}_{0,k}(x)$ depende apenas do subconjunto de dados $(W_i)_{i\not\in I_k}$.
+
+**Estimar parâmetro causal:** Construa o estimador para o parâmetro causal $\tilde{\theta}_0$ como a solução da equação
+
+$$\frac{1}{N} \sum_{k=1}^{K} \sum_{i \in I_k} \psi(W_i; \tilde{\theta}_0, \hat{\eta}_{0,k}) = 0.$$
+
+**Saídas:** A estimativa do parâmetro causal $\tilde{\theta}_0$ bem como os valores da função score avaliada são retornados.
+
+## 6.3 - Implementação dos Algoritmos de Aprendizado de Máquina Duplo
+
+Como exemplo, consideramos um modelo de regressão parcialmente linear (PLR) implementado em `DoubleMLPLR`.
+
+A versão padrão da classe `DoubleML` é baseada no algoritmo DML2.
+
+```{r, message = FALSE, warning = FALSE}
+
+library(DoubleML)
+
+library(mlr3)
+
+library(mlr3learners)
+
+library(data.table)
+
+lgr::get_logger("mlr3")$set_threshold("warn")
+
+learner = lrn(
+  "regr.ranger",
+  num.trees = 100,
+  mtry = 20,
+  min.node.size = 2,
+  max.depth = 5
+)
+
+ml_l = learner$clone()
+
+ml_m = learner$clone()
+
+set.seed(3141)
+
+data = make_plr_CCDDHNR2018(alpha = 0.5, return_type = 'data.table')
+
+obj_dml_data = DoubleMLData$new(data, y_col = "y", d_cols = "d")
+
+dml_plr_obj = DoubleMLPLR$new(obj_dml_data, ml_l, ml_m, dml_procedure = "dml1")
+
+dml_plr_obj$fit()
+
+```
+
+O algoritmo DML pode ser selecionado via parâmetro `dml_procedure='dml1'` vs. `dml_procedure='dml2'`.
+
+O método `fit()` de `DoubleMLPLR` armazena a estimativa $\tilde{\theta}_0$ em seu atributo `coef`.
+
+```{r, message = FALSE, warning = FALSE}
+
+print(dml_plr_obj$coef)
+
+```
+
+Seja $k(i) = \lbrace k: i \in I_k \rbrace$. Os valores da função score $(\psi(W_i; \tilde{\theta}_0, \hat{\eta}_{0,k(i)}))_{i \in [N]}$ são armazenados no atributo `psi`.
+
+```{r, message = FALSE, warning = FALSE}
+
+print(dml_plr_obj$psi[1:5, ,1])
+
+```
+
+Para o algoritmo DML1, as estimativas para os diferentes folds $\check{\theta}_{0,k}$, $k \in [K]$ são armazenadas no atributo `all_dml1_coef`.
+
+```{r, message = FALSE, warning = FALSE}
+
+print(dml_plr_obj$all_dml1_coef)
+
+```

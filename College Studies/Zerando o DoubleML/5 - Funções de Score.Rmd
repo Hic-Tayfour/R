@@ -1,0 +1,443 @@
+---
+title: "5 - Funções de Score"
+author: "Hicham Munir Tayfour"
+output:
+  html_document:
+    theme: flatly       
+    toc: true           
+    toc_float: true     
+    code_folding: hide  
+    highlight: tango  
+---
+
+Usamos estimadores method-of-moments para o parâmetro alvo $\theta_0$ baseados no análogo empírico da condição de momento
+
+$$\mathbb{E}[\psi(W; \theta_0, \eta_0)] = 0,$$
+
+onde chamamos $\psi$ de **função score**, $W = (Y, D, X, Z)$, $\theta_0$ é o parâmetro de interesse e $\eta$ denota funções nuisance com valor populacional $\eta_0$. Usamos funções score $\psi(W; \theta, \eta)$ que satisfazem $\mathbb{E}[\psi(W; \theta_0, \eta_0)] = 0$ com $\theta_0$ sendo a solução única e que obedecem a **condição de ortogonalidade de Neyman**
+
+$$\partial_\eta \mathbb{E}[\psi(W; \theta_0, \eta)]\Big|_{\eta=\eta_0} = 0.$$
+
+As funções score de muitos modelos de double machine learning (PLR, PLIV, IRM, IIVM) são lineares no parâmetro $\theta$, i.e.,
+
+$$\psi(W; \theta, \eta) = \psi_a(W; \eta) \theta + \psi_b(W; \eta).$$
+
+Portanto, o estimador pode ser escrito como
+
+$$\hat{\theta}_0 = -\frac{\mathbb{E}_N[\psi_b(W; \eta)]}{\mathbb{E}_N[\psi_a(W; \eta)]}.$$
+
+A linearidade da função score no parâmetro $\theta$ permite a implementação de componentes chave de maneira muito geral. Os métodos e algoritmos para estimar o parâmetro causal, estimar erros padrão, realizar um multiplier bootstrap, obter intervalos de confiança e muitos outros são implementados na classe base abstrata `DoubleML`. A arquitetura orientada a objetos, portanto, permite fácil extensão para novas classes de modelo para double machine learning. Isso é factível com muito pouco esforço.
+
+Se a linearidade da função score **não é satisfeita**, os cálculos são mais envolvidos. No pacote Python `DoubleML`, a funcionalidade em torno das funções score é implementada em classes mixin chamadas `LinearScoreMixin` e `NonLinearScoreMixin`. O pacote R atualmente vem apenas com uma implementação para funções score lineares. No caso de uma função score não linear, o parâmetro estimado $\hat{\theta}_0$ é obtido via busca de raiz numérica do análogo empírico da condição de momento $\mathbb{E}[\psi(W; \theta_0, \eta_0)] = 0$.
+
+## 5.1 - Implementação da Função de Score e Estimativa do Parâmetro Causal
+
+Como exemplo, consideramos um modelo de regressão parcialmente linear (PLR) implementado em `DoubleMLPLR`.
+
+```{r, message = FALSE, warning = FALSE}
+
+library(DoubleML)
+
+library(mlr3)
+
+library(mlr3learners)
+
+library(data.table)
+
+lgr::get_logger("mlr3")$set_threshold("warn")
+
+learner = lrn(
+  "regr.ranger",
+  num.trees = 100,
+  mtry = 20,
+  min.node.size = 2,
+  max.depth = 5
+)
+
+ml_l = learner$clone()
+
+ml_m = learner$clone()
+
+set.seed(3141)
+
+data = make_plr_CCDDHNR2018(alpha = 0.5, return_type = 'data.table')
+
+obj_dml_data = DoubleMLData$new(data, y_col = "y", d_cols = "d")
+
+dml_plr_obj = DoubleMLPLR$new(obj_dml_data, ml_l, ml_m)
+
+dml_plr_obj$fit()
+
+print(dml_plr_obj)
+
+```
+
+O método `fit()` de `DoubleMLPLR` armazena a estimativa $\hat{\theta}_0$ em seu atributo `coef`.
+
+```{r, message = FALSE, warning = FALSE}
+
+print(dml_plr_obj$coef)
+
+
+```
+
+Os valores dos componentes da função score $\psi_a(W_i; \hat{\eta}_0)$ e $\psi_b(W_i; \hat{\eta}_0)$ são armazenados nos atributos `psi_elements['psi_a']` e `psi_elements['psi_b']` (pacote Python `DoubleML`) e `psi_a` e `psi_b` (pacote R `DoubleML`). No atributo `psi` os valores da função score $\psi(W_i; \hat{\theta}_0, \hat{\eta}_0)$ são armazenados.
+
+```{r, message = FALSE, warning = FALSE}
+
+print(dml_plr_obj$psi[1:5, ,1])
+
+
+```
+
+## 5.2 - Funções de Score Ortogonais de Neyman Implementadas
+
+### 5.2.1 - Modelos Linearmente Parciais (PLM)
+
+Os seguintes scores para modelos parcialmente lineares são implementados.
+
+#### 5.2.1.1 - Modelos de Regressão Linearmente Parciais (PLR)
+
+Para o modelo PLR implementado em `DoubleMLPLR`, pode-se escolher entre `score='partialling out'` e `score='IV-type'`.
+
+`score='partialling out'` implementa a função score:
+
+$$\psi(W; \theta, \eta) := [Y - \ell(X) - \theta(D - m(X))][D - m(X)]$$ $$= -(D - m(X))(D - m(X))\theta + (Y - \ell(X))(D - m(X))$$ $$= \psi_a(W; \eta)\theta + \psi_b(W; \eta)$$
+
+com $\eta = (\ell, m)$, onde
+
+$$\ell_0(X) := \mathbb{E}[Y | X] = \theta_0 \mathbb{E}[D | X] + g(X),$$ $$m_0(X) := \mathbb{E}[D | X].$$
+
+Os componentes do score linear são
+
+$$\psi_a(W; \eta) = -(D - m(X))(D - m(X)),$$ $$\psi_b(W; \eta) = (Y - \ell(X))(D - m(X)).$$
+
+`score='IV-type'` implementa a função score:
+
+$$\psi(W; \theta, \eta) := [Y - D\theta - g(X)][D - m(X)]$$ $$= -D(D - m(X))\theta + (Y - g(X))(D - m(X))$$ $$= \psi_a(W; \eta)\theta + \psi_b(W; \eta)$$
+
+com $\eta = (g, m)$, onde
+
+$$g_0(X) := \mathbb{E}[Y - D\theta_0 | X],$$ $$m_0(X) := \mathbb{E}[D | X].$$
+
+Os componentes do score linear são
+
+$$\psi_a(W; \eta) = -D(D - m(X)),$$ $$\psi_b(W; \eta) = (Y - g(X))(D - m(X)).$$
+
+#### 5.2.1.2. Modelo de regressão IV parcialmente linear (PLIV)
+
+Para o modelo PLIV implementado em `DoubleMLPLIV` pode-se escolher entre `score='IV-type'` e `score='partialling out'`.
+
+`score='partialling out'` implementa a função score:
+
+$$\psi(W; \theta, \eta) := [Y - \ell(X) - \theta(D - r(X))][Z - m(X)]$$ $$= -(D - r(X))(Z - m(X))\theta + (Y - \ell(X))(Z - m(X))$$ $$= \psi_a(W; \eta)\theta + \psi_b(W; \eta)$$
+
+com $\eta = (\ell, m, r)$ e onde os componentes da pontuação linear são
+
+$$\psi_a(W; \eta) = -(D - r(X))(Z - m(X)),$$ $$\psi_b(W; \eta) = (Y - \ell(X))(Z - m(X)).$$
+
+`score='IV-type'` implementa a função score:
+
+$$\psi(W; \theta, \eta) := [Y - D\theta - g(X)][Z - m(X)]$$ $$= -D(Z - m(X))\theta + (Y - g(X))(Z - m(X))$$ $$= \psi_a(W; \eta)\theta + \psi_b(W; \eta)$$
+
+com $\eta = (g, m)$ e onde os componentes da pontuação linear são
+
+$$\psi_a(W; \eta) = -D(Z - m(X)),$$ $$\psi_b(W; \eta) = (Y - g(X))(Z - m(X)).$$
+
+### 5.2.2 - Modelos de Regressão Interativa (IRM)
+
+Os seguintes scores para modelos de regressão não paramétrica são implementados.
+
+#### 5.2.2.1 - Modelo de Regressão Interativa Binária (IRM)
+
+Para o modelo IRM implementado em `DoubleMLIRM` pode-se escolher entre `score='ATE'` e `score='ATTE'`. Além disso, pesos $\omega(Y,D,X)$ podem ser especificados. A função score geral assume a forma
+
+$$\psi(W; \theta, \eta) := \omega(Y,D,X) \left\{ \frac{D \cdot (Y - g(1,X))}{\pi(X)} - \frac{(1-D) \cdot (Y - g(0,X))}{1 - \pi(X)} - \theta \left( \frac{D}{\pi(X)} - \frac{(1-D)}{1 - \pi(X)} \right) \right\}$$
+
+com $\eta=(g,m)$ e onde os componentes do score linear são
+
+$$\psi_a(W; \eta) = -\omega(Y,D,X) \left( \frac{D}{m(X)} - \frac{(1-D)}{1 - m(X)} \right),$$ $$\psi_b(W; \eta) = \omega(Y,D,X) \left\{ \frac{D \cdot (Y - g(1,X))}{m(X)} - \frac{(1-D) \cdot (Y - g(0,X))}{1 - m(X)} \right\}.$$
+
+Se nenhum peso for especificado, `score='ATE'` define os pesos
+
+$$\omega(Y,D,X) = 1$$
+
+enquanto `score='ATTE'` muda os pesos para:
+
+$$\omega(Y,D,X) = m(X).$$
+
+Este score é idêntico à apresentação original na Seção 5.1 de Chernozhukov et al. (2018). Para mais detalhes sobre outras especificações de peso, veja [Efeitos de Tratamento Médios Ponderados](heterogeneity.html#weighted-cates).
+
+#### 5.2.2.2 - Resultados Potenciais Médios (APOs)
+
+Para os modelos de resultados potenciais médios (APO) implementados em `DoubleMLAPO` e `DoubleMLAPOS`, o `score='APO'` é implementado. Além disso, pesos $\omega(Y,D,X)$ podem ser especificados. Para um nível de tratamento dado $d$, a função score geral assume a forma
+
+$$\psi(W; \theta, \eta) := \omega(Y,D,X) \left\{ \frac{\mathbf{1}\{D=d\} \cdot (Y - g(d,X))}{m_d(X)} - \theta \frac{\mathbf{1}\{D=d\}}{m_d(X)} \right\}$$
+
+com $\eta=(g,m)$, onde os elementos nuisance verdadeiros são
+
+$$g_0(d,X) := \mathbb{E}[Y(d) | X], \quad m_{d,0}(X) := \mathbb{E}[\mathbf{1}\{D=d\} | X] = \mathbb{P}(D=d|X).$$
+
+Os componentes do score linear são
+
+$$\psi_a(W; \eta) = -\omega(Y,D,X) \frac{\mathbf{1}\{D=d\}}{m_d(X)},$$ $$\psi_b(W; \eta) = \omega(Y,D,X) \frac{\mathbf{1}\{D=d\} \cdot (Y - g(d,X))}{m_d(X)}.$$
+
+Se nenhum peso for especificado, os pesos são definidos como
+
+$$\omega(Y,D,X) = 1.$$
+
+#### 5.2.2.3 - Modelo IV Interativo (IIVM)
+
+Para o modelo IIVM implementado em `DoubleMLIIVM` empregamos para `score='LATE'` a função score:
+
+`score='LATE'` implementa a função score:
+
+$$\psi(W; \theta, \eta) := g(1,X) - g(0,X) - \theta(r(1,X) - r(0,X))$$
+
+com $\eta=(g, m, r)$ e onde os componentes do score linear são
+
+$$\psi_a(W; \eta) = -(r(1,X) - r(0,X)),$$ $$\psi_b(W; \eta) = g(1,X) - g(0,X).$$
+
+#### 5.2.2.4 - Quantis Potenciais (PQs)
+
+Para `DoubleMLPQ` a única opção válida é `score='PQ'`. Para `treatment=d` com $d\in\{0,1\}$ e um quantil $\tau\in (0,1)$ isto implementa a função score não linear:
+
+$$\psi(W; \theta, \eta) := \frac{\mathbf{1}\{D=d\}}{m_d(X)} \left( \mathbf{1}\{Y \leq \theta\} - \tau \right) + g_{d,0}(X,\theta) - \tau$$
+
+onde $\eta=(g_d,m)$ com valores verdadeiros
+
+$$g_{d,0}(X) := \mathbb{E}[Y(d) | X], \quad m_{d,0}(X) := \mathbb{P}(D=d|X).$$
+
+Note que $g_{d,0}(X,\theta_0)$ depende do parâmetro alvo $\theta_0$, de modo que o score é estimado com uma estimativa preliminar $\tilde{\theta}$. Para mais detalhes, veja [Kallus et al. (2019)](https://arxiv.org/abs/1912.12945).
+
+#### 5.2.2.5 - Quantis Potenciais Locais (LPQs)
+
+Para `DoubleMLLPQ` a única opção válida é `score='LPQ'`. Para `treatment=d` com $d\in\{0,1\}$, instrumento $Z$ e um quantil $\tau\in (0,1)$ isto implementa a função score não linear:
+
+$$\psi(W; \theta, \eta) := \frac{\mathbf{1}\{D=d\}}{m_d(X)} \left( \mathbf{1}\{Y \leq \theta\} - \tau \right) \cdot Z + g_{d,Z=1,0}(X,\theta) - \tau \gamma_0(X)$$
+
+onde $\eta=(g_{d,Z=1}, g_{d,Z=0}, m, \gamma)$ com valores verdadeiros
+
+$$g_{d,Z=z,0}(X) := \mathbb{E}[Y(d) | X, Z=z], \quad m_{d,0}(X) := \mathbb{P}(D=d|X).$$
+
+Além disso, a probabilidade de compliance $\gamma_0$ é estimada com os dois componentes nuisance adicionais
+
+$$\gamma_0(X) := \mathbb{P}(D(1) > D(0) | X).$$
+
+Note que $g_{d,Z=z,0}(X, \theta_0)$ depende do parâmetro alvo $\theta_0$, de modo que o score é estimado com uma estimativa preliminar $\tilde{\theta}$. Para mais detalhes, veja [Kallus et al. (2019)](https://arxiv.org/abs/1912.12945).
+
+#### 5.2.2.6 - Valor Condicional em Risco (CVaR)
+
+Para `DoubleMLCVAR` a única opção válida é `score='CVaR'`. Para `treatment=d` com $d\in\{0,1\}$ e um quantil $\tau\in (0,1)$ isto implementa a função score:
+
+$$\psi(W; \theta, \eta) := \frac{\mathbf{1}\{D=d\}}{m_d(X)} \left( \gamma_0 + \frac{1}{\tau}(Y - \gamma_0) \mathbf{1}\{Y \leq \gamma_0\} - \theta \right) + g_d(X) - \theta$$
+
+onde $\eta=(g_d,m,\gamma)$ com valores verdadeiros
+
+$$g_{d,0}(X) := \mathbb{E}[Y(d) | X], \quad m_{d,0}(X) := \mathbb{P}(D=d|X),$$
+
+e $\gamma_0$ sendo o quantil potencial de $Y(d)$. Como para quantis potenciais, a estimativa $g_d$ é construída via uma estimativa preliminar de $\gamma_0$. Para mais detalhes, veja [Kallus et al. (2019)](https://arxiv.org/abs/1912.12945).
+
+### 5.2.3 - Modelos de Diferença em Diferenças
+
+Os seguintes scores para modelos de diferença em diferenças são implementados.
+
+#### 5.2.3.1 - Dados em Painel
+
+Como na descrição do [modelo DiD](models.html#did-pa-model), os elementos nuisance necessários são para uma certa escolha de $(\mathrm{g}, t_\text{pre}, t_\text{eval})$ e $\delta$ e grupo controle $C_{i,t_\text{eval} + \delta}^{(\cdot)}$.
+
+Para fins de notação, omitiremos os subscritos $\mathrm{g}, t_\text{pre}, t_\text{eval}, \delta$ no seguinte e usaremos a notação: - $g_0(0, X_i)\equiv g_{0, \mathrm{g}, t_\text{pre}, t_\text{eval}, \delta}(X_i)$ (função de regressão de resultado populacional do grupo controle) - $m_0(X_i)\equiv m_{0, \mathrm{g}, t_\text{eval} + \delta}(X_i)$ (escore de propensão generalizado)
+
+Todos os scores no cenário multi-período têm a forma
+
+$$\psi(W; \theta, \eta) \cdot \mathbf{1}\{G^{\mathrm{g}}_i \vee C_{i,t_\text{eval} + \delta}^{(\cdot)} = 1\}$$
+
+i.e., o score é apenas não-zero para unidades no grupo de tratamento correspondente $\mathrm{g}$ e grupo controle $C_{i,t_\text{eval} + \delta}^{(\cdot)}$.
+
+Para o modelo de diferença em diferenças implementado em `DoubleMLDIDMulti` pode-se escolher entre `score='observational'` e `score='experimental'`.
+
+`score='observational'` implementa a função score (omitindo o índice de unidade $i$):
+
+$$\psi(W; \theta, \eta) := \left( G^{\mathrm{g}} - \frac{m(X)}{1-m(X)} \cdot (1-G^{\mathrm{g}}) \right) \left( (Y_{t_\text{eval}} - Y_{t_\text{pre}}) - g(0,X) - \theta \right)$$
+
+onde os componentes do score linear final $\psi$ são
+
+$$\psi_a(W; \eta) = -\left( G^{\mathrm{g}} - \frac{m(X)}{1-m(X)} \cdot (1-G^{\mathrm{g}}) \right),$$ $$\psi_b(W; \eta) = \left( G^{\mathrm{g}} - \frac{m(X)}{1-m(X)} \cdot (1-G^{\mathrm{g}}) \right) \left( (Y_{t_\text{eval}} - Y_{t_\text{pre}}) - g(0,X) \right)$$
+
+e os elementos nuisance $\eta=(g, m)$.
+
+**Nota:** Note que $1-G^{\mathrm{g}}=C^{(\cdot)}$ se $G^{\mathrm{g}} \vee C_{t_\text{eval} + \delta}^{(\cdot)}=1$.
+
+Se `in_sample_normalization='False'`, o score é definido como
+
+$$\psi(W; \theta, \eta) := \frac{1}{\mathbb{E}[G^{\mathrm{g}} + \frac{m(X)}{1-m(X)} \cdot (1-G^{\mathrm{g}})]} \left( G^{\mathrm{g}} - \frac{m(X)}{1-m(X)} \cdot (1-G^{\mathrm{g}}) \right) \left( (Y_{t_\text{eval}} - Y_{t_\text{pre}}) - g(0,X) - \theta \right)$$
+
+com $\eta=(g, m)$. Note que isso resultará no mesmo score, mas apenas usa normalização ligeiramente diferente.
+
+`score='experimental'` assume que a probabilidade de tratamento é independente das covariáveis $X$ e não depende do escore de propensão. Em vez disso, define as funções de regressão de resultado populacional para grupos tratados e controle como: - $g_0(0, X_i)\equiv \mathbb{E}[Y_{i,t_\text{eval}} - Y_{i,t_\text{pre}}|X_i, C_{i,t_\text{eval} + \delta}^{(\cdot)} = 1]$ (grupo controle) - $g_0(1, X_i)\equiv \mathbb{E}[Y_{i,t_\text{eval}} - Y_{i,t_\text{pre}}|X_i, G_i^{\mathrm{g}} = 1]$ (grupo tratado)
+
+`score='experimental'` implementa a função score:
+
+$$\psi(W; \theta, \eta) := G^{\mathrm{g}} \left( (Y_{t_\text{eval}} - Y_{t_\text{pre}}) - g(1,X) - \theta \right) + (1-G^{\mathrm{g}}) \left( (Y_{t_\text{eval}} - Y_{t_\text{pre}}) - g(0,X) \right)$$
+
+onde os componentes do score linear final $\psi$ são
+
+$$\psi_a(W; \eta) = -G^{\mathrm{g}},$$ $$\psi_b(W; \eta) = G^{\mathrm{g}} \left( (Y_{t_\text{eval}} - Y_{t_\text{pre}}) - g(1,X) \right) + (1-G^{\mathrm{g}}) \left( (Y_{t_\text{eval}} - Y_{t_\text{pre}}) - g(0,X) \right)$$
+
+e os elementos nuisance $\eta=(g)$.
+
+Analogamente, se `in_sample_normalization='False'`, o score é definido com normalização ligeiramente diferente.
+
+#### 5.2.3.2 - Dados de Corte Transversal Repetidos
+
+**Nota:** Será implementado em breve.
+
+#### 5.2.3.3 - Dois períodos de tratamento
+
+**Aviso:** Esta documentação refere-se à implementação descontinuada para dois períodos de tempo. Esta funcionalidade será removida em uma versão futura. As versões generalizadas são [Dados em Painel](#did-pa-score) e [Dados de Corte Transversal Repetidos](#did-cs-score).
+
+##### 5.2.3.3.1 - Dados em Painel
+
+Para o modelo de diferença em diferenças implementado em `DoubleMLDID` pode-se escolher entre `score='observational'` e `score='experimental'`.
+
+`score='observational'` implementa a função score (omitindo o índice de unidade $i$):
+
+$\psi(W; \theta, \eta) := \left( D - \frac{m(X)}{1-m(X)} \cdot (1-D) \right) \left( (Y_1 - Y_0) - g(0,X) - \theta \right)$
+
+onde os componentes do score linear são
+
+$\psi_a(W; \eta) = -\left( D - \frac{m(X)}{1-m(X)} \cdot (1-D) \right),$ $\psi_b(W; \eta) = \left( D - \frac{m(X)}{1-m(X)} \cdot (1-D) \right) \left( (Y_1 - Y_0) - g(0,X) \right)$
+
+e os elementos nuisance $\eta=(g, m)$ são definidos como
+
+$g_0(0,X) := \mathbb{E}[Y_1 - Y_0 | X, D=0], \quad m_0(X) := \mathbb{P}(D=1|X).$
+
+Se `in_sample_normalization='False'`, o score é definido como
+
+$\psi(W; \theta, \eta) := \frac{1}{\mathbb{E}[D + \frac{m(X)}{1-m(X)} \cdot (1-D)]} \left( D - \frac{m(X)}{1-m(X)} \cdot (1-D) \right) \left( (Y_1 - Y_0) - g(0,X) - \theta \right)$
+
+com $\eta=(g, m, p)$, onde $p_0 = \mathbb{E}[D]$ é estimado nos folds de cross-fitting. Note que isso resultará no mesmo score, mas apenas usa normalização ligeiramente diferente.
+
+`score='experimental'` assume que a probabilidade de tratamento é independente das covariáveis $X$ e implementa a função score:
+
+$\psi(W; \theta, \eta) := D \left( (Y_1 - Y_0) - g(1,X) - \theta \right) + (1-D) \left( (Y_1 - Y_0) - g(0,X) \right)$
+
+onde os componentes do score linear são
+
+$\psi_a(W; \eta) = -D,$ $\psi_b(W; \eta) = D \left( (Y_1 - Y_0) - g(1,X) \right) + (1-D) \left( (Y_1 - Y_0) - g(0,X) \right)$
+
+e os elementos nuisance $\eta=(g)$ são definidos como
+
+$g_0(d,X) := \mathbb{E}[Y_1 - Y_0 | X, D=d] \text{ para } d \in \{0,1\}.$
+
+Analogamente, se `in_sample_normalization='False'`, o score é definido como
+
+$\psi(W; \theta, \eta) := \frac{1}{\mathbb{E}[D]} \left[ D \left( (Y_1 - Y_0) - g(1,X) - \theta \right) + (1-D) \left( (Y_1 - Y_0) - g(0,X) \right) \right]$
+
+com $\eta=(g, p)$, onde $p_0 = \mathbb{E}[D]$ é estimado nos folds de cross-fitting. Note que isso resultará no mesmo score, mas apenas usa normalização ligeiramente diferente.
+
+##### 5.2.3.3.2 - Dados de Corte Transversal Repetidos
+
+Para o modelo de diferença em diferenças implementado em `DoubleMLDIDCS` pode-se escolher entre `score='observational'` e `score='experimental'`.
+
+`score='observational'` implementa a função score (omitindo o índice de unidade $i$):
+
+$\psi(W; \theta, \eta) := \left( D - \frac{m(X)}{1-m(X)} \cdot (1-D) \right) \left( Y - g(0,X) - \theta T \right)$
+
+onde os componentes do score linear são
+
+$\psi_a(W; \eta) = -\left( D - \frac{m(X)}{1-m(X)} \cdot (1-D) \right) T,$ $\psi_b(W; \eta) = \left( D - \frac{m(X)}{1-m(X)} \cdot (1-D) \right) \left( Y - g(0,X) \right)$
+
+e os elementos nuisance $\eta=(g)$ são definidos como
+
+$g_0(0,X) := \mathbb{E}[Y | X, D=0].$
+
+Se `in_sample_normalization='False'`, o score é definido como
+
+$\psi(W; \theta, \eta) := \frac{1}{\mathbb{E}[\left( D - \frac{m(X)}{1-m(X)} \cdot (1-D) \right) T]} \left( D - \frac{m(X)}{1-m(X)} \cdot (1-D) \right) \left( Y - g(0,X) - \theta T \right)$
+
+com $\eta=(g, p, \lambda)$, onde $p_0 = \mathbb{E}[D]$ e $\lambda_0 = \mathbb{E}[T]$ são estimados nos folds de cross-fitting. Note que isso resultará no mesmo score, mas apenas usa normalização ligeiramente diferente.
+
+`score='experimental'` assume que a probabilidade de tratamento é independente das covariáveis $X$ e implementa a função score:
+
+$\psi(W; \theta, \eta) := D \left( Y - g(1,X) - \theta T \right) + (1-D) \left( Y - g(0,X) \right)$
+
+onde os componentes do score linear são
+
+$\psi_a(W; \eta) = -D \cdot T,$ $\psi_b(W; \eta) = D \left( Y - g(1,X) \right) + (1-D) \left( Y - g(0,X) \right)$
+
+e os elementos nuisance $\eta=(g, m)$ são definidos como
+
+$g_0(d,X) := \mathbb{E}[Y | X, D=d] \text{ para } d \in \{0,1\}, \quad m_0(X) := \mathbb{P}(D=1|X).$
+
+Analogamente, se `in_sample_normalization='False'`, o score é definido como
+
+$\psi(W; \theta, \eta) := \frac{1}{\mathbb{E}[D \cdot T]} \left[ D \left( Y - g(1,X) - \theta T \right) + (1-D) \left( Y - g(0,X) \right) \right]$
+
+com $\eta=(g, m, p, \lambda)$, onde $p_0 = \mathbb{E}[D]$ e $\lambda_0 = \mathbb{E}[T]$ são estimados nos folds de cross-fitting. Note que isso resultará no mesmo score, mas apenas usa normalização ligeiramente diferente.
+
+### 5.2.4 - Modelos de Seleção Amostral
+
+Os seguintes scores para modelos de seleção amostral são implementados.
+
+#### 5.2.4.1 - Ausência Aleatória
+
+Para `DoubleMLSSM` o `score='missing-at-random'` implementa a função score:
+
+$$\psi(W; \theta, \eta) := \frac{S}{m_S(X)} \left\{ \frac{D \cdot (Y - g(1,X))}{\pi(D,X)} - \frac{(1-D) \cdot (Y - g(0,X))}{1 - \pi(D,X)} - \theta \left( \frac{D}{\pi(D,X)} - \frac{(1-D)}{1 - \pi(D,X)} \right) \right\}$$
+
+onde
+
+$$\psi_a(W; \eta) = -\frac{S}{m_S(X)} \left( \frac{D}{\pi(D,X)} - \frac{(1-D)}{1 - \pi(D,X)} \right),$$ $$\psi_b(W; \eta) = \frac{S}{m_S(X)} \left\{ \frac{D \cdot (Y - g(1,X))}{\pi(D,X)} - \frac{(1-D) \cdot (Y - g(0,X))}{1 - \pi(D,X)} \right\}$$
+
+para $d\in\{0,1\}$ e $\eta=(g, m, \pi)$ com valores verdadeiros
+
+$$g_{d,0}(X) := \mathbb{E}[Y(d) | X], \quad m_{S,0}(X) := \mathbb{P}(S=1|X), \quad \pi_{d,0}(X) := \mathbb{P}(D=d|X).$$
+
+Para mais detalhes, veja [Bia, Huber e Lafférs (2023)](https://doi.org/10.1080/07350015.2023.2271071).
+
+#### 5.2.4.2 - Não-resposta Não-ignorável
+
+Para `DoubleMLSSM` o `score='nonignorable'` implementa a função score:
+
+$$\psi(W; \theta, \eta) := \frac{S}{m_S(X)} \left\{ \frac{D \cdot (Y - g(1,X))}{\pi(D,X)} - \frac{(1-D) \cdot (Y - g(0,X))}{1 - \pi(D,X)} - \theta \left( \frac{D}{\pi(D,X)} - \frac{(1-D)}{1 - \pi(D,X)} \right) \right\} + \Pi(D,X,Z) - \theta$$
+
+onde
+
+$$\psi_a(W; \eta) = -\frac{S}{m_S(X)} \left( \frac{D}{\pi(D,X)} - \frac{(1-D)}{1 - \pi(D,X)} \right) - 1,$$ $$\psi_b(W; \eta) = \frac{S}{m_S(X)} \left\{ \frac{D \cdot (Y - g(1,X))}{\pi(D,X)} - \frac{(1-D) \cdot (Y - g(0,X))}{1 - \pi(D,X)} \right\} + \Pi(D,X,Z)$$
+
+para $d\in\{0,1\}$ e $\eta=(g, m, \pi, \Pi)$ com valores verdadeiros
+
+$$g_{d,0}(X) := \mathbb{E}[Y(d) | X], \quad m_{S,0}(X) := \mathbb{P}(S=1|X), \quad \pi_{d,0}(X) := \mathbb{P}(D=d|X), \quad \Pi_0(D,X,Z) := \mathbb{E}[Y(D) | D,X,Z].$$
+
+A estimativa de $\Pi_0$ é construída via uma estimativa preliminar de $\pi_0(D,X,Z)$ via cross-fitting aninhado.
+
+Para mais detalhes, veja [Bia, Huber e Lafférs (2023)](https://doi.org/10.1080/07350015.2023.2271071).
+
+## 5.3 - Especificação de Funções de Score Alternativas via Callables
+
+Via callables, funções de score escritas pelo usuário podem ser utilizadas. Esta funcionalidade está atualmente implementada apenas para classes de modelo específicas em Python.
+
+Para o modelo PLR implementado em `DoubleMLPLR`, uma função score alternativa pode ser definida via `score`. Escolha um objeto callable / função com assinatura `score(y, d, g_hat, m_hat, smpls)` que retorna os dois componentes de score $\psi_a()$ e $\psi_b()$.
+
+Por exemplo, a função score não-ortogonal
+
+$$\psi(W; \theta, \eta) = D(Y - D\theta - g(X))$$
+
+pode ser obtida com
+
+```{r, message = FALSE, warning = FALSE}
+
+non_orth_score = function(y, d, l_hat, m_hat, g_hat, smpls) {
+  u_hat = y - g_hat
+  psi_a = -1*d*d
+  psi_b = d*u_hat
+  psis = list(psi_a = psi_a, psi_b = psi_b)
+  return(psis)
+}
+
+```
+
+Use `DoubleMLPLR` com `inf_model=non_orth_score` para obter o estimador quando aplicar `fit()`.
+
+Note que esta estimativa será, em geral, propensa a um viés de regularização, veja também [Superando o viés de regularização por ortogonalização](basics.html#bias-non-orth).

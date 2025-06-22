@@ -1,0 +1,634 @@
+---
+title: "10 - Análise de Sensibilidade"
+author: "Hicham Munir Tayfour"
+output:
+  html_document:
+    theme: flatly       
+    toc: true           
+    toc_float: true     
+    code_folding: hide  
+    highlight: tango   
+editor_options: 
+  markdown: 
+    wrap: 72
+---
+
+# 10. Análise de Sensibilidade
+
+O pacote [DoubleML](../index.html#doubleml-package) implementa análise
+de sensibilidade em relação ao viés de variável omitida baseado em
+[Chernozhukov et al. (2022)](https://www.nber.org/papers/w30302).
+
+## 10.1 - Algoritmo Geral
+
+A seção [Teoria](#teoria) contém um resumo geral e as definições
+relevantes, enquanto [Implementação](#implementação) considera a parte
+geral da implementação.
+
+### 10.1.1 - Teoria {#teoria}
+
+Assumimos que podemos escrever o modelo na seguinte representação
+
+$$\mathbb{E}[m(W,f)] = 0$$
+
+onde geralmente $g_0(W) = \mathbb{E}[Y|X, D]$ (atualmente, a análise de
+sensibilidade está disponível apenas para modelos lineares).
+
+Desde que $\mathbb{E}[m(W,f)]$ seja um funcional linear contínuo de $f$,
+existe uma única variável aleatória quadrado-integrável $\alpha_0(W)$,
+chamada **representante de Riesz** (veja [teorema de representação de
+Riesz-Fréchet](https://en.wikipedia.org/wiki/Riesz_representation_theorem)),
+tal que
+
+$$\mathbb{E}[m(W,f)] = \mathbb{E}[\alpha_0(W) \cdot f(W)].$$
+
+O parâmetro alvo $\theta_0$ tem a seguinte representação
+
+$$\theta_0 = \mathbb{E}[\alpha_0(W) \cdot g_0(W)]$$
+
+que corresponde a uma função score ortogonal de Neyman (ortogonal em
+relação aos elementos nuisance $(g, \alpha)$). Para delimitar o viés de
+variável omitida, os seguintes elementos adicionais são necessários. A
+variância da regressão de resultado
+
+$$\sigma_0^2 := \mathbb{E}[(Y - g_0(W))^2]$$
+
+e o segundo momento do representante de Riesz
+
+$$\nu_0^2 := \mathbb{E}[\alpha_0(W)^2].$$
+
+Ambas as representações são ortogonais de Neyman em relação a $g$ e
+$\alpha$, respectivamente. Além disso, definimos as funções score
+correspondentes
+
+$$\psi_{\sigma^2}(W; g) := (Y - g(W))^2 - \sigma^2, \quad \psi_{\nu^2}(W; \alpha) := \alpha(W)^2 - \nu^2.$$
+
+Lembre que o parâmetro $\theta_0$ é identificado via a condição de
+momento
+
+$$\mathbb{E}[\psi(W; \theta_0, \eta_0)] = 0.$$
+
+Se $W=(Y, D, X)$ não inclui todas as variáveis confundidoras, o
+parâmetro alvo "verdadeiro" $\tilde{\theta}_0$ seria identificado apenas
+via a forma estendida (ou "longa")
+
+$$\mathbb{E}[\tilde{\psi}(\tilde{W}; \tilde{\theta}_0, \tilde{\eta}_0)] = 0$$
+
+onde $\tilde{W}=(Y, D, X, A)$ inclui os confundidores não observados
+$A$.
+
+No Teorema 2 de seu artigo, [Chernozhukov et al.
+(2022)](https://www.nber.org/papers/w30302) conseguem delimitar o viés
+de variável omitida
+
+$$|\tilde{\theta}_0 - \theta_0| \leq \rho \sqrt{C_Y^2 \cdot C_D^2}$$
+
+onde
+
+$$C_Y^2 := \frac{\mathbb{E}[(\tilde{g}(\tilde{W}) - g(W))^2]}{\sigma_0^2}, \quad C_D^2 := \frac{\nu_0^2}{\mathbb{E}[\tilde{\alpha}(\tilde{W})^2]} - 1$$
+
+denota o produto de variações adicionais na regressão de resultado e
+representante de Riesz geradas por confundidores omitidos e
+
+$$\rho := \frac{\mathbb{E}[(\tilde{g}(\tilde{W}) - g(W)) \cdot (\tilde{\alpha}(\tilde{W}) - \alpha(W))]}{\sqrt{\mathbb{E}[(\tilde{g}(\tilde{W}) - g(W))^2] \cdot \mathbb{E}[(\tilde{\alpha}(\tilde{W}) - \alpha(W))^2]}}$$
+
+denota as correlações entre os desvios gerados por confundidores
+omitidos. A escolha $\rho=1$ é conservadora e considera confundimento
+adversarial. Além disso, a delimitação pode ser expressa como
+
+$$|\tilde{\theta}_0 - \theta_0| \leq \sqrt{\frac{cf_y \cdot cf_d}{(1 - cf_d) \cdot (1 - cf_y)} \cdot \sigma_0^2 \cdot \nu_0^2}$$
+
+onde
+
+$$cf_y := \frac{C_Y^2 \cdot \sigma_0^2}{\sigma_0^2 + C_Y^2 \cdot \sigma_0^2} = \frac{C_Y^2}{1 + C_Y^2}, \quad cf_d := \frac{C_D^2}{1 + C_D^2}.$$
+
+Como $\sigma_0^2$ e $\nu_0^2$ não dependem dos confundidores não
+observados $A$, eles são identificados. Além disso, as outras partes têm
+as seguintes interpretações:
+
+-   **`cf_y`**
+    $:=\frac{\mathbb{E}[(\tilde{g}(\tilde{W}) - g(W))^2]}{\mathbb{E}[(Y - g(W))^2]}$
+    mede a proporção da variância residual no resultado $Y$ explicada
+    pelos confundidores latentes $A$
+
+-   **`cf_d`**
+    $:=1 - \frac{\mathbb{E}\big[\alpha(W)^2\big]}{\mathbb{E}\big[\tilde{\alpha}(\tilde{W})^2\big]}$
+    mede a proporção da variância residual no representante de Riesz
+    $\tilde{\alpha}(\tilde{W})$ gerada pelos confundidores latentes $A$
+
+**Nota:** `cf_y` tem a interpretação como o $R^2$ parcial não
+paramétrico de $A$ com $Y$ dado $(D,X)$.
+
+Para interpretações específicas do modelo de `cf_d` ou $C_D^2$, veja os
+capítulos correspondentes (ex: [Modelo de regressão parcialmente linear
+(PLR)](#modelos-linearmente-parciais-plm)).
+
+Consequentemente, para valores dados `cf_y` e `cf_d`, podemos criar
+limites inferior e superior para o parâmetro alvo $\tilde{\theta}_0$ da
+forma
+
+$$\theta_{\pm} := \theta_0 \pm \rho \sqrt{\frac{cf_y \cdot cf_d}{(1 - cf_d) \cdot (1 - cf_y)} \cdot \sigma_0^2 \cdot \nu_0^2}.$$
+
+Seja $\psi(W,\theta,\eta)$ a função score (corretamente escalada) para o
+parâmetro alvo $\theta_0$. Então
+
+$$\psi_{\pm}(W; \theta, \eta_{\pm}) := \psi(W; \theta, \eta) \pm \rho \sqrt{\frac{cf_y \cdot cf_d}{(1 - cf_d) \cdot (1 - cf_y)} \cdot \psi_{\sigma^2}(W; g) \cdot \psi_{\nu^2}(W; \alpha)}$$
+
+determina uma função score ortogonal para $\theta_{\pm}$, com elementos
+nuisance $\eta_\pm:=(g, \alpha, \sigma, \nu)$. O score pode ser usado
+para calcular os desvios padrão de $\theta_{\pm}$ via
+
+$$\mathbb{V}[\theta_{\pm}] = \mathbb{E}[\psi_{\pm}(W; \theta_{\pm}, \eta_{\pm})^2] / N.$$
+
+Para mais detalhes e interpretações, veja [Chernozhukov et al.
+(2022)](https://www.nber.org/papers/w30302).
+
+### 10.1.2 - Implementação {#implementação}
+
+O [Modelo de regressão parcialmente linear (PLR)](models.html#plr-model)
+será usado como exemplo:
+
+```{r, message = FALSE, warning = FALSE}
+
+library(DoubleML)
+
+library(mlr3)
+
+library(mlr3learners)
+
+library(data.table)
+
+lgr::get_logger("mlr3")$set_threshold("warn")
+
+learner = lrn("regr.ranger", num.trees = 100, mtry = 20, min.node.size = 2, max.depth = 5)
+
+ml_l = learner$clone()
+
+ml_m = learner$clone()
+
+set.seed(1111)
+
+data = make_plr_CCDDHNR2018(alpha = 0.5, n_obs = 500, dim_x = 20, return_type = 'data.table')
+
+obj_dml_data = DoubleMLData$new(data, y_col = "y", d_cols = "d")
+
+dml_plr_obj = DoubleMLPLR$new(obj_dml_data, ml_l, ml_m)
+
+```
+
+Se a análise de sensibilidade for implementada (veja [Implementações
+específicas por modelo](#implementações-específicas-por-modelo)), os
+elementos de sensibilidade correspondentes são estimados automaticamente
+chamando o método `fit()`. Na maioria dos casos, esses elementos são
+baseados nos seguintes estimadores plug-in:
+
+$$\hat{\sigma}^2 := \mathbb{E}_N[(Y - \hat{g}(W))^2], \quad \hat{\nu}^2 := \mathbb{E}_N[\hat{\alpha}(W)^2]$$
+
+onde $\hat{g}(W)$ e $\hat{\alpha}(W)$ denotam as predições cross-fitted
+da regressão de resultado e do representante de Riesz (ambos são
+específicos do modelo, veja [Implementações específicas por
+modelo](#implementações-específicas-por-modelo)). Além disso, os scores
+correspondentes são definidos como
+
+$$\hat{\psi}_{\sigma^2}(W_i) := (Y_i - \hat{g}(W_i))^2 - \hat{\sigma}^2, \quad \hat{\psi}_{\nu^2}(W_i) := \hat{\alpha}(W_i)^2 - \hat{\nu}^2.$$
+
+Após a chamada `fit()`, os elementos de sensibilidade são armazenados em
+uma lista e podem ser acessados via a propriedade
+`sensitivity_elements`.
+
+```{r, message = FALSE, warning = FALSE}
+
+dml_plr_obj$fit()
+
+print(names(dml_plr_obj$sensitivity_elements))
+
+```
+
+Cada valor é um array 3-dimensional, com as variâncias sendo da forma
+`(1, n_rep, n_coefs)` e os scores da forma `(n_obs, n_rep, n_coefs)`.
+
+O método `sensitivity_analysis()` então calcula os limites superior e
+inferior para a estimativa, baseado nos parâmetros de sensibilidade
+`cf_y`, `cf_d` e `rho` (padrão é `rho=1.0` para considerar confundimento
+adversarial). Adicionalmente, limites de confiança unilaterais são
+computados baseados em um nível de significância fornecido (padrão
+`level=0.95`).
+
+Os resultados são resumidos como uma string formatada no
+`sensitivity_summary`:
+
+```{r, message = FALSE, warning = FALSE}
+
+dml_plr_obj$sensitivity_analysis(cf_y = 0.03, cf_d = 0.03, rho = 1.0, level = 0.95)
+
+print(dml_plr_obj$sensitivity_summary)
+
+```
+
+ou podem ser acessados diretamente via a propriedade
+`sensitivity_params`:
+
+```{r, message = FALSE, warning = FALSE}
+
+print(dml_plr_obj$sensitivity_params)
+
+```
+
+Os limites são salvos como uma lista aninhada, onde as chaves `'theta'`
+denotam os limites no parâmetro $\hat{\theta}_{\pm}$, `'se'` denota o
+erro padrão correspondente e `'ci'` denota os limites de confiança
+inferior e superior para $\hat{\theta}_{\pm}$. Cada uma das chaves
+refere-se a uma lista com chaves `'lower'` e `'upper'` que se referem ao
+limite inferior ou superior, ex:
+`sensitivity_params[['theta']][['lower']]` refere-se ao limite inferior
+$\hat{\theta}_{-}$ do coeficiente estimado.
+
+Além disso, a análise de sensibilidade tem um parâmetro de entrada
+`theta` (com padrão `theta=0.0`), que se refere à hipótese nula usada
+para cada coeficiente. Esta hipótese nula é usada para calcular os
+valores de robustez como exibido nos `sensitivity_params`.
+
+O **valor de robustez** $RV$ é definido como a força de confundimento
+necessária (`cf_y=rv` e `cf_d=rv`), tal que o limite inferior ou
+superior do parâmetro causal inclua a hipótese nula. Se o parâmetro
+estimado $\hat{\theta}$ for maior que a hipótese nula, o limite inferior
+é usado e vice-versa.
+
+O **valor de robustez** $RVa$ é definido analogamente, mas
+adicionalmente incorpora incerteza estatística (pois é baseado nos
+intervalos de confiança dos limites).
+
+Para obter uma visão mais completa sobre a sensibilidade, pode-se chamar
+o método `sensitivity_plot()`. O método cria um gráfico de contorno, que
+calcula a estimativa do limite superior ou inferior para $\theta$
+(baseado na hipótese nula) para cada combinação de `cf_y` e `cf_d` em
+uma grade de valores.
+
+**Nota:** O `sensitivity_plot()` requer chamar `sensitivity_analysis`
+primeiro, pois a escolha do limite (superior ou inferior) é baseada na
+hipótese nula correspondente. Além disso, os parâmetros `rho` e `level`
+são usados. Ambos estão contidos na propriedade `sensitivity_params`. O
+`sensitivity_plot()` é criado para a primeira variável de tratamento.
+Isso pode ser alterado via o parâmetro `idx_treatment`. Os valores de
+robustez são dados via a interseção de contorno da hipótese nula e a
+identidade.
+
+### 10.1.3 - Benchmarking {#benchmarking}
+
+Os parâmetros de entrada para a análise de sensibilidade são bastante
+difíceis de interpretar (dependendo do modelo). Consequentemente, é
+desafiador propor limites razoáveis para a força de confundimento `cf_y`
+e `cf_d` (e `rho`). Para ter uma noção da magnitude dos limites, uma
+abordagem popular é confiar em confundidores observados para obter uma
+estimativa informada sobre a força de possíveis confundidores não
+observados.
+
+O princípio subjacente é relativamente simples. Se temos um confundidor
+observado $X_1$, somos capazes de emular confundimento omitido
+propositalmente omitindo $X_1$ e reajustando todo o modelo. Isso nos
+permite comparar a forma "longa" e "curta" com e sem confundimento
+omitido. Considerando os `sensitivity_params` de ambos os modelos,
+pode-se estimar a força correspondente de confundimento `cf_y` e `cf_d`
+(e `rho`).
+
+**Nota:** O benchmarking também pode ser feito com um conjunto de
+variáveis de benchmarking (ex: $X_1, X_2, X_3$), que tenta emular o
+efeito de múltiplos confundidores não observados. A abordagem é bastante
+computacionalmente demandante, pois o modelo curto que omite as
+variáveis de benchmark tem que ser ajustado.
+
+O método `sensitivity_benchmark()` implementa esta abordagem. O método
+apenas requer um conjunto de covariáveis válidas, o `benchmarking_set`,
+para computar o benchmark. As variáveis de benchmark devem ser um
+subconjunto das covariáveis usadas na análise principal.
+
+```{r, message = FALSE, warning = FALSE}
+
+benchmark_results = dml_plr_obj$sensitivity_benchmark(benchmarking_set = c("X1"))
+
+print(benchmark_results)
+
+```
+
+O método retorna um data.frame contendo os valores benchmarked para
+`cf_y`, `cf_d`, `rho` e a mudança nas estimativas `delta_theta`.
+
+**Nota:** Os resultados de benchmarking devem ser usados para ter uma
+ideia da magnitude/validade da força de confundimento proposta dos
+confundidores omitidos. Se esses valores estão próximos do confundimento
+real, depende inteiramente do cenário e escolha das variáveis de
+benchmarking. Um bom conjunto de benchmarking tem uma justificativa
+forte que se refere aos confundidores omitidos. Se as variáveis de
+benchmarking são apenas confundidores fracos, as estimativas de `rho`
+podem ser ligeiramente instáveis (devido a denominadores pequenos).
+
+A implementação é baseada no Apêndice D de [Chernozhukov et al.
+(2022)](https://www.nber.org/papers/w30302) e corresponde a uma
+generalização do processo de benchmarking no [pacote
+Sensemakr](https://github.com/carloscinelli/sensemakr) para modelos de
+regressão para uso com double machine learning. Para uma introdução ao
+Sensemakr, veja [Cinelli and Hazlett
+(2020)](https://doi.org/10.1111/rssb.12348) e a [introdução do
+Sensemakr](https://cran.r-project.org/web/packages/sensemakr/vignettes/sensemakr.html).
+
+As estimativas benchmarked são as seguintes:
+
+Seja o subscrito $short$ denotando a forma "curta" do modelo, onde as
+variáveis de benchmarking são omitidas. - $\hat{\sigma}^2_{short}$
+denota a variância da regressão de resultado na forma "curta". -
+$\hat{\nu}^2_{short}$ denota o segundo momento do representante de Riesz
+na forma "curta".
+
+Ambos os parâmetros estão contidos nos `sensitivity_params` da forma
+"curta".
+
+Isso permite a seguinte estimação dos $R^2$ não paramétricos da
+regressão de resultado: -
+$\hat{R}^2:= 1 - \frac{\hat{\sigma}^2}{\text{Var}(Y)}$ -
+$\hat{R}^2_{short}:= 1 - \frac{\hat{\sigma}^2_{short}}{\text{Var}(Y)}$
+
+e a razão de correlação das representações de Riesz estimadas:
+
+$$\hat{R}^2_{\alpha} := \frac{\hat{\nu}^2_{short}}{\hat{\nu}^2}.$$
+
+As estimativas benchmarked são então definidas como:
+
+-   **`cf_y`** $:=\frac{\hat{R}^2 - \hat{R}^2_{short}}{1 - \hat{R}^2}$
+    mede a proporção da variância residual no resultado $Y$ explicada
+    adicionando o `benchmarking_set` propositalmente omitido
+
+-   **`cf_d`** $:=\frac{1 - \hat{R}^2_{\alpha}}{\hat{R}^2_{\alpha}}$
+    mede o ganho proporcional em variação que o `benchmarking_set` cria
+    no representante de Riesz
+
+Além disso, o grau de adversidade $\rho$ pode ser estimado via:
+
+$$\hat{\rho} := \frac{\text{Cov}(\hat{g}(W) - \hat{g}_{short}(W), \hat{\alpha}(W) - \hat{\alpha}_{short}(W))}{\sqrt{\text{Var}(\hat{g}(W) - \hat{g}_{short}(W)) \cdot \text{Var}(\hat{\alpha}(W) - \hat{\alpha}_{short}(W))}}.$$
+
+Para uma descrição mais detalhada, veja o Apêndice D de [Chernozhukov et
+al. (2022)](https://www.nber.org/papers/w30302).
+
+**Nota:** Como o benchmarking requer a estimação de um modelo separado,
+o uso com predições externas geralmente não é possível, sem fornecer
+predições adicionais.
+
+## 10.2 - Implementações Específicas por Modelo {#implementações-específicas-por-modelo}
+
+Esta seção contém os detalhes de implementação para cada modelo
+específico e interpretações específicas do modelo.
+
+### 10.2.1 - Modelos Linearmente Parciais (PLM) {#modelos-linearmente-parciais-plm}
+
+Os seguintes modelos parcialmente lineares são implementados.
+
+#### 10.2.1.1 - Modelo de Regressão Parcialmente Linear (PLR)
+
+No [Modelo de regressão parcialmente linear
+(PLR)](models.html#plr-model), a força de confundimento `cf_d` pode ser
+ainda mais simplificada para corresponder à explicação de `cf_y`.
+
+Dado que o representante de Riesz assume a seguinte forma:
+
+$$\alpha_0(W) = D - \mathbb{E}[D|X]$$
+
+pode-se mostrar que:
+
+$$\mathbb{E}[\tilde{\alpha}(\tilde{W})^2] = \mathbb{E}[(D - \mathbb{E}[D|X,A])^2] = \text{Var}(D|X,A).$$
+
+Portanto:
+
+-   **`cf_y`**
+    $:=\frac{\mathbb{E}[(\tilde{g}(\tilde{W}) - g(W))^2]}{\mathbb{E}[(Y - g(W))^2]}$
+    mede a proporção da variância residual no resultado $Y$ explicada
+    pelos confundidores latentes $A$
+
+-   **`cf_d`**
+    $:=\frac{\mathbb{E}\big[\big(\mathbb{E}[D|X,A] - \mathbb{E}[D|X]\big)^2\big]}{\mathbb{E}\big[\big(D - \mathbb{E}[D|X]\big)^2\big]}$
+    mede a proporção da variância residual no tratamento $D$ explicada
+    pelos confundidores latentes $A$
+
+**Nota:** No [Modelo de regressão parcialmente linear
+(PLR)](models.html#plr-model), tanto `cf_y` quanto `cf_d` podem ser
+interpretados como $R^2$ parciais não paramétricos: - `cf_y` tem a
+interpretação como o $R^2$ parcial não paramétrico de $A$ com $Y$ dado
+$(D,X)$ - `cf_d` tem a interpretação como o $R^2$ parcial não
+paramétrico de $A$ com $D$ dado $X$
+
+Usando o modelo de regressão parcialmente linear com
+`score='partialling out'`, os `nuisance_elements` são implementados na
+seguinte forma:
+
+$$\hat{g}(W) = \hat{\ell}(X), \quad \hat{\alpha}(W) = D - \hat{m}(X)$$
+
+com scores:
+
+$$\hat{\psi}_{\sigma^2}(W_i) = (Y_i - \hat{\ell}(X_i))^2 - \hat{\sigma}^2, \quad \hat{\psi}_{\nu^2}(W_i) = (D_i - \hat{m}(X_i))^2 - \hat{\nu}^2.$$
+
+Se `score='IV-type'`, os elementos de sensibilidade são definidos como:
+
+$$\hat{g}(W) = \hat{g}(X), \quad \hat{\alpha}(W) = D - \hat{m}(X).$$
+
+### 10.2.2 - Modelos de Regressão Interativa (IRM)
+
+Os seguintes modelos de regressão não paramétrica são implementados.
+
+#### 10.2.2.1 - Modelo de Regressão Interativa (IRM)
+
+No [Modelo de Regressão Interativa Binária
+(IRM)](models.html#irm-model), o parâmetro alvo pode ser escrito como:
+
+$$\theta_0 = \mathbb{E}\left[\omega(Y,D,X) \left\{ \frac{D \cdot g_0(1,X)}{m_0(X)} - \frac{(1-D) \cdot g_0(0,X)}{1 - m_0(X)} \right\}\right]$$
+
+onde $\omega(Y,D,X)$ são pesos (ex: definidos como $1$ para o ATE). Isso
+implica as seguintes representações:
+
+$$g_0(W) = \frac{D \cdot g_0(1,X)}{m_0(X)} - \frac{(1-D) \cdot g_0(0,X)}{1 - m_0(X)}$$
+
+$$\alpha_0(W) = \omega(Y,D,X) \left( \frac{D}{m_0(X)} - \frac{(1-D)}{1 - m_0(X)} \right).$$
+
+**Nota:** No [Modelo de Regressão Interativa Binária
+(IRM)](models.html#irm-model) para o ATE (pesos iguais a $1$), a forma e
+interpretação de `cf_y` é a mesma que no [Modelo de regressão
+parcialmente linear (PLR)](models.html#plr-model).
+
+-   `cf_y` tem a interpretação como o $R^2$ parcial não paramétrico de
+    $A$ com $Y$ dado $(D,X)$
+
+-   `cf_d` assume a seguinte forma:
+
+$$cf_d = \frac{\mathbb{E}\left[\frac{1}{P(D=1|X,A)(1-P(D=1|X,A))} - \frac{1}{P(D=1|X)(1-P(D=1|X))}\right]}{\mathbb{E}\left[\frac{1}{P(D=1|X,A)(1-P(D=1|X,A))}\right]}$$
+
+onde o numerador mede o ganho na precisão condicional média para
+predizer $D$ usando $A$ além de $X$. O denominador é a precisão
+condicional média para predizer $D$ usando $A$ e $X$. Consequentemente,
+`cf_d` mede o ganho relativo na precisão condicional média.
+
+Note que $P(D=1|X,A)(1-P(D=1|X,A))$ denota a variância da distribuição
+condicional de $D$ dado $(X,A)$, tal que o inverso mede a precisão de
+predizer $D$ condicional em $(X,A)$.
+
+Incluir pesos muda apenas a definição de `cf_d` para:
+
+$$cf_d = \frac{\mathbb{E}\left[\omega(Y,D,X)^2 \left(\frac{1}{P(D=1|X,A)(1-P(D=1|X,A))} - \frac{1}{P(D=1|X)(1-P(D=1|X))}\right)\right]}{\mathbb{E}\left[\omega(Y,D,X)^2 \frac{1}{P(D=1|X,A)(1-P(D=1|X,A))}\right]}$$
+
+que tem interpretação como o ganho relativo ponderado na precisão
+condicional média.
+
+Os `nuisance_elements` são então computados com versões plug-in de
+acordo com a [Implementação](#implementação) geral.
+
+Para `score='ATE'`, os pesos são definidos como um:
+
+$$\omega(Y,D,X) = 1$$
+
+enquanto para `score='ATTE'`:
+
+$$\omega(Y,D,X) = \hat{m}(X)$$
+
+tal que:
+
+$$\hat{\alpha}(W) = \hat{m}(X) \left( \frac{D}{\hat{m}(X)} - \frac{(1-D)}{1 - \hat{m}(X)} \right).$$
+
+#### 10.2.2.2 - Resultados Potenciais Médios (APOs)
+
+No [Modelo de Regressão Interativa Binária
+(IRM)](models.html#irm-model), o resultado potencial médio (ponderado)
+para o nível de tratamento $d$ pode ser escrito como:
+
+$$\theta_0 = \mathbb{E}\left[\omega(Y,D,X) \frac{\mathbf{1}\{D=d\} \cdot g_0(d,X)}{m_{d,0}(X)}\right]$$
+
+onde $\omega(Y,D,X)$ são pesos (ex: definidos como $1$ para o APO). Isso
+implica as seguintes representações:
+
+$$g_0(W) = \frac{\mathbf{1}\{D=d\} \cdot g_0(d,X)}{m_{d,0}(X)}$$
+
+$$\alpha_0(W) = \omega(Y,D,X) \frac{\mathbf{1}\{D=d\}}{m_{d,0}(X)}.$$
+
+**Nota:** No [Modelo de Regressão Interativa Binária
+(IRM)](models.html#irm-model), a forma e interpretação de `cf_y` depende
+apenas da expectativa condicional $\mathbb{E}[Y|D,X]$.
+
+-   `cf_y` tem a interpretação como o $R^2$ parcial não paramétrico de
+    $A$ com $Y$ dado $(D,X)$
+
+-   `cf_d` assume a seguinte forma:
+
+$$cf_d = \frac{\mathbb{E}\left[\frac{1}{P(D=d|X,A)} - \frac{1}{P(D=d|X)}\right]}{\mathbb{E}\left[\frac{1}{P(D=d|X,A)}\right]}$$
+
+onde o numerador mede a mudança média nos pesos de propensão inversa
+para $D=d$ condicional em $A$ além de $X$. O denominador é a média dos
+pesos de propensão inversa para $D=d$ condicional em $A$ e $X$.
+Consequentemente, `cf_d` mede a mudança relativa nos pesos de propensão
+inversa.
+
+Incluir pesos muda apenas a definição de `cf_d` para uma interpretação
+como mudança relativa ponderada nos pesos de propensão inversa.
+
+Os `nuisance_elements` são então computados com versões plug-in de
+acordo com a [Implementação](#implementação) geral. Os pesos padrão são
+definidos como um, enquanto pesos que dependem de $Y$ ou $D$ devem ser
+fornecidos.
+
+### 10.2.3 - Modelos de Diferença em Diferenças
+
+Os seguintes modelos de diferença em diferenças são implementados.
+
+**Nota:** Note que [Benchmarking](#benchmarking) é relevante apenas para
+`score='observational'`, pois nenhum efeito de $X$ na atribuição de
+tratamento é assumido. Geralmente, recomendamos `score='observational'`,
+se confundimento não observado parecer plausível.
+
+#### 10.2.3.1 - Diferença em Diferenças para Dados em Painel {#diferença-em-diferenças-para-dados-em-painel}
+
+Para uma descrição detalhada dos scores e elementos nuisance, veja
+[Dados em Painel](scores.html#did-pa-score).
+
+Nos [Dados em painel](models.html#did-pa-model) com
+`score='observational'` e `in_sample_normalization=True`, a função score
+implica as seguintes representações:
+
+$$g_0(W) = g_0(0,X), \quad \alpha_0(W) = G^{\mathrm{g}} - \frac{m_0(X)}{1-m_0(X)} \cdot (1-G^{\mathrm{g}}).$$
+
+Se em vez disso `in_sample_normalization=False`, o representante de
+Riesz muda para:
+
+$$\alpha_0(W) = \frac{1}{\mathbb{E}[G^{\mathrm{g}} + \frac{m_0(X)}{1-m_0(X)} \cdot (1-G^{\mathrm{g}})]} \left( G^{\mathrm{g}} - \frac{m_0(X)}{1-m_0(X)} \cdot (1-G^{\mathrm{g}}) \right).$$
+
+Para `score='experimental'`, a função score implica as seguintes
+representações:
+
+$$g_0(W) = G^{\mathrm{g}} \cdot g_0(1,X) + (1-G^{\mathrm{g}}) \cdot g_0(0,X), \quad \alpha_0(W) = G^{\mathrm{g}}.$$
+
+Os `nuisance_elements` são então computados com versões plug-in de
+acordo com a [Implementação](#implementação) geral.
+
+**Nota:** Note que os elementos são apenas não-zero para unidades no
+grupo de tratamento correspondente $\mathrm{g}$ e grupo controle
+$C^{(\cdot)}$, pois $1-G^{\mathrm{g}}=C^{(\cdot)}$ se
+$G^{\mathrm{g}} \vee C_{t_\text{eval} + \delta}^{(\cdot)}=1$.
+
+#### 10.2.3.2 - Diferença em Diferenças para Seções Transversais Repetidas {#diferença-em-diferenças-para-seções-transversais-repetidas}
+
+**Nota:** Será implementado em breve.
+
+#### 10.2.3.3 - Dois Períodos de Tratamento
+
+**Aviso:** Esta documentação refere-se à implementação descontinuada
+para dois períodos de tempo. Esta funcionalidade será removida em uma
+versão futura. As versões generalizadas são [Diferença em Diferenças
+para Dados em Painel](#diferença-em-diferenças-para-dados-em-painel) e
+[Diferença em Diferenças para seções transversais
+repetidas](#diferença-em-diferenças-para-seções-transversais-repetidas).
+
+##### 10.2.3.3.1 - Dados em Painel
+
+Nos [Dados em painel](models.html#did-pa-model) com
+`score='observational'` e `in_sample_normalization=True`, a função score
+implica as seguintes representações:
+
+$$g_0(W) = g_0(0,X), \quad \alpha_0(W) = D - \frac{m_0(X)}{1-m_0(X)} \cdot (1-D).$$
+
+Se em vez disso `in_sample_normalization=False`, o representante de
+Riesz muda para:
+
+$$\alpha_0(W) = \frac{1}{\mathbb{E}[D + \frac{m_0(X)}{1-m_0(X)} \cdot (1-D)]} \left( D - \frac{m_0(X)}{1-m_0(X)} \cdot (1-D) \right).$$
+
+Para `score='experimental'`, a função score implica as seguintes
+representações:
+
+$$g_0(W) = D \cdot g_0(1,X) + (1-D) \cdot g_0(0,X), \quad \alpha_0(W) = D.$$
+
+Os `nuisance_elements` são então computados com versões plug-in de
+acordo com a [Implementação](#implementação) geral.
+
+##### 10.2.3.3.2 - Dados de Seção Transversal Repetidos
+
+Nas [Seções transversais repetidas](models.html#did-cs-model) com
+`score='observational'` e `in_sample_normalization=True`, a função score
+implica as seguintes representações:
+
+$$g_0(W) = g_0(0,X), \quad \alpha_0(W) = T \left( D - \frac{m_0(X)}{1-m_0(X)} \cdot (1-D) \right).$$
+
+Se em vez disso `in_sample_normalization=False`, o representante de
+Riesz (após simplificações) muda para:
+
+$$\alpha_0(W) = \frac{T}{\mathbb{E}[T \cdot (D + \frac{m_0(X)}{1-m_0(X)} \cdot (1-D))]} \left( D - \frac{m_0(X)}{1-m_0(X)} \cdot (1-D) \right).$$
+
+Para `score='experimental'` e `in_sample_normalization=True`, a função
+score implica as seguintes representações:
+
+$$g_0(W) = D \cdot g_0(1,X) + (1-D) \cdot g_0(0,X), \quad \alpha_0(W) = T \cdot D.$$
+
+E novamente, se em vez disso `in_sample_normalization=False`, o
+representante de Riesz (após simplificações) muda para:
+
+$$\alpha_0(W) = \frac{T \cdot D}{\mathbb{E}[T \cdot D]}.$$
+
+Os `nuisance_elements` são então computados com versões plug-in de
+acordo com a [Implementação](#implementação) geral.
+
+## 10.3 – Referências
+
+Chernozhukov, V., Demirer, M., Duflo, E., Fernández-Val, I. (2022).
+*Robust empirical sensitivity analysis for causal effects*. NBER Working
+Paper 30302.
