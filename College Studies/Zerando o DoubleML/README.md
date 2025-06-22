@@ -82,13 +82,5 @@ Chernozhukov, V., Chetverikov, D., Demirer, M., Duflo, E., Hansen, C., Newey, W.
 
 ---
 
-**Sinta-se à vontade para usar, estudar, adaptar ou expandir este material em seus projetos de pesquisa e aprendizado.**
-
-Todo o conteúdo é baseado na documentação oficial do DoubleML e foi traduzido com autorização educacional.
-
----
-
-🙏 **Espero que este trabalho contribua para o avanço da pesquisa em inferência causal no Brasil e países de língua portuguesa.**
-
 Atenciosamente,  
 **Hicham Munir Tayfour**
