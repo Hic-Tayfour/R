@@ -1,0 +1,985 @@
+---
+title: |
+  <div style="text-align:center; margin-top:20px;">
+    <h1 style="font-size:24px;"><strong>Gráficos no Padrão <em>The Economist</em> em R</strong></h1>
+    <h2 style="font-size:22px; font-weight:700; margin:24px 0 6px 0;">
+  🔧 Minhas utilitárias (com exemplos prontos)
+  </h2>
+  <p style="font-size:14px; color:#3F5661; margin:0 0 10px 0;">
+  Wrappers do <code>ggplot2</code> que já aplicam tema, paleta e formatação do guia automaticamente.
+  Abaixo mostro como chamar cada um, com exemplos mínimos.
+  </p>
+
+  </div>
+author: |
+  <div style="text-align:center;">
+    Hicham Tayfour — <a href="mailto:hichamt@al.insper.edu.br">hichamt@al.insper.edu.br</a>
+  </div>
+date: |
+  <div style="text-align:center;"><strong>São Paulo — `r format(Sys.Date(), "%d/%m/%Y")`</strong></div>
+
+output:
+  html_document:
+    toc: true
+    toc_depth: 2
+    toc_float:
+      collapsed: false
+      smooth_scroll: true
+    number_sections: true
+    theme: flatly
+    highlight: tango
+    df_print: paged
+    code_folding: show
+
+fontsize: 12pt
+encoding: UTF-8
+lang: pt-BR
+---
+
+```{css, echo=FALSE}
+
+#TOC {
+  border-radius: 10px;
+  box-shadow: 0 4px 10px rgba(0,0,0,.08);
+  border: 1px solid #e1e5ea;
+}
+#TOC:before {
+  content: "Insper – Guia de Gráficos";
+  display: block;
+  background: #2c3e50;
+  color: #fff;
+  padding: 10px 12px;
+  border-radius: 10px 10px 0 0;
+  font-weight: 700;
+  letter-spacing: .2px;
+}
+#TOC .tocify-item { font-size: 15px; line-height: 1.25; padding: 6px 12px; }
+#TOC .tocify-subheader .tocify-item { font-size: 14px; padding-left: 20px; }
+#TOC .tocify-focus { background: #ecf0f1; border-left: 4px solid #18bc9c; }
+#TOC .tocify { padding-bottom: 10px; }
+
+```
+
+```{r setup, include=FALSE}
+
+knitr::opts_chunk$set(
+  echo = TRUE, message = FALSE, warning = FALSE,
+  fig.width = 10,      # antes 11
+  fig.height = 5.8,    # antes 6.2
+  dpi = 110,           # baixa um pouco a densidade p/ o texto “crescer”
+  fig.retina = 1       # evita “miniaturizar” no navegador
+)
+
+
+```
+
+Aqui eu começo o “coração” do meu kit de gráficos no padrão **The Economist**. A ideia foi concentrar todas as decisões visuais (cores, tipografia, grades e legendas) num **núcleo único e reutilizável**, para que depois eu só plugue os dados e o gráfico já saia no estilo certo.
+
+O que eu fiz aqui:
+
+-   **Paletas e ordens de cor.** Recriei as famílias do guia (main, secondary, supporting, background, neutral) e defini ordens específicas por tipo de gráfico (barras, linhas, scatter, pie). Assim eu não fico caçando hex toda hora e mantenho consistência.
+
+-   **Tokens de tema (`econ_base`).** Deixei três variáveis globais (fundo, grade e texto). Se eu quiser mudar o “clima” do documento (ex.: fundo mais claro/escuro), faço num lugar só.
+
+-   **Helpers de escala.** Criei `scale_fill_econ()` e `scale_colour_econ()` para aplicar as paletas com `scale_*_manual()` sem repetição. Também dá para inverter ordem ou passar cores customizadas quando eu precisar.
+
+-   **Tema unificado (`theme_econ_base`).** Montei um tema minimalista com:
+
+    -   fundo cinza-claro do guia,
+    -   **grade só horizontal** por padrão,
+    -   títulos à esquerda e fonte condensada quando disponível,
+    -   legenda no topo e margens enxutas. Incluí um argumento `scale` para “engordar” todas as fontes de uma vez (ótimo quando o knit deixa tudo pequeno).
+
+-   **Exportação em pontos.** Um utilitário simples para salvar figuras com largura em **pt** (bem útil quando sigo specs editoriais).
+
+Por que eu fiz assim?
+
+-   **Separação de estilo e conteúdo.** O estilo vive aqui; os gráficos só mapeiam dados → estética. Fica fácil manter, reutilizar e padronizar.
+-   **Fidelidade ao manual.** Cores e grades seguem o guia, inclusive o uso do cinza para “Outros”.
+-   **Ergonomia.** As funções prontas por tipo de gráfico deixam meus scripts curtos e práticos de adaptar.
+
+Como eu uso esse núcleo:
+
+-   Ajusto a fonte trocando `font_family` no topo; o tema herda automaticamente.
+-   Se o knit reduzir textos, chamo `theme_econ_base(scale = 1.25)` (ou o valor que eu quiser).
+-   Troco a paleta de um gráfico com `scale_*_econ(palette = "secondary")` ou passo `values = ...` quando precisar de liberdade editorial.
+
+A partir daqui, eu defino essas peças-base — e logo depois parto para os exemplos de cada tipo de gráfico.
+
+# 🧰 Núcleo do Estilo (paletas, tema e helpers)
+
+**Para que serve:** centralizar o estilo. Aqui ficam as paletas do guia, o tema base e as escalas auxiliares que padronizam cores, fontes e grades em todos os gráficos.
+
+```{r}
+# Pacotes
+library(tidyverse)
+library(scales)
+library(showtext)
+
+# Tipografia (fallback simples)
+font_family <- if ("Roboto Condensed" %in% systemfonts::system_fonts()$family) "Roboto Condensed" else "sans"
+showtext_auto()
+
+# Paletas (as que usamos no projeto)
+econ_colors <- list(
+  main = c(
+    econ_red   = "#E3120B",
+    red1       = "#D86A77",
+    red_text   = "#CC334C",
+    blue1      = "#006BA2",
+    blue2      = "#3EBCD2",
+    blue2_text = "#0097A7"
+  ),
+  secondary = c(
+    mustard   = "#E6B83C",
+    burgundy  = "#A63D57",
+    mauve     = "#B48A9B",
+    teal      = "#008080",
+    aqua      = "#6FC7C7"
+  ),
+  supporting_bright = c(
+    purple = "#924C7A",
+    pink   = "#DA3C78",
+    orange = "#F7A11A",
+    lime   = "#B3D334"
+  ),
+  supporting_dark = c(
+    navy     = "#003D73",
+    cyan_dk  = "#005F73",
+    green_dk = "#385F44"
+  ),
+  background = c(
+    print_bkgd = "#E9EDF0",
+    highlight  = "#DDE8EF",
+    number_box = "#C2D3E0"
+  ),
+  neutral = c(
+    grid_lines = "#B7C6CF",
+    grey_box   = "#7C8C99",
+    grey_text  = "#333333",
+    black25    = "#BFBFBF",
+    black50    = "#808080",
+    black75    = "#404040",
+    black100   = "#000000"
+  ),
+  equal_lightness = c(
+    red    = "#A81829",
+    blue   = "#00588D",
+    cyan   = "#005F73",
+    green  = "#005F52",
+    yellow = "#714C00",
+    olive  = "#4C5900",
+    purple = "#78405F",
+    gold   = "#674E1F",
+    grey   = "#3F5661"
+  )
+)
+
+# Tokens base
+econ_base <- list(
+  bg   = econ_colors$background["print_bkgd"],
+  grid = econ_colors$neutral["grid_lines"],
+  text = "#0C0C0C"
+)
+
+# Ordens (conforme páginas do guia)
+econ_order6 <- unname(c(
+  econ_colors$main["blue1"], econ_colors$main["blue2"],
+  econ_colors$secondary["mustard"], econ_colors$secondary["teal"],
+  econ_colors$secondary["burgundy"], econ_colors$secondary["mauve"]
+))
+econ_stack6 <- unname(c(
+  econ_colors$main["blue1"], econ_colors$main["blue2"],
+  econ_colors$secondary["mustard"], econ_colors$main["blue2_text"],
+  econ_colors$secondary["aqua"], econ_colors$equal_lightness["blue"]
+))
+econ_line_order6 <- unname(c(
+  econ_colors$main["blue1"], econ_colors$main["blue2"],
+  econ_colors$secondary["mustard"], econ_colors$secondary["burgundy"],
+  econ_colors$main["blue2_text"], econ_colors$secondary["mauve"]
+))
+econ_line_stack_order6 <- econ_stack6
+econ_thermo_order6 <- unname(c(
+  econ_colors$main["blue2"], econ_colors$secondary["burgundy"],
+  econ_colors$secondary["mustard"], econ_colors$main["blue1"],
+  econ_colors$main["blue2_text"], econ_colors$secondary["mauve"]
+))
+econ_scatter_order6 <- unname(c(
+  econ_colors$main["blue2"], econ_colors$secondary["burgundy"],
+  econ_colors$secondary["mustard"], econ_colors$main["blue1"],
+  econ_colors$main["blue2_text"], econ_colors$secondary["mauve"]
+))
+econ_pie_order6 <- unname(c(
+  econ_colors$main["blue1"], econ_colors$main["blue2"],
+  econ_colors$secondary["mustard"], econ_colors$main["blue2_text"],
+  econ_colors$secondary["burgundy"], econ_colors$secondary["aqua"]
+))
+
+# Escalas auxiliares
+scale_fill_econ <- function(palette = c("order6","equal_lightness","main","secondary",
+                                        "supporting_bright","supporting_dark","neutral"),
+                            values = NULL, reverse = FALSE, ...) {
+  pal <- switch(match.arg(palette),
+                order6 = econ_order6,
+                equal_lightness = econ_colors$equal_lightness,
+                main = econ_colors$main,
+                secondary = econ_colors$secondary,
+                supporting_bright = econ_colors$supporting_bright,
+                supporting_dark   = econ_colors$supporting_dark,
+                neutral = econ_colors$neutral)
+  pal <- if (!is.null(values)) values else pal
+  pal <- unname(pal)
+  if (reverse) pal <- rev(pal)
+  scale_fill_manual(values = pal, ...)
+}
+scale_colour_econ <- function(palette = c("order6","equal_lightness","main","secondary",
+                                          "supporting_bright","supporting_dark","neutral"),
+                              values = NULL, reverse = FALSE, ...) {
+  pal <- switch(match.arg(palette),
+                order6 = econ_order6,
+                equal_lightness = econ_colors$equal_lightness,
+                main = econ_colors$main,
+                secondary = econ_colors$secondary,
+                supporting_bright = econ_colors$supporting_bright,
+                supporting_dark   = econ_colors$supporting_dark,
+                neutral = econ_colors$neutral)
+  pal <- if (!is.null(values)) values else pal
+  pal <- unname(pal)
+  if (reverse) pal <- rev(pal)
+  scale_colour_manual(values = pal, ...)
+}
+
+# Tema base
+theme_econ_base <- function(base_family = font_family) {
+  theme_minimal(base_family = base_family) +
+    theme(
+      plot.background  = element_rect(fill = econ_base$bg, colour = NA),
+      panel.background = element_rect(fill = econ_base$bg, colour = NA),
+      plot.title.position = "plot",
+      plot.title    = element_text(face = "bold", size = 20, hjust = 0, colour = econ_base$text, margin = margin(b = 2)),
+      plot.subtitle = element_text(size = 12.5, hjust = 0, colour = econ_base$text, margin = margin(b = 8)),
+      plot.caption  = element_text(size = 9, colour = econ_base$text),
+      axis.title = element_text(size = 11, colour = econ_base$text),
+      axis.text  = element_text(size = 10, colour = econ_base$text),
+      axis.line.x  = element_line(colour = econ_base$text, linewidth = 0.6),
+      axis.ticks.x = element_line(colour = econ_base$text, linewidth = 0.6),
+      panel.grid.major.y = element_line(colour = econ_base$grid, linewidth = 0.4),
+      panel.grid.major.x = element_blank(),
+      panel.grid.minor   = element_blank(),
+      legend.position = "top",
+      legend.title = element_blank(),
+      legend.text  = element_text(size = 10, colour = econ_base$text),
+      plot.margin = margin(t = 16, r = 16, b = 12, l = 16)
+    )
+}
+```
+
+------------------------------------------------------------------------
+
+# 📊 Barras — Lado a Lado
+
+**Quando usar:** para comparar valores entre diferentes categorias ou subgrupos, em um único ponto no tempo.  
+
+**Dica:** prefira barras horizontais quando os nomes das categorias forem longos — isso facilita a leitura dos rótulos.
+
+
+```{r}
+# Função
+econ_bar_side <- function(data,
+                          x, y,
+                          fill = NULL,
+                          horizontal = TRUE,
+                          palette = "order6",
+                          legend = TRUE,
+                          width = 0.66, dodge = 0.7,
+                          labels = list(title=NULL, subtitle=NULL, x=NULL, y=NULL, caption=NULL),
+                          format_values = c("number","percent","si")) {
+  format_values <- match.arg(format_values)
+  p <- ggplot(data, aes({{x}}, {{y}}))
+  has_fill <- !rlang::quo_is_null(rlang::enquo(fill))
+  if (has_fill) p <- p + aes(fill = {{fill}})
+  if (has_fill) {
+    p <- p + geom_col(width = width, position = position_dodge(width = dodge)) +
+      scale_fill_econ(palette = palette)
+  } else {
+    p <- p + geom_col(width = width, fill = unname(econ_order6[1]))
+  }
+  if (format_values == "percent") p <- p + scale_y_continuous(labels = label_percent())
+  if (format_values == "si")      p <- p + scale_y_continuous(labels = label_number_si())
+  if (horizontal) p <- p + coord_flip()
+  p <- p + theme_econ_base()
+  if (!has_fill || !legend) p <- p + guides(fill = "none")
+  p + labs(title=labels$title, subtitle=labels$subtitle, x=labels$x, y=labels$y, caption=labels$caption)
+}
+
+# Exemplo 1 — uma série (cada barra uma cor se quiser usar fill = pais)
+set.seed(10)
+df_bar1 <- tibble(
+  pais = c("Alemanha","Áustria","Espanha","França","Itália","Portugal"),
+  valor = round(runif(6, 20, 80), 0)
+) %>% mutate(pais = forcats::fct_reorder(pais, valor))
+econ_bar_side(
+  df_bar1, x = pais, y = valor,
+  labels = list(
+    title = "Consultas médicas por pessoa",
+    subtitle = "Países selecionados; barras ordenadas por valor",
+    caption = "Fonte: Exemplo sintético"
+  ),
+  legend = FALSE
+)
+
+# Exemplo 2 — duas séries
+set.seed(11)
+df_bar2 <- tibble(
+  pais = rep(c("Chile","Brasil","México","Malásia","Polônia","Índia"), each = 2),
+  grupo = rep(c("Classe média","Baixa renda"), times = 6),
+  valor = runif(12, 0.10, 0.80)
+)
+econ_bar_side(
+  df_bar2, x = pais, y = valor, fill = grupo,
+  labels = list(
+    title = "Defensores da democracia",
+    subtitle = "Proporção dizendo que eleições são muito importantes",
+    x = NULL, y = NULL, caption = "Fonte: Exemplo sintético"
+  ),
+  format_values = "percent"
+)
+```
+
+------------------------------------------------------------------------
+
+# 🧱 Barras — Empilhadas (absoluta e 100%)
+
+**Quando usar:** para mostrar a composição de valores por categoria ou ao longo do tempo, destacando a contribuição de cada parte no total.
+
+**Dica:** use a cor cinza para agrupar pequenas parcelas como “Outros”, mantendo o foco nas categorias principais.
+
+
+```{r}
+econ_bar_stacked <- function(data, x, y, fill,
+                             percent = FALSE, horizontal = FALSE, legend = TRUE,
+                             other_levels = NULL, width = 0.66,
+                             labels = list(title=NULL, subtitle=NULL, x=NULL, y=NULL, caption=NULL),
+                             format_values = c("number","percent","si")) {
+  format_values <- match.arg(format_values)
+  p <- ggplot(data, aes({{x}}, {{y}}, fill = {{fill}})) +
+    geom_col(width = width, position = if (percent) "fill" else "stack")
+  lvls <- levels(factor(dplyr::pull(data, {{fill}})))
+  pal_named <- setNames(rep_len(econ_stack6, length(lvls)), lvls)
+  if (!is.null(other_levels))
+    pal_named[names(pal_named) %in% other_levels] <- econ_colors$neutral["grey_box"]
+  p <- p + scale_fill_manual(values = pal_named)
+  if (percent || format_values == "percent") p <- p + scale_y_continuous(labels = label_percent())
+  else if (format_values == "si")             p <- p + scale_y_continuous(labels = label_number_si())
+  if (horizontal) p <- p + coord_flip()
+  p <- p + theme_econ_base()
+  if (!legend) p <- p + guides(fill = "none")
+  if (horizontal) {
+    p <- p + theme(panel.grid.major.y = element_blank(),
+                   panel.grid.major.x = element_line(colour = econ_base$grid, linewidth = 0.4))
+  }
+  p + labs(title=labels$title, subtitle=labels$subtitle, x=labels$x, y=labels$y, caption=labels$caption)
+}
+
+# Exemplo — empilhada normal
+set.seed(20)
+df_stack1 <- tibble(
+  segmento = rep(c("All mobiles","Smartphones"), each = 4),
+  operador = rep(c("AT&T","T-Mobile","Verizon","Other"), times = 2),
+  share    = c(30, 18, 22, 10, 44, 16, 12, 8)
+)
+econ_bar_stacked(
+  df_stack1, x = segmento, y = share, fill = operador,
+  other_levels = "Other",
+  labels = list(
+    title = "Market share por segmento",
+    subtitle = "Operadoras selecionadas; barras empilhadas",
+    x = NULL, y = "Unidades", caption = "Fonte: Exemplo sintético"
+  )
+)
+
+# Exemplo — 100% (horizontal)
+set.seed(21)
+df_stack2 <- tibble(
+  ano   = rep(2018:2022, each = 5),
+  canal = rep(c("Paid search","Display","Classified","Online video","Other"), times = 5),
+  share = runif(25, 5, 35)
+) %>%
+  group_by(ano) %>%
+  mutate(share = share/sum(share)) %>%
+  ungroup()
+econ_bar_stacked(
+  df_stack2, x = ano, y = share, fill = canal,
+  percent = TRUE, horizontal = TRUE, other_levels = "Other",
+  labels = list(
+    title = "Gasto em publicidade digital por canal",
+    subtitle = "Barras empilhadas 100%",
+    x = NULL, y = NULL, caption = "Fonte: Exemplo sintético"
+  ),
+  format_values = "percent"
+)
+```
+
+------------------------------------------------------------------------
+
+# 📈 Linhas — Lado a Lado
+
+**Quando usar:** para comparar a evolução de 2 a 6 séries ao longo do tempo, permitindo identificar tendências e diferenças entre elas.
+
+
+```{r}
+econ_line_side <- function(data,
+                           x, y, colour,
+                           linewidth = 1.1, legend = TRUE,
+                           labels = list(title=NULL, subtitle=NULL, x=NULL, y=NULL, caption=NULL),
+                           format_y = c("number","percent","si")) {
+  format_y <- match.arg(format_y)
+  p <- ggplot(data, aes({{x}}, {{y}}, colour = {{colour}})) +
+    geom_line(linewidth = linewidth, lineend = "round") +
+    scale_colour_manual(values = econ_line_order6) +
+    theme_econ_base()
+  if (format_y == "percent") p <- p + scale_y_continuous(labels = label_percent())
+  if (format_y == "si")      p <- p + scale_y_continuous(labels = label_number_si())
+  if (!legend) p <- p + guides(colour = "none")
+  p + labs(title=labels$title, subtitle=labels$subtitle, x=labels$x, y=labels$y, caption=labels$caption)
+}
+
+# Exemplo — 3 linhas
+set.seed(42)
+df_line3 <- tidyr::crossing(
+  ano = 2010:2024, serie = c("Japão","EUA","Alemanha")
+) %>%
+  group_by(serie) %>%
+  arrange(ano, .by_group = TRUE) %>%
+  mutate(base = 10 + 0.8 * as.integer(factor(serie)),
+         valor = base + cumsum(rnorm(n(), 0, 0.2))) %>%
+  ungroup()
+econ_line_side(
+  df_line3, x = ano, y = valor, colour = serie,
+  labels = list(
+    title = "Linhas lado a lado (3 séries)",
+    subtitle = "Sem marcadores; ordem de cor oficial",
+    x = NULL, y = "Índice", caption = "Fonte: Exemplo sintético"
+  )
+)
+
+# Exemplo — 6 linhas
+set.seed(99)
+df_line6 <- tidyr::crossing(
+  ano = 2010:2024, serie = paste0("S", 1:6)
+) %>%
+  group_by(serie) %>%
+  arrange(ano, .by_group = TRUE) %>%
+  mutate(base = 10 + 0.7 * as.integer(factor(serie)),
+         valor = base + cumsum(rnorm(n(), 0, 0.3))) %>%
+  ungroup()
+econ_line_side(
+  df_line6, x = ano, y = valor, colour = serie,
+  labels = list(
+    title = "Linhas lado a lado (6 séries)",
+    subtitle = "Cores: azul, ciano, mostarda, bordô, teal, malva",
+    x = NULL, y = "Índice", caption = "Fonte: Exemplo sintético"
+  )
+)
+```
+
+------------------------------------------------------------------------
+
+# 🧩 Linhas — Empilhadas (área / 100%)
+
+**Quando usar:** para mostrar a soma de valores por grupo (área empilhada) ou a participação relativa de cada grupo ao longo do tempo (100%).  
+
+**Dica:** utilize a versão 100% quando o interesse for proporções; prefira a versão absoluta quando o foco for o volume total.
+
+
+```{r}
+econ_line_stacked <- function(data, x, y, fill,
+                              percent = FALSE, legend  = TRUE, alpha = 0.95,
+                              labels  = list(title=NULL, subtitle=NULL, x=NULL, y=NULL, caption=NULL),
+                              format_y = c("number","percent","si"),
+                              legend_reverse = FALSE) {
+  format_y <- match.arg(format_y)
+  p <- ggplot(data, aes({{x}}, {{y}}, fill = {{fill}})) +
+    geom_area(position = if (percent) "fill" else "stack", alpha = alpha, colour = NA) +
+    scale_fill_manual(values = econ_line_stack_order6) +
+    theme_econ_base()
+  if (percent || format_y == "percent") p <- p + scale_y_continuous(labels = label_percent())
+  else if (format_y == "si")            p <- p + scale_y_continuous(labels = label_number_si())
+  if (!legend) p <- p + guides(fill = "none")
+  else if (legend_reverse) p <- p + guides(fill = guide_legend(reverse = TRUE))
+  p + labs(title=labels$title, subtitle=labels$subtitle, x=labels$x, y=labels$y, caption=labels$caption)
+}
+
+# Exemplo — área empilhada
+set.seed(123)
+df_area_abs <- tidyr::crossing(
+  ano   = 2005:2020,
+  grupo = c("China","Outros países em desenvolvimento","Índia","Brasil","Rússia")
+) %>%
+  group_by(grupo) %>%
+  arrange(ano, .by_group = TRUE) %>%
+  mutate(base = c(5, 3.5, 2.8, 2.4, 2.0)[as.integer(factor(grupo))],
+         fluxo = base + cumsum(abs(rnorm(n(), 0.05, 0.05)))) %>%
+  ungroup()
+econ_line_stacked(
+  df_area_abs, x = ano, y = fluxo, fill = grupo,
+  labels = list(
+    title = "Linhas empilhadas (área)",
+    subtitle = "Soma absoluta por grupo",
+    x = NULL, y = "Unidades", caption = "Fonte: Exemplo sintético"
+  )
+)
+
+# Exemplo — 100%
+set.seed(321)
+df_area_pct <- tidyr::crossing(
+  ano   = 2010:2022,
+  grupo = c("Setor A","Setor B","Setor C","Setor D","Setor E","Setor F")
+) %>%
+  group_by(ano) %>%
+  mutate(valor = rgamma(n(), 2, 1), share = valor / sum(valor)) %>%
+  ungroup()
+econ_line_stacked(
+  df_area_pct, x = ano, y = share, fill = grupo,
+  percent = TRUE,
+  labels = list(
+    title = "Linhas empilhadas 100%",
+    subtitle = "Participação relativa por ano",
+    x = NULL, y = NULL, caption = "Fonte: Exemplo sintético"
+  ),
+  format_y = "percent", legend_reverse = TRUE
+)
+```
+
+------------------------------------------------------------------------
+
+# 🌡️ Termômetro (haste + ponto / dot terminals)
+
+**Quando usar:** para comparar valores pontuais entre categorias, permitindo visualizar diferenças de magnitude de forma clara.  
+
+**Dica:** use hastes cinza bem finas para dar contexto e pontos coloridos para destacar os valores; opte apenas pelos pontos (“dot terminals”) quando houver risco de poluição visual.
+
+
+```{r}
+econ_thermometer <- function(data, category, value, group = NULL,
+                             segments = TRUE, stem_size = 0.6, dot_size  = 2.6,
+                             legend = TRUE,
+                             labels = list(title=NULL, subtitle=NULL, x=NULL, y=NULL, caption=NULL),
+                             format_x = c("number","percent","si")) {
+  format_x <- match.arg(format_x)
+  df <- data %>%
+    mutate(.cat = forcats::fct_rev(forcats::fct_inorder({{category}})),
+           .grp = if (rlang::quo_is_null(rlang::enquo(group))) factor("value")
+                  else forcats::fct_inorder({{group}}))
+  p <- ggplot(df, aes(x = {{value}}, y = .cat, colour = .grp))
+  if (segments) {
+    p <- p + geom_segment(aes(x = 0, xend = {{value}}, y = .cat, yend = .cat),
+                          inherit.aes = FALSE, colour = econ_colors$neutral["grid_lines"],
+                          linewidth = stem_size, lineend = "round")
+  }
+  p <- p + geom_point(size = dot_size, stroke = 0)
+  pal <- rep(econ_thermo_order6, length.out = nlevels(df$.grp)); names(pal) <- levels(df$.grp)
+  p <- p + scale_colour_manual(values = pal)
+  if (format_x == "percent") p <- p + scale_x_continuous(labels = label_percent(), expand = expansion(mult = c(0, .02)))
+  if (format_x == "si")      p <- p + scale_x_continuous(labels = label_number_si(), expand = expansion(mult = c(0, .02)))
+  if (format_x == "number")  p <- p + scale_x_continuous(expand = expansion(mult = c(0, .02)))
+  p <- p + theme_econ_base() +
+    theme(panel.grid.major.y = element_blank(),
+          panel.grid.major.x = element_line(colour = econ_base$grid, linewidth = 0.4)) +
+    expand_limits(x = 0)
+  if (!legend || nlevels(df$.grp) == 1) p <- p + guides(colour = "none")
+  else p <- p + guides(colour = guide_legend(override.aes = list(linetype = 0, size = 3)))
+  p + labs(title=labels$title, subtitle=labels$subtitle, x=labels$x, y=labels$y, caption=labels$caption)
+}
+
+# Exemplo — 3 linhas
+set.seed(7)
+disc <- c("Matemática","Economia","Computação","Administração","Biologia",
+          "Filosofia","História","Inglês","Comunicação","Sociologia")
+df_th3 <- tidyr::crossing(disciplina = disc, grupo = c("um","dois","três")) %>%
+  mutate(valor = round(runif(n(), 20, 400), 0))
+econ_thermometer(
+  df_th3, category = disciplina, value = valor, group = grupo,
+  labels = list(
+    title = "Thermometer chart (3 linhas)",
+    subtitle = "Hastes cinza finas + pontos coloridos por série",
+    x = NULL, y = NULL, caption = "Fonte: Exemplo sintético"
+  ), format_x = "number"
+)
+
+# Exemplo — dot terminals em %
+set.seed(9)
+df_th4 <- tidyr::crossing(disciplina = disc, grupo = paste("G", 1:4)) %>%
+  mutate(valor = runif(n(), 0.05, 1))
+econ_thermometer(
+  df_th4, category = disciplina, value = valor, group = grupo,
+  segments = FALSE,
+  labels = list(
+    title = "Thermometer chart (dot terminals)",
+    subtitle = "Apenas pontos quando as hastes atrapalham",
+    x = NULL, y = NULL, caption = "Fonte: Exemplo sintético"
+  ), format_x = "percent"
+)
+```
+
+------------------------------------------------------------------------
+
+# 🔴 Dispersão & Bubble
+
+**Quando usar:** para explorar relações entre duas variáveis (dispersão) ou três variáveis quando o tamanho dos pontos representa uma métrica adicional (bubble). 
+
+**Dica:** aplique transparência nos pontos para evitar sobreposição excessiva e utilize destaques ou linhas de tendência para evidenciar padrões importantes.
+
+
+```{r}
+# Versão robusta (highlight pode ser coluna ou vetor lógico)
+econ_scatter <- function(data, x, y, colour = NULL, size_var = NULL,
+                         style = c("standard","bubble"),
+                         highlight = NULL, trendline = FALSE,
+                         labels = list(title=NULL, subtitle=NULL, x=NULL, y=NULL, caption=NULL),
+                         format_x = c("number","percent","si"),
+                         format_y = c("number","percent","si")) {
+  style    <- match.arg(style)
+  format_x <- match.arg(format_x)
+  format_y <- match.arg(format_y)
+
+  aes_base <- aes({{x}}, {{y}})
+  if (!rlang::quo_is_null(rlang::enquo(colour))) aes_base$colour <- rlang::enquo(colour)
+  if (!rlang::quo_is_null(rlang::enquo(size_var))) aes_base$size   <- rlang::enquo(size_var)
+  p <- ggplot(data, aes_base)
+
+  if (style == "standard") {
+    p <- p + geom_point(alpha = 0.5, size = 2.2, stroke = 0, shape = 16)
+  } else {
+    p <- p + geom_point(alpha = 0.5, size = 3.2, shape = 21,
+                        colour = econ_base$text, stroke = 0.3,
+                        aes(fill = {{colour}}))
+  }
+  if (style == "standard") {
+    if (!rlang::quo_is_null(rlang::enquo(colour))) p <- p + scale_colour_manual(values = econ_scatter_order6)
+  } else {
+    if (!rlang::quo_is_null(rlang::enquo(colour))) p <- p + scale_fill_manual(values = econ_scatter_order6)
+  }
+
+  h_quo <- rlang::enquo(highlight)
+  if (!rlang::quo_is_null(h_quo)) {
+    hi_vec <- rlang::eval_tidy(h_quo, data = data)
+    if (is.logical(hi_vec) && length(hi_vec) == nrow(data) && any(hi_vec, na.rm = TRUE)) {
+      d_hi <- data[which(hi_vec %in% TRUE), , drop = FALSE]
+      aes_hi <- aes({{x}}, {{y}})
+      if (!rlang::quo_is_null(rlang::enquo(colour))) {
+        if (style == "standard") aes_hi$colour <- rlang::enquo(colour) else aes_hi$fill <- rlang::enquo(colour)
+      }
+      if (style == "standard") {
+        p <- p + geom_point(data = d_hi, aes_hi, alpha = 1, size = 2.6, shape = 16, stroke = 0)
+      } else {
+        p <- p + geom_point(data = d_hi, aes_hi, alpha = 1, size = 3.6, shape = 21,
+                            colour = econ_base$text, stroke = 0.3)
+      }
+    }
+  }
+
+  if (trendline) {
+    p <- p + geom_smooth(method = "lm", se = FALSE, linewidth = 0.4, linetype = "22",
+                         colour = econ_base$text, alpha = 0.9)
+  }
+  if (!rlang::quo_is_null(rlang::enquo(size_var))) p <- p + scale_size_area(max_size = 10, guide = "none")
+  if (format_x == "percent") p <- p + scale_x_continuous(labels = label_percent())
+  if (format_x == "si")      p <- p + scale_x_continuous(labels = label_number_si())
+  if (format_y == "percent") p <- p + scale_y_continuous(labels = label_percent())
+  if (format_y == "si")      p <- p + scale_y_continuous(labels = label_number_si())
+
+  p + theme_econ_base() +
+    theme(panel.grid.major.x = element_blank(),
+          panel.grid.major.y = element_line(colour = econ_base$grid, linewidth = 0.4)) +
+    labs(title = labels$title, subtitle = labels$subtitle,
+         x = labels$x, y = labels$y, caption = labels$caption)
+}
+
+# Connected scatter
+econ_scatter_connected <- function(data, x, y, series, order_var, colour = NULL,
+                                   linewidth = 0.9,
+                                   labels = list(title=NULL, subtitle=NULL, x=NULL, y=NULL, caption=NULL)) {
+  aes_line <- aes({{x}}, {{y}}, group = {{series}})
+  if (!rlang::quo_is_null(rlang::enquo(colour))) aes_line$colour <- rlang::enquo(colour)
+  p <- ggplot(data, aes_line) +
+    geom_path(linewidth = linewidth, lineend = "round") +
+    geom_point(size = 1.8) +
+    theme_econ_base()
+  if (!rlang::quo_is_null(rlang::enquo(colour))) p <- p + scale_colour_manual(values = econ_scatter_order6)
+  p + labs(title=labels$title, subtitle=labels$subtitle, x=labels$x, y=labels$y, caption=labels$caption)
+}
+
+# Exemplo — padrão + highlight + tendência
+set.seed(1)
+n <- 200
+df_sc <- tibble(
+  emprego = rnorm(n, 50, 15),
+  renda   = 0.5*emprego + rnorm(n, 0, 10) + 40,
+  regiao  = sample(c("Norte","Sul","Leste","Oeste"), n, TRUE)
+) %>% mutate(outlier = renda > quantile(renda, .97))
+econ_scatter(
+  df_sc, x = emprego, y = renda, colour = regiao,
+  style = "standard", highlight = outlier, trendline = TRUE,
+  labels = list(
+    title = "Dispersão padrão",
+    subtitle = "Pontos 50% opacos; destaques 100% + linha de tendência",
+    x = "Emprego", y = "Renda", caption = "Fonte: Exemplo sintético"
+  )
+)
+
+# Exemplo — bubble
+set.seed(2)
+df_bub <- tibble(
+  x = runif(120, 0, 1), y = runif(120, 0, 1),
+  cat = sample(paste("C", 1:5), 120, TRUE),
+  pop = rexp(120, 3) * 1e6
+)
+econ_scatter(
+  df_bub, x = x, y = y, colour = cat, size_var = pop,
+  style = "bubble",
+  labels = list(
+    title = "Bubble chart (category dot)",
+    subtitle = "Contorno ~0.3px, fill 50% e tamanho proporcional",
+    x = NULL, y = NULL, caption = "Fonte: Exemplo sintético"
+  ),
+  format_x = "percent", format_y = "percent"
+)
+
+# Exemplo — connected scatter
+set.seed(3)
+df_conn <- crossing(pais = c("Japão","EUA","França"), ano = 2010:2020) %>%
+  arrange(pais, ano) %>%
+  group_by(pais) %>%
+  mutate(x = cumsum(rnorm(n(), 0.4, 0.5)) + 10,
+         y = cumsum(rnorm(n(), 0.5, 0.6)) + 10, grupo = pais) %>%
+  ungroup()
+econ_scatter_connected(
+  df_conn, x = x, y = y, series = pais, order_var = ano, colour = grupo,
+  labels = list(
+    title = "Connected scatter",
+    subtitle = "Linhas ligando a trajetória por país",
+    x = NULL, y = NULL, caption = "Fonte: Exemplo sintético"
+  )
+)
+```
+
+------------------------------------------------------------------------
+
+# 🍩 Pizza & Rosca
+
+**Quando usar:** para ilustrar a divisão de um todo em poucas partes (até 4–6 categorias), facilitando a visualização de proporções simples.  
+
+**Dica:** reserve a cor cinza para agrupar fatias menores em “Outros” e considere a versão em rosca quando quiser adicionar texto ou valores no centro.
+
+
+```{r}
+# Helper para rótulos SI (substitui label_number_si())
+label_si_br <- scales::label_number(
+  scale_cut    = scales::cut_short_scale(),
+  big.mark     = ".",
+  decimal.mark = ","
+)
+
+econ_pie <- function(data, cat, val, type = c("pie","doughnut"),
+                     top_n = NULL, other_label = "Outros",
+                     show_labels = TRUE, label_kind = c("percent","value","both"),
+                     min_pct_label = 0.06, hole_text = NULL,
+                     start = 0, direction = 1,
+                     title = NULL, subtitle = NULL, caption = "Fonte: Exemplo sintético") {
+  type <- match.arg(type); label_kind <- match.arg(label_kind)
+  df <- as_tibble(data) %>%
+    group_by({{cat}}) %>%
+    summarise(valor = sum({{val}}, na.rm = TRUE), .groups = "drop") %>%
+    arrange(desc(valor))
+  if (!is.null(top_n) && nrow(df) > top_n) {
+    df <- bind_rows(
+      df %>% slice(1:top_n),
+      tibble(`{{cat}}` := other_label,
+             valor = sum(df$valor[(top_n+1):nrow(df)], na.rm = TRUE))
+    )
+    names(df)[1] <- rlang::as_name(rlang::enquo(cat))
+  }
+  total <- sum(df$valor)
+  df <- df %>%
+    mutate(pct = valor/total,
+           lab = case_when(
+             label_kind == "percent" ~ label_percent(accuracy = 1)(pct),
+             label_kind == "value"   ~ label_number(big.mark=".", decimal.mark=",")(valor),
+             TRUE ~ paste0(label_percent(accuracy = 1)(pct), " (",
+                           label_number(big.mark=".", decimal.mark=",")(valor), ")")
+           ),
+           cat_f = forcats::fct_inorder(!!rlang::enquo(cat)))
+  pal <- econ_pie_order6
+  if (any(df[[1]] %in% other_label, na.rm = TRUE)) pal <- c(pal, econ_base$grid)
+  pal <- rep(pal, length.out = length(levels(df$cat_f))); names(pal) <- levels(df$cat_f)
+  base_theme <- theme_void(base_family = font_family) +
+    theme(plot.background  = element_rect(fill = econ_base$bg, colour = NA),
+          panel.background = element_rect(fill = econ_base$bg, colour = NA),
+          legend.position = "none",
+          plot.title    = element_text(face = "bold", size = 20, hjust = 0, colour = econ_base$text),
+          plot.subtitle = element_text(size = 12.5, hjust = 0, colour = econ_base$text),
+          plot.caption  = element_text(size = 9,  hjust = 1, colour = econ_base$text),
+          plot.margin   = margin(16,16,14,16))
+  if (type == "pie") {
+    g <- ggplot(df, aes(x = 1, y = valor, fill = cat_f)) +
+      geom_col(width = 1, colour = econ_base$bg, linewidth = 0.6) +
+      coord_polar(theta = "y", start = start, direction = direction) +
+      scale_fill_manual(values = pal) + base_theme +
+      labs(title = title, subtitle = subtitle, caption = caption)
+  } else {
+    g <- ggplot(df, aes(x = 2, y = valor, fill = cat_f)) +
+      geom_col(width = 1, colour = econ_base$bg, linewidth = 0.6) +
+      coord_polar(theta = "y", start = start, direction = direction) +
+      xlim(0.5, 2.5) +
+      scale_fill_manual(values = pal) + base_theme +
+      labs(title = title, subtitle = subtitle, caption = caption)
+    if (!is.null(hole_text)) {
+      g <- g + annotate("text", x = 0, y = 0, label = hole_text,
+                        family = font_family, colour = econ_base$text,
+                        size = 4, lineheight = 1.05, fontface = "bold")
+    }
+  }
+  if (show_labels) {
+    g <- g + geom_text(
+      data = df %>% filter(pct >= min_pct_label),
+      aes(label = lab),
+      position = position_stack(vjust = 0.5),
+      family = font_family, size = 3.2, colour = econ_base$text
+    )
+  }
+  g
+}
+
+# Exemplo — pizza
+df_pie <- tibble(
+  categoria = c("A","B","C","D"),
+  valor = c(42, 28, 18, 12)
+)
+econ_pie(
+  df_pie, cat = categoria, val = valor,
+  type = "pie",
+  title = "Participação por segmento",
+  subtitle = "Pizza com ordem de cor do guia"
+)
+
+# Exemplo — rosca com “Outros”
+df_donut <- tibble(
+  setor = c("Automotivo","Tecnologia","Serviços","Energia","Varejo","Outros nichos"),
+  v     = c(23, 19, 17, 14, 11, 9)
+)
+econ_pie(
+  df_donut, cat = setor, val = v,
+  type = "doughnut", top_n = 5,
+  hole_text = paste0("Total\n", label_si_br(sum(df_donut$v))),
+  title = "Receita por setor",
+  subtitle = "Rosca com ‘Outros’ em cinza"
+)
+```
+
+------------------------------------------------------------------------
+
+# 🕒 Timelines (linhas + períodos + eventos)
+
+**Quando usar:** para mostrar a evolução de uma ou mais séries ao longo do tempo, destacando períodos e eventos relevantes que ajudam a contextualizar as mudanças observadas.  
+
+**Dica:** use faixas alternadas para marcar diferentes eras e setas finas para indicar eventos, mantendo os rótulos curtos e objetivos para evitar poluição visual.
+
+
+```{r}
+.make_alternating <- function(n) rep(c(TRUE, FALSE), length.out = n)
+
+econ_timeline_data <- function(data, x, y, series = NULL,
+                               periods = NULL, events  = NULL,
+                               labels = list(title=NULL, subtitle=NULL, x=NULL, y=NULL, caption="Fonte: Exemplo sintético"),
+                               format_y = c("number","percent","si"),
+                               linewidth = 1.1, legend = TRUE) {
+  format_y <- match.arg(format_y)
+  y_vec <- dplyr::pull(data, {{y}}); yr <- range(y_vec, na.rm = TRUE)
+  dy <- diff(yr); y_top <- yr[2]; y_bot <- yr[1]
+  p <- ggplot()
+  if (!is.null(periods) && nrow(periods) > 0) {
+    per_df <- as_tibble(periods) %>%
+      mutate(shade = .make_alternating(n()), xmid  = (start + end) / 2)
+    p <- p +
+      geom_rect(data = filter(per_df, shade),
+                aes(xmin = start, xmax = end, ymin = -Inf, ymax = Inf),
+                inherit.aes = FALSE,
+                fill = econ_colors$background["highlight"], colour = NA) +
+      geom_text(data = per_df,
+                aes(x = xmid, y = y_bot + 0.04*dy, label = label),
+                inherit.aes = FALSE,
+                family = font_family, size = 3.2, fontface = "bold",
+                colour = econ_base$text)
+  }
+  aes_line <- if (rlang::quo_is_null(rlang::enquo(series))) aes({{x}}, {{y}})
+              else aes({{x}}, {{y}}, colour = {{series}})
+  p <- p + geom_line(data = data, mapping = aes_line, linewidth = linewidth, lineend = "round")
+  if (!rlang::quo_is_null(rlang::enquo(series))) p <- p + scale_colour_manual(values = econ_line_order6)
+  if (!is.null(events) && nrow(events) > 0) {
+    ev_df <- as_tibble(events) %>%
+      mutate(y0 = y_top - 0.02*dy, y1 = y_top - 0.14*dy,
+             hjust = rep(c(0,1), length.out = n()), xlab  = date + ifelse(hjust == 0, 0.2, -0.2))
+    p <- p +
+      geom_segment(data = ev_df,
+                   aes(x = date, xend = date, y = y0, yend = y1),
+                   inherit.aes = FALSE, linewidth = 0.4,
+                   arrow = grid::arrow(length = grid::unit(3, "pt"), type = "closed"),
+                   colour = econ_base$text) +
+      geom_text(data = ev_df,
+                aes(x = xlab, y = y1 - 0.02*dy, label = label, hjust = hjust),
+                inherit.aes = FALSE, family = font_family, size = 3.2, colour = econ_base$text)
+  }
+  if (format_y == "percent") p <- p + scale_y_continuous(labels = label_percent())
+  if (format_y == "si")      p <- p + scale_y_continuous(labels = label_number(scale_cut = cut_short_scale()))
+  if (!legend) p <- p + guides(colour = "none")
+  p + theme_econ_base() +
+    labs(title = labels$title, subtitle = labels$subtitle,
+         x = labels$x, y = labels$y, caption = labels$caption)
+}
+
+# Exemplo — timeline com 2 séries, períodos e eventos
+set.seed(10)
+anos <- 2004:2024
+df_ts <- tibble(
+  ano = rep(anos, 2),
+  serie = rep(c("Petróleo (índice)","PIB real (índice)"), each = length(anos)),
+  valor = c(
+    90 + cumsum(rnorm(length(anos), 0.5, 2)),
+    100 + cumsum(rnorm(length(anos), 0.2, 1.2))
+  )
+)
+periodos <- tibble(
+  start = c(2005, 2009, 2017, 2021),
+  end   = c(2009, 2017, 2021, 2024),
+  label = c("Período A","Período B","Período C","Período D")
+)
+eventos <- tibble(
+  date = c(2008, 2014, 2020, 2022),
+  label= c("Crise","Choque","Pandemia","Reabertura")
+)
+econ_timeline_data(
+  df_ts, x = ano, y = valor, series = serie,
+  periods = periodos, events = eventos,
+  labels = list(
+    title = "Séries temporais com períodos e eventos",
+    subtitle = "Faixas alternadas marcam eras; setas indicam eventos",
+    x = NULL, y = "Índice", caption = "Fonte: Exemplo sintético"
+  )
+)
+
+# Exemplo — timeline simples (1 série)
+set.seed(99)
+df_ts1 <- tibble(ano = anos, valor = 50 + cumsum(rnorm(length(anos), 0.3, 1.5)))
+eventos2 <- tibble(date = c(2007, 2012, 2019),
+                   label = c("Mudança\nregulatória","Novo\nproduto","Aquisição"))
+econ_timeline_data(
+  df_ts1, x = ano, y = valor, series = NULL,
+  periods = periodos[2:4,], events = eventos2, legend = FALSE,
+  labels = list(
+    title = "Timeline de dados (1 série)",
+    subtitle = "Eventos com rótulos curtos; sem legenda",
+    x = NULL, y = "Índice", caption = "Fonte: Exemplo sintético"
+  )
+)
+```
