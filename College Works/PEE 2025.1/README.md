@@ -1,4 +1,4 @@
-## 📘 Trabalho de PEE — Independência do BC e a Potência da Política Monetária (Problemas em Economia | 2024.2)
+## 📘 Trabalho de PEE — Independência do BC e a Potência da Política Monetária (Problemas em Economia | 2025.1)
 
 ### 🎯 Objetivo do Trabalho
 
