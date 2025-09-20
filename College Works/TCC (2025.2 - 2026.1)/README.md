@@ -1,0 +1,1 @@
+## 📘 Trabalho de Conslusão de Curso — Predição Conformal para Estimação do Efeito de Tratamento do Indivíduo (TCC | 2025.2 - 2026.1)
