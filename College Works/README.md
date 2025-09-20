@@ -38,6 +38,9 @@ Todos os projetos foram implementados em **R**, acompanhados das respectivas bas
 ### 📈 Problemas em Economia
 - [PEE — 2025.1](https://github.com/Hic-Tayfour/R/tree/main/College%20Works/PEE%202025.1)
 
+### 📈 Trabalho de Conclusão de Curso
+- [TCC — (2025.2-2026.1)](https://github.com/Hic-Tayfour/R/tree/main/College%20Works/TCC%20(2025.2%20-%202026.1))
+
 Cada pasta contém:
 - 📄 O script principal em R (`.R` ou `.qmd`)
 - 📊 A base de dados utilizada
