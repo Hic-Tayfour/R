@@ -26,9 +26,7 @@ Comparar três variantes de predição conformal em dados simulados Friedman-1:
 * Treino = 20.000, calibração = 3.000, teste = 3.000.
 * Resposta:
 
-  $$
-  y = 10\sin(\pi x_1x_2) + 20(x_3-0.5)^2 + 10x_4 + 5x_5 + \varepsilon
-  $$
+  $$y = 10\sin(\pi x_1x_2) + 20(x_3-0.5)^2 + 10x_4 + 5x_5 + \varepsilon$$
 
 ### 🧪 Etapas
 
@@ -56,9 +54,7 @@ Avaliar intervalos conformais sob **mudança de distribuição** entre treino e 
 * Teste: $X \sim \mathcal{N}((1,0),\Sigma_t)$, $\Sigma_t=\begin{pmatrix}1&0.7\\0.7&1\end{pmatrix}$.
 * Resposta:
 
-  $$
-  y = 2x_1 + \sin(\pi x_1x_2) - x_2^2
-  $$
+  $$y = 2x_1 + \sin(\pi x_1x_2) - x_2^2$$
 
 ### 🧪 Etapas
 
@@ -87,9 +83,7 @@ Explorar intervalos conformais sob covariate shift em alta dimensão, com pesos 
 * Teste: $x_1,x_2 \sim U(0.2,1)$, demais $U(0,1)$.
 * Resposta: Friedman-1
 
-  $$
-  y = 10\sin(\pi x_1x_2)+20(x_3-0.5)^2+10x_4+5x_5+\varepsilon
-  $$
+  $$y = 10\sin(\pi x_1x_2)+20(x_3-0.5)^2+10x_4+5x_5+\varepsilon$$
 
 ### 🧪 Etapas
 
