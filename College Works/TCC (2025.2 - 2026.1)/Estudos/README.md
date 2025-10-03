@@ -50,8 +50,8 @@ Avaliar intervalos conformais sob **mudança de distribuição** entre treino e 
 
 ### 📊 Dados
 
-* Treino/Calibração: $X \sim \mathcal{N}((2,0),\Sigma)$, $\Sigma=\begin{matrix}1&0.8\\0.8&1\end{matrix}$.
-* Teste: $X \sim \mathcal{N}((1,0),\Sigma_t)$, $\Sigma_t=\begin{matrix}1&0.7\\0.7&1\end{matrix}$.
+* Treino/Calibração: $X \sim \mathcal{N}((2,0),\Sigma)$, $\Sigma=\left[\begin{matrix}1&0.8\\0.8&1\end{matrix}\right]$.
+* Teste: $X \sim \mathcal{N}((1,0),\Sigma_t)$, $\Sigma_t=\left[\begin{matrix}1&0.7\\0.7&1\end{matrix}\right]$.
 * Resposta:
 
   $$y = 2x_1 + \sin(\pi x_1x_2) - x_2^2$$
