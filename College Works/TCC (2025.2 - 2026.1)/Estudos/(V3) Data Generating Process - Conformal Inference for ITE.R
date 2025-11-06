@@ -1,3 +1,8 @@
+# ============================================================================
+# Conformal Prediction para ITE - DGP Paulo Cilas Marques Filho (dgp.R)
+# Baseado em Lei & Candès (2021)
+# ============================================================================
+
 # Bibliotecas 
 
 library(patchwork)
@@ -6,8 +11,6 @@ library(showtext)
 library(mvtnorm)
 library(ranger)
 library(scales)   
-library(ranger)   
-library(caret)    
 library(MASS)
 
 # Definindo funções gráficas ----
@@ -213,200 +216,262 @@ fmt_lab <- function(kind = c("number", "percent", "si")) {
 
 # ----
 
-# Definindo a Data Generating Process (Processo Gerador dos Dados)
 
-dgp <- function(n, mu, Sigma) {
-  X <- MASS::mvrnorm(n = n, mu = mu, Sigma = Sigma)
-  colnames(X) <- paste0("x", 1:2)
-  y <- apply(X, 1, \(x) 2*x[1] + sin(pi*x[1]*x[2]) - x[2]^2)
-  data.frame(X, y)
+# Definindo a Data Generating Process (Processo Gerador dos Dados Causal)
+
+dgp <- function(n = 1e3, true_tau = -1, stdev = 0.7, return_counterfactuals = FALSE) {
+  x1 <- rnorm(n)
+  x2 <- rnorm(n)
+  mu <- ifelse(x1 < x2, 3, -1)
+  propensity_score <- pnorm(mu)
+  t <- rbinom(n, size = 1, prob = propensity_score)
+  y0 <- mu + rnorm(n, sd = stdev)
+  y1 <- mu + true_tau + rnorm(n, sd = stdev)
+  y <- ifelse(t == 0, y0, y1)
+  if (!return_counterfactuals) {
+    return(data.frame(x1 = x1, x2 = x2, treatment = t, Y = y))
+  }
+  data.frame(
+    x1 = x1,
+    x2 = x2,
+    Y0 = y0,
+    Y1 = y1,
+    tau_true = y1 - y0,
+    propensity_score = propensity_score,
+    treatment = t,
+    Y = y
+  )
 }
 
-# Definindo a Função de Razão de Densidade
-
-density_ratio <- function(x, mu, Sigma, mu_tilde, Sigma_tilde) {
-                exp(mvtnorm::dmvnorm(x,
-                                     mean = mu_tilde,
-                                     sigma = Sigma_tilde,
-                                     log = TRUE) -
-                    mvtnorm::dmvnorm(x,
-                                     mean = mu,
-                                     sigma = Sigma,
-                                     log = TRUE)
-                )
-}
-
-
-# Gerando os Dados
+# Vendo o DGP
 
 set.seed(42)
 
-mu <- c(2, 0)
-Sigma <- matrix(c(1, 0.8,
-                  0.8, 1),
-                nrow = 2
-                )
+db_check <- dgp(1e4, return_counterfactuals = TRUE)
 
-mu_tilde <- c(1, 0)
-Sigma_tilde <- matrix(c(1, -0.7,
-                        -0.7, 1),
-                      nrow = 2
-                      )
+# Preparando os Dados para os Modelos de Inferencia Conformal 
 
-a <- 0.1
-cover <- 1 - a
+# Parâmetros
+
+true_tau <- -1
+stdev <- 0.7
+alpha <- 0.1
+cover <- 1 - alpha
+
+sample <- 10e3
+
+n_trn <- 0.075 * sample
+n_cal <- 0.025 * sample
+n_tst <- 1 * sample
+
+# Gerar conjuntos
+
+trn <- dgp(
+  n = n_trn,
+  true_tau = true_tau,
+  stdev = stdev,
+  return_counterfactuals = TRUE
+)
+
+cal <- dgp(
+  n = n_cal,
+  true_tau = true_tau,
+  stdev = stdev,
+  return_counterfactuals = TRUE
+)
+
+tst <- dgp(
+  n = n_tst,
+  true_tau = true_tau,
+  stdev = stdev,
+  return_counterfactuals = TRUE
+)
+
+# Treinando o Modelo 
+
+# Separar por grupo de tratamento
+"
+Separando a base de treino para treinar um modelo 
+para o grupo de controle (0) e outro para o grupo tratado(1)
+"
+
+trn_0 <- trn[trn$treatment == 0, ]
+trn_1 <- trn[trn$treatment == 1, ]
 
 
-n_trn <- 2e4
-n <- 3e3
-n_tst <- 3e3
+# Modelo 1: Treinar no grupo controle
+"
+Treinando o modelo do grupo controle com somente o grupo controle
+"
 
-trn <- dgp(n_trn, mu, Sigma)
-cal <- dgp(n, mu, Sigma)
-tst <- dgp(n_tst, mu_tilde, Sigma_tilde)
+rf_mu0 <- ranger(Y ~ x1 + x2, data = trn_0)
 
-# Função de Peso de Densidade
+# Modelo 2: Treinar no grupo tratado
+"
+Treinando o modelo do grupo tratado com somente o grupo tratado
+"
 
-w <- function(x) {
-    density_ratio(x, mu, Sigma, mu_tilde, Sigma_tilde)
-}
+rf_mu1 <- ranger(Y ~ x1 + x2, data = trn_1)
 
-# Visulização das densididades----
+# Para controles: quanto Y teria aumentado se tratado (contrafactual do controle)
+"
+Usando o grupo controle, caso eles fossem tratados(usando o modelo tratados),
+qual seria o seu Y ?
+Contrafactual
+"
 
-df_plot <- rbind(
-  transform(trn, set = "Treino"),
-  transform(tst, set = "Teste")
-) %>% 
-  mutate(set = factor(set, levels = c("Treino", "Teste")))
+mu1_pred_on_0 <- predict(rf_mu1, data = trn_0)$predictions
 
-col_train <- unname(econ_colors$main["blue1"])
-col_test <- unname(econ_colors$secondary["burgundy"])
+D_0 <- mu1_pred_on_0 - trn_0$Y
 
-p_main <- df_plot %>%
-  ggplot(aes(x = x1, y = x2, color = set)) +
-  stat_density_2d(linewidth = 0.7) +
-  scale_color_manual(values = c("Treino" = col_train, "Teste" = col_test)) +
-  labs(x = "x1", y = "x2") +
-  theme_econ_base() +
-  theme(legend.position = "none")
+# Para tratados: quanto Y aumentou por ser tratado (contrafactual do tratado)
+"
+Usando o grupo tratado, caso eles fossem não tivessem sido tratados
+(usando o modelo controle) , qual seria o seu Y ?
+Contrafactual
+"
 
-p_top <- df_plot %>%
-  ggplot(aes(x = x1, fill = set)) +
-  geom_density(alpha = 0.6) +
-  scale_fill_manual(values = c("Treino" = col_train, "Teste" = col_test)) +
-  theme_econ_base() +
-  theme(
-    axis.title = element_blank(),
-    axis.text = element_blank(),
-    axis.ticks = element_blank(),
-    panel.grid = element_blank(),
-    legend.position = "none"
-  )
+mu0_pred_on_1 <- predict(rf_mu0, data = trn_1)$predictions
 
-p_right <- df_plot %>%
-  ggplot(aes(x = x2, fill = set)) +
-  geom_density(alpha = 0.6) +
-  scale_fill_manual(values = c("Treino" = col_train, "Teste" = col_test)) +
-  coord_flip() +
-  theme_econ_base() +
-  theme(
-    axis.title = element_blank(),
-    axis.text = element_blank(), 
-    axis.ticks = element_blank(),
-    panel.grid = element_blank(),
-    legend.position = "none"
-  )
+D_1 <- trn_1$Y - mu0_pred_on_1
 
-p_top + p_main + p_right +
-  plot_layout(
-    design = "
-    A##
-    BC#
-    ",
-    heights = c(1, 4), 
-    widths = c(4, 1)
-  ) +
-  plot_annotation(
-    title = "Distribuições conjuntas: Treino (Azul) vs. Teste (Roxo)",
-    subtitle = "Contornos centrais e densidades marginais",
-    caption = "Fonte : Dados Simulados",
-    theme = theme_econ_base()
-  )
-#----
+# Modelar os Efeitos
 
-# Treinando os Modelos
+# Preparar dados com efeitos 
 
-rf <- ranger(y ~., data = trn)
+"
+Adicionando na base de treino o valor do ganho(ou perda) gerado pelo 
+tratamento
+"
 
-mu_hat_cal <- predict(rf, data = cal)$predictions
-mu_hat_tst <- predict(rf, data = tst)$predictions
+trn_0_with_D <- trn_0 %>% 
+  mutate(D = D_0)
 
-R <- abs(cal$y - mu_hat_cal)
+trn_1_with_D <- trn_1 %>% 
+  mutate(D = D_1)
+
+# Aprender D₀ como função de X nos controles
+"
+Entendendo o `valor` do tratamento(tau) para os controles
+"
+
+rf_tau0 <- ranger(D ~ x1 + x2, data = trn_0_with_D)
+
+# Aprender D₁ como função de X nos tratados
+"
+Entendendo o `valor` do tratamento(tau) para os tratados
+"
+
+rf_tau1 <- ranger(D ~ x1 + x2, data = trn_1_with_D)
+
+# ESTIMAR ERROS PADRÃO DOS RESÍDUOS
+"
+Preparando e treinando os modelos para fazer os intervalos de confiança
+variáveis para a Predição Conformal.
+"
+
+# Predições no conjunto de treino
+
+tau0_hat_trn <- predict(rf_tau0, data = trn_0_with_D)$predictions
+
+tau1_hat_trn <- predict(rf_tau1, data = trn_1_with_D)$predictions
+
+# Resíduos ABSOLUTOS
+
+trn_0_res <- data.frame(
+  x1 = trn_0_with_D$x1,
+  x2 = trn_0_with_D$x2,
+  delta = abs(trn_0_with_D$D - tau0_hat_trn)
+)
+
+trn_1_res <- data.frame(
+  x1 = trn_1_with_D$x1,
+  x2 = trn_1_with_D$x2,
+  delta = abs(trn_1_with_D$D - tau1_hat_trn)
+)
+
+# Treinar Random Forest para prever |resíduos|
+
+rf_sigma0 <- ranger(delta ~ x1 + x2, data = trn_0_res)
+
+rf_sigma1 <- ranger(delta ~ x1 + x2, data = trn_1_res)
+
+
+# Estimar Propensity Score
+
+# Treinar modelo de propensity
+
+rf_prop <- ranger(
+  treatment ~ x1 + x2,
+  data = trn,
+  probability = TRUE
+)
+
+# Predições na Calibração e no Teste
+
+# Propensity scores
+
+e_hat_cal <- predict(rf_prop, data = cal)$predictions[, 2]
+
+e_hat_tst <- predict(rf_prop, data = tst)$predictions[, 2]
+
+# Efeitos estimados
+
+tau0_cal <- predict(rf_tau0, data = cal)$predictions
+tau1_cal <- predict(rf_tau1, data = cal)$predictions
+tau0_tst <- predict(rf_tau0, data = tst)$predictions
+tau1_tst <- predict(rf_tau1, data = tst)$predictions
+
+# Combinação ponderada pelo propensity score
+
+tau_hat_cal <- (1 - e_hat_cal) * tau0_cal + e_hat_cal * tau1_cal
+tau_hat_tst <- (1 - e_hat_tst) * tau0_tst + e_hat_tst * tau1_tst
+
+# Erros padrão estimados
+
+sigma0_cal <- predict(rf_sigma0, data = cal)$predictions
+sigma1_cal <- predict(rf_sigma1, data = cal)$predictions
+sigma_hat_cal <- (1 - e_hat_cal) * sigma0_cal + e_hat_cal * sigma1_cal
+
+sigma0_tst <- predict(rf_sigma0, data = tst)$predictions
+sigma1_tst <- predict(rf_sigma1, data = tst)$predictions
+sigma_hat_tst <- (1 - e_hat_tst) * sigma0_tst + e_hat_tst * sigma1_tst
+
+# Conformal Prediction NORMALIZADO
+
+# Resíduos de não-conformidade NORMALIZADOS
+
+R <- abs(cal$tau_true - tau_hat_cal) / pmax(sigma_hat_cal, 1e-6)
 R_sorted <- sort(R)
 R_order <- order(R)
 
-w_cal <- apply(cal[, 1:2], 1, w)
-w_tst <- apply(tst[, 1:2], 1, w)
-
-sum_w_cal <- sum(w_cal)
-sum_w_tst <- sum(w_tst)
+# Construção dos intervalos de predição
 
 lower <- numeric(n_tst)
 upper <- numeric(n_tst)
 
 pb <- txtProgressBar(min = 1, max = n_tst, style = 3)
 for (i in 1:n_tst) {
-  p_cal <- w_cal / (sum_w_cal + w_tst[i])
-  p_tst <- w_tst[i] / (sum_w_cal + w_tst[i])
-  p <- c(p_cal[R_order], p_tst)
-  k_hat <- which.max(cumsum(p) >= cover)
-  if (k_hat == n + 1) s_hat <- Inf else s_hat <- R_sorted[k_hat]  
-  lower[i] <- mu_hat_tst[i] - s_hat
-  upper[i] <- mu_hat_tst[i] + s_hat
+  k_hat <- ceiling((1 - alpha) * (n_cal + 1))
+  if (k_hat > n_cal) {
+    s_hat <- Inf
+  } else {
+    s_hat <- R_sorted[k_hat]
+  }
+  lower[i] <- tau_hat_tst[i] - s_hat * sigma_hat_tst[i]
+  upper[i] <- tau_hat_tst[i] + s_hat * sigma_hat_tst[i]
   setTxtProgressBar(pb, i)
 }
 close(pb)
 
+# Avaliação
+
+mean((lower <= tst$tau_true) & (upper >= tst$tau_true))
+
 sum(upper == Inf)
 
-mean((lower <= tst$y) & (upper >= tst$y))
+mean((upper - lower)[is.finite(upper) & is.finite(lower)])
 
-# Visualizando 
 
-idx <- seq_len(50)
 
-ggplot(NULL, aes(x = idx)) +
-  geom_errorbar(
-    aes(
-      ymin = ifelse(is.infinite(lower[idx]), NA, lower[idx]),
-      ymax = ifelse(is.infinite(upper[idx]), NA, upper[idx])
-    ),
-    width = 0.4, linewidth = 0.8, colour = "#3EBCD2",
-    na.rm = TRUE
-  ) +
-  geom_point(
-    aes(y = mu_hat_tst[idx]),
-    shape = 18, size = 2, colour = "#E3120B"
-  ) +
-  geom_point(
-    aes(y = tst$y[idx]),
-    shape = 16, size = 1.5, colour = "black"
-  ) +
-  theme_econ_base() +
-  theme(
-    legend.position    = "none",
-    panel.grid.major.x = element_blank(),
-    plot.title         = element_text(hjust = 0, face = "bold"),
-    plot.caption       = element_text(hjust = 1, face = "italic", size = 9)
-  ) +
-  labs(
-    title = sprintf("Intervalos de Predição Conformal (Primeiras %d Amostras)", 50),
-    subtitle = "Split Conformal Prediction na Random Forest com Covariate Shift",
-    x = "Unidade da Amostra de Teste", y = "Valor de Y",
-    caption = sprintf(
-      "Cobertura empírica: %.1f%% | Largura média: %.2f",
-      100 * mean(lower[idx] <= tst$y[idx] & tst$y[idx] <= upper[idx], na.rm = TRUE),
-      mean((upper[idx] - lower[idx])[is.finite(upper[idx]) & is.finite(lower[idx])])
-    )
-  )
 

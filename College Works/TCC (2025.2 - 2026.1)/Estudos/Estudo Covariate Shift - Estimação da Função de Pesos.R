@@ -1,11 +1,14 @@
-# Importando as Bibliotecas Necessárias
+# Bibliotecas 
 
+library(patchwork)
 library(tidyverse)
 library(showtext)
+library(mvtnorm)
 library(ranger)
 library(scales)   
 library(ranger)   
 library(caret)    
+library(MASS)
 
 # Definindo funções gráficas ----
 font_family <- if ("Roboto Condensed" %in% systemfonts::system_fonts()$family)
@@ -210,78 +213,218 @@ fmt_lab <- function(kind = c("number", "percent", "si")) {
 
 # ----
 
-# Função Geradora dos Dados
+# Definindo a Data Generating Process (Processo Gerador dos Dados)
 
-friedman <- function(n, p = 10) {
-  X <- matrix(
-    runif(n * p),
-    nrow = n,
-    ncol = p,
-    dimnames = list(1:n, paste0("x_", 1:p))
-  )
-  y <- 10 * sin(pi * X[, 1] * X[, 2]) + 20 * (X[, 3] - 0.5)^2 + 10 * X[, 4] + 5 *
-    X[, 5] + rnorm(n)
-  data.frame(cbind(y, X))
+dgp <- function(n, mu, Sigma) {
+  X <- MASS::mvrnorm(n = n, mu = mu, Sigma = Sigma)
+  colnames(X) <- paste0("x", 1:2)
+  y <- apply(X, 1, \(x) 2*x[1] + sin(pi*x[1]*x[2]) - x[2]^2)
+  data.frame(X, y)
 }
 
-# Trava de Geração de Dados
+# Definindo a Função de Razão de Densidade
+
+density_ratio <- function(x, mu, Sigma, mu_tilde, Sigma_tilde) {
+  exp(mvtnorm::dmvnorm(x,
+                       mean = mu_tilde,
+                       sigma = Sigma_tilde,
+                       log = TRUE) -
+        mvtnorm::dmvnorm(x,
+                         mean = mu,
+                         sigma = Sigma,
+                         log = TRUE)
+  )
+}
+
+
+# Gerando os Dados
 
 set.seed(42)
 
-# Gerando os Dados
+mu <- c(2, 0)
+Sigma <- matrix(c(1, 0.8,
+                  0.8, 1),
+                nrow = 2
+)
+
+mu_tilde <- c(1, 0)
+Sigma_tilde <- matrix(c(1, 0.7,
+                        0.7, 1),
+                      nrow = 2
+)
+
+a <- 0.1
+cover <- 1 - a
+
 
 n_trn <- 2e4
 n <- 3e3
 n_tst <- 3e3
 
-trn <- friedman(n_trn)
-cal <- friedman(n)
-tst <- friedman(n_tst)
+trn <- dgp(n_trn, mu, Sigma)
+cal <- dgp(n, mu, Sigma)
+tst <- dgp(n_tst, mu_tilde, Sigma_tilde)
 
-# Definindo o Nível de Cobertura (e "Descobertura")
+# Visulização das densididades
 
-a <- 0.1 # "miscoverage"
+df_plot <- rbind(
+  transform(trn, set = "Treino"),
+  transform(tst, set = "Teste")
+) %>% 
+  mutate(set = factor(set, levels = c("Treino", "Teste")))
 
-cover <- 1 - a
+col_train <- unname(econ_colors$main["blue1"])
+col_test <- unname(econ_colors$secondary["burgundy"])
 
-# Método Clássico da Predição Conformal Split
+p_main <- df_plot %>%
+  ggplot(aes(x = x1, y = x2, color = set)) +
+  stat_density_2d(linewidth = 0.7) +
+  scale_color_manual(values = c("Treino" = col_train, "Teste" = col_test)) +
+  labs(x = "x1", y = "x2") +
+  theme_econ_base() +
+  theme(legend.position = "none")
 
-rf <- ranger(y ~ ., data = trn)
+p_top <- df_plot %>%
+  ggplot(aes(x = x1, fill = set)) +
+  geom_density(alpha = 0.6) +
+  scale_fill_manual(values = c("Treino" = col_train, "Teste" = col_test)) +
+  theme_econ_base() +
+  theme(
+    axis.title = element_blank(),
+    axis.text = element_blank(),
+    axis.ticks = element_blank(),
+    panel.grid = element_blank(),
+    legend.position = "none"
+  )
+
+p_right <- df_plot %>%
+  ggplot(aes(x = x2, fill = set)) +
+  geom_density(alpha = 0.6) +
+  scale_fill_manual(values = c("Treino" = col_train, "Teste" = col_test)) +
+  coord_flip() +
+  theme_econ_base() +
+  theme(
+    axis.title = element_blank(),
+    axis.text = element_blank(), 
+    axis.ticks = element_blank(),
+    panel.grid = element_blank(),
+    legend.position = "none"
+  )
+
+p_top + p_main + p_right +
+  plot_layout(
+    design = "
+    A##
+    BC#
+    ",
+    heights = c(1, 4), 
+    widths = c(4, 1)
+  ) +
+  plot_annotation(
+    title = "Distribuições conjuntas: Treino (Azul) vs. Teste (Roxo)",
+    subtitle = "Contornos centrais e densidades marginais",
+    caption = "Fonte : Dados Simulados",
+    theme = theme_econ_base()
+  )
+
+
+# Unindo os Treino e Teste e suas proporções 
+
+df <- rbind(
+  data.frame(trn[, 1:2], group = 0),
+  data.frame(tst[, 1:2], group = 1)
+)
+
+p_test  <- nrow(tst) / (nrow(trn) + nrow(tst)) 
+p_train <- nrow(trn) / (nrow(trn) + nrow(tst))
+
+# Random Forest para Classificador de Grupos
+
+clf <- ranger(
+  formula = factor(group) ~ .,
+  data = df,
+  probability = TRUE
+)
+
+# Prevendo em qual grupo as observações do calibração e teste são alocadas
+
+p_cal_prob <- predict(clf, 
+                      data = cal[, c("x1","x2")])$predictions[, "1"]
+
+p_tst_prob <- predict(clf, 
+                      data = tst[, c("x1","x2")])$predictions[, "1"]
+
+eps <- 1e-6
+p_cal_prob <- pmin(pmax(p_cal_prob, eps), 1 - eps)
+p_tst_prob <- pmin(pmax(p_tst_prob, eps), 1 - eps)
+
+# Estimando a Razão de Densidade
+
+rhat_cal <- (p_cal_prob / (1 - p_cal_prob)) * (p_train / p_test)
+rhat_tst <- (p_tst_prob / (1 - p_tst_prob)) * (p_train / p_test)
+
+lower_cut <- 1e-3
+upper_cut <- 1e3
+
+rhat_cal <- pmin(pmax(rhat_cal, lower_cut), upper_cut)
+rhat_tst <- pmin(pmax(rhat_tst, lower_cut), upper_cut)
+
+w_cal <- rhat_cal
+w_tst <- rhat_tst
+sum_w_cal <- sum(w_cal) 
+
+# Treinando os Modelos
+
+rf <- ranger(y ~., data = trn)
 
 mu_hat_cal <- predict(rf, data = cal)$predictions
-
-R <- abs(cal$y - mu_hat_cal)
-
-s_hat <- sort(R)[ceiling((cover)*(n+1))]
-
 mu_hat_tst <- predict(rf, data = tst)$predictions
 
-lower <- mu_hat_tst - s_hat
-upper <- mu_hat_tst + s_hat
+R <- abs(cal$y - mu_hat_cal)
+R_sorted <- sort(R)
+R_order <- order(R)
+
+sum_w_cal <- sum(w_cal)
+sum_w_tst <- sum(w_tst)
+
+lower <- numeric(n_tst)
+upper <- numeric(n_tst)
+
+pb <- txtProgressBar(min = 1, max = n_tst, style = 3)
+for (i in 1:n_tst) {
+  p_cal <- w_cal / (sum_w_cal + w_tst[i])
+  p_tst <- w_tst[i] / (sum_w_cal + w_tst[i])
+  p <- c(p_cal[R_order], p_tst)
+  k_hat <- which.max(cumsum(p) >= cover)
+  if (k_hat == n + 1) s_hat <- Inf else s_hat <- R_sorted[k_hat]  
+  lower[i] <- mu_hat_tst[i] - s_hat
+  upper[i] <- mu_hat_tst[i] + s_hat
+  setTxtProgressBar(pb, i)
+}
+close(pb)
+
+sum(upper == Inf)
 
 mean((lower <= tst$y) & (upper >= tst$y))
-mean(upper - lower)
-
-## Visualização da Cobertura 
 
 idx <- seq_len(50)
 
 ggplot(NULL, aes(x = idx)) +
   geom_errorbar(
-    aes(ymin = lower[idx], ymax = upper[idx]),
-    width = 0.4,
-    linewidth = 0.8,
-    colour = "#3EBCD2"
+    aes(
+      ymin = ifelse(is.infinite(lower[idx]), NA, lower[idx]),
+      ymax = ifelse(is.infinite(upper[idx]), NA, upper[idx])
+    ),
+    width = 0.4, linewidth = 0.8, colour = "#3EBCD2",
+    na.rm = TRUE
   ) +
   geom_point(
     aes(y = mu_hat_tst[idx]),
-    shape = 18, size = 2,
-    colour = "#E3120B"
+    shape = 18, size = 2, colour = "#E3120B"
   ) +
   geom_point(
     aes(y = tst$y[idx]),
-    shape = 16, size = 1.5,
-    colour = "black"
+    shape = 16, size = 1.5, colour = "black"
   ) +
   theme_econ_base() +
   theme(
@@ -291,145 +434,12 @@ ggplot(NULL, aes(x = idx)) +
     plot.caption       = element_text(hjust = 1, face = "italic", size = 9)
   ) +
   labs(
-    title   = sprintf("Intervalos de Predição Conformal (Primeiras %d Amostras)", 50),
-    subtitle = "Split Conformal Prediction na Random Forest",
-    x       = "Unidade da Amostra de Teste",
-    y       = "Valor de Y",
+    title = sprintf("Intervalos de Predição Conformal (Primeiras %d Amostras)", 50),
+    subtitle = "Split Conformal Prediction na Random Forest com Covariate Shift",
+    x = "Unidade da Amostra de Teste", y = "Valor de Y",
     caption = sprintf(
-      "Cobertura empírica: %.1f%% | Largura média do intervalo: %.2f",
-      100 * mean(lower[idx] <= tst$y[idx] &
-                   tst$y[idx] <= upper[idx]),
-      mean(upper[idx] - lower[idx])
+      "Cobertura empírica: %.1f%% | Largura média: %.2f",
+      100 * mean(lower[idx] <= tst$y[idx] & tst$y[idx] <= upper[idx], na.rm = TRUE),
+      mean((upper[idx] - lower[idx])[is.finite(upper[idx]) & is.finite(lower[idx])])
     )
   )
-
-# Método Ponderado da Predição Conformal Split
-
-y_hat_trn <- predict(rf, data = trn)$predictions
-
-trn_resd <- trn %>% 
-  mutate(delta = abs(y - y_hat_trn)) %>% 
-  select(-y)
-
-rf_resd <- ranger(delta ~., data = trn_resd)
-
-sig_hat_cal <- predict(rf_resd, data = cal)$predictions
-
-R <- abs(cal$y - mu_hat_cal) / sig_hat_cal
-
-s_hat <- sort(R)[cover * (n + 1)]
-
-lower <- mu_hat_tst - s_hat * sig_hat_cal
-upper <- mu_hat_tst + s_hat * sig_hat_cal
-
-mean((lower <= tst$y) & (upper >= tst$y))
-mean(upper - lower)
-
-idx <- seq_len(50)
-
-ggplot(NULL, aes(x = idx)) +
-  geom_errorbar(
-    aes(ymin = lower[idx], ymax = upper[idx]),
-    width = 0.4,
-    linewidth = 0.8,
-    colour = "#3EBCD2"
-  ) +
-  geom_point(
-    aes(y = mu_hat_tst[idx]),
-    shape = 18, size = 2,
-    colour = "#E3120B"
-  ) +
-  geom_point(
-    aes(y = tst$y[idx]),
-    shape = 16, size = 1.5,
-    colour = "black"
-  ) +
-  theme_econ_base() +
-  theme(
-    legend.position    = "none",
-    panel.grid.major.x = element_blank(),
-    plot.title         = element_text(hjust = 0, face = "bold"),
-    plot.caption       = element_text(hjust = 1, face = "italic", size = 9)
-  ) +
-  labs(
-    title   = sprintf("Intervalos de Predição Conformal (Primeiras %d Amostras)", 50),
-    subtitle = "Split Conformal Prediction Padronizada na Random Forest",
-    x       = "Unidade da Amostra de Teste",
-    y       = "Valor de Y",
-    caption = sprintf(
-      "Cobertura empírica: %.1f%% | Largura média do intervalo: %.2f",
-      100 * mean(lower[idx] <= tst$y[idx] &
-                   tst$y[idx] <= upper[idx]),
-      mean(upper[idx] - lower[idx])
-    )
-  )
-
-# Quantile Random Forest
-
-rf <- ranger(y ~., data = trn , quantreg = TRUE)
-
-a_low <- a / 2
-a_high <- 1- a / 2
-
-q_hat_cal <- predict(rf, 
-                     data = cal, 
-                     type = "quantiles", 
-                     quantiles = c(a_low, a_high)
-                     )$predictions
-
-R <- pmax(q_hat_cal[, 1] - cal$y, 
-          cal$y - q_hat_cal[, 2])
-
-s_hat <- sort(R)[cover * (nrow(cal) + 1)]
-
-q_hat_tst <- predict(rf, 
-                     data = tst, 
-                     type = "quantiles", 
-                     quantiles = c(a_low, a_high)
-                     )$predictions
-
-lower <- q_hat_tst[, 1] - s_hat
-upper <- q_hat_tst[, 2] + s_hat
-
-mean((lower <= tst$y) & (upper >= tst$y))
-mean(upper - lower)
-
-idx <- seq_len(50)
-
-ggplot(NULL, aes(x = idx)) +
-  geom_errorbar(
-    aes(ymin = lower[idx], ymax = upper[idx]),
-    width = 0.4,
-    linewidth = 0.8,
-    colour = "#3EBCD2"
-  ) +
-  geom_point(
-    aes(y = rowMeans(q_hat_tst)[idx]),
-    shape = 18, size = 2,
-    colour = "#E3120B"
-  ) +
-  geom_point(
-    aes(y = tst$y[idx]),
-    shape = 16, size = 1.5,
-    colour = "black"
-  ) +
-  theme_econ_base() +
-  theme(
-    legend.position    = "none",
-    panel.grid.major.x = element_blank(),
-    plot.title         = element_text(hjust = 0, face = "bold"),
-    plot.caption       = element_text(hjust = 1, face = "italic", size = 9)
-  ) +
-  labs(
-    title   = sprintf("Intervalos de Predição Conformal (Primeiras %d Amostras)", 50),
-    subtitle = "Quantile Random Forest",
-    x       = "Unidade da Amostra de Teste",
-    y       = "Valor de Y",
-    caption = sprintf(
-      "Cobertura empírica: %.1f%% | Largura média do intervalo: %.2f",
-      100 * mean(lower[idx] <= tst$y[idx] &
-                   tst$y[idx] <= upper[idx]),
-      mean(upper[idx] - lower[idx])
-    )
-  )
-
