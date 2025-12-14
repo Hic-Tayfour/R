@@ -129,8 +129,6 @@ As métricas de desempenho incluem:
 - Os sinais de regime do ML não informam diretamente a alocação dos pesos
 - Custos de transação não são considerados no backtest
 
-*(Conforme descrito exclusivamente nos materiais fornecidos.)*
-
 ---
 
 ## Tecnologias Utilizadas
