@@ -372,7 +372,7 @@ flights |>
   filter(cia != "Outras") |> 
   count(cia, name = "total_voos") |> 
   mutate(cia = fct_reorder(cia, total_voos)) |> 
-  ggplot(aes(x = total_voos, y = cia, fill = "Principal")) +
+  ggplot(aes(total_voos, cia, fill = "Principal")) +
   geom_col(width = 0.6, show.legend = FALSE) +
   geom_text(aes(label = scales::comma(total_voos, big.mark = ".", decimal.mark = ",")),
             hjust = -0.15, size = 4.5, family = font_family, colour = "#333333") +
