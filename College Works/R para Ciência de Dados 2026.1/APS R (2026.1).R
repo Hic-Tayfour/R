@@ -3,8 +3,10 @@
 library(tidyverse)
 library(labelled)
 library(showtext)
+library(gtExtras)
 library(scales)
 library(arrow)
+library(gt)
 
 # Funções Gráficas The Economist ----
 
@@ -332,27 +334,108 @@ planes <- read_parquet("planes.parquet") |>
   ) |> 
   glimpse()
     
+
+# Rotas mais movimentadas
+
+flights |> 
+  filter(situacao == "REALIZADO") |> 
+  count(origem_icao, destino_icao, name = "total_voos") |> 
+  arrange(desc(total_voos)) |> 
+  head(10) |>
+  mutate(rota = fct_reorder(paste(origem_icao, "-", destino_icao), total_voos)) |>
+  ggplot(aes(total_voos, rota, fill = "Principal")) +
+    geom_col(width = 0.75, show.legend = FALSE) +
+    geom_text(aes(label = scales::comma(total_voos, big.mark = ".", decimal.mark = ",")),
+              hjust = -0.2, size = 3.5, family = font_family, colour = "#333333") +
+    scale_fill_manual(values = unname(pal["data_red"])) +
+    scale_x_continuous(labels = fmt_lab("number"), 
+                       expand = expansion(mult = c(0, 0.15))) +
+    labs(title = "Ponte Aérea Imbatível", 
+         subtitle = "As 10 rotas com maior número de voos realizados no Brasil em 2023", 
+         caption = "Fonte: ANAC (Agência Nacional de Aviação Civil) | Dados VRA", 
+         x = NULL, y = NULL) +
+    theme_econ_base() +
+    theme(axis.line.y = element_blank(), 
+          panel.grid.major.x = element_line(colour = econ_base$grid, linewidth = 0.4),
+          panel.grid.major.y = element_blank(), axis.text.y = element_text(hjust = 1))
     
     
+# Empresas mais movimentadas
+
+flights |> 
+  filter(situacao == "REALIZADO") |> 
+  mutate(cia = case_when(str_detect(empresa, "(?i)AZUL") ~ "Azul", 
+                         str_detect(empresa, "(?i)TAM|LATAM") ~ "LATAM", 
+                         str_detect(empresa, "(?i)GOL") ~ "GOL", 
+                         str_detect(empresa, "(?i)PASSAREDO|VOEPASS") ~ "Voepass", 
+                         TRUE ~ "Outras")) |> 
+  filter(cia != "Outras") |> 
+  count(cia, name = "total_voos") |> 
+  mutate(cia = fct_reorder(cia, total_voos)) |> 
+  ggplot(aes(x = total_voos, y = cia, fill = "Principal")) +
+    geom_col(width = 0.6, show.legend = FALSE) +
+    geom_text(aes(label = scales::comma(total_voos, big.mark = ".", decimal.mark = ",")),
+              hjust = -0.15, size = 4.5, family = font_family, colour = "#333333") +
+    scale_fill_manual(values = unname(pal["blue1"])) +
+    scale_x_continuous(labels = fmt_lab("number"), expand = expansion(mult = c(0, 0.2))) +
+    labs(title = "O Domínio do Espaço Aéreo", 
+         subtitle = "Volume total de voos realizados pelas 4 grandes companhias do Brasil em 2023", 
+         caption = "Fonte: ANAC | Dados VRA", 
+         x = NULL, y = NULL) +
+    theme_econ_base() +
+    theme(axis.line.y = element_blank(), 
+          panel.grid.major.x = element_line(colour = econ_base$grid, linewidth = 0.4), 
+          panel.grid.major.y = element_blank(), 
+          axis.text.y = element_text(hjust = 1, size = 12, face = "bold"))    
     
     
+# Atrasos
+
+flights |> 
+  filter(situacao == "REALIZADO", !is.na(atraso_chegada_min)) |> 
+  mutate(cia = case_when(str_detect(empresa, "(?i)AZUL") ~ "Azul", 
+                         str_detect(empresa, "(?i)TAM|LATAM") ~ "LATAM", 
+                         str_detect(empresa, "(?i)GOL") ~ "GOL", 
+                         str_detect(empresa, "(?i)PASSAREDO|VOEPASS") ~ "Voepass", 
+                         TRUE ~ "Outras")) |> 
+  filter(cia != "Outras") |> 
+  group_by(cia) |> 
+  summarise(taxa_atraso = mean(atraso_chegada_min > 15) * 100) |> 
+  mutate(cia = fct_reorder(cia, taxa_atraso)) |> 
+  ggplot(aes(taxa_atraso, cia, fill = "Principal")) +
+    geom_col(width = 0.6, show.legend = FALSE) +
+    geom_text(aes(label = sprintf("%.1f%%", taxa_atraso)), 
+              hjust = -0.15, size = 4.5, family = font_family, colour = "#333333") +
+    scale_fill_manual(values = unname(pal["burgundy"])) +
+    scale_x_continuous(expand = expansion(mult = c(0, 0.2))) +
+    labs(title = "O Relógio da Aviação", 
+         subtitle = "Percentual de voos com atraso superior a 15 minutos na chegada em 2023", 
+         caption = "Fonte: ANAC | Dados VRA \n Critério internacional de pontualidade (>15 min)", 
+         x = NULL, y = NULL) +
+  theme_econ_base() +
+  theme(axis.line.y = element_blank(), 
+        panel.grid.major.x = element_line(colour = econ_base$grid, linewidth = 0.4), 
+        panel.grid.major.y = element_blank(), 
+        axis.text.y = element_text(hjust = 1, size = 12, face = "bold"), 
+        axis.text.x = element_blank(), axis.ticks.x = element_blank())
     
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
+# Série Histórica
+
+flights |> 
+  filter(situacao == "REALIZADO", !is.na(partida_real)) |> 
+  mutate(semana = floor_date(as_date(partida_real), "week")) |> 
+  filter(year(semana) == 2023) |> 
+  count(semana, name = "total_voos") |> 
+  ggplot(aes(semana, total_voos)) +
+    geom_area(fill = unname(pal["blue1"]), alpha = 0.1) +
+    geom_line(colour = unname(pal["blue1"]), linewidth = 1.2) +
+    scale_y_continuous(labels = fmt_lab("number"), expand = expansion(mult = c(0, 0.15))) +
+    scale_x_date(date_breaks = "2 months", date_labels = "%b") +
+    labs(title = "A Sazonalidade do Céu Brasileiro", 
+         subtitle = "Volume semanal de voos comerciais realizados ao longo de 2023", 
+         caption = "Fonte: ANAC | Dados VRA", 
+         x = NULL, y = NULL) +
+  theme_econ_base() +
+  theme(axis.line.y = element_blank(), 
+        panel.grid.major.x = element_blank(), 
+        panel.grid.major.y = element_line(colour = econ_base$grid, linewidth = 0.4))
