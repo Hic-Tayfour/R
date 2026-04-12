@@ -1,5 +1,6 @@
 # Bibliotecas 
 
+library(tidymodels)
 library(tidyverse)
 library(labelled)
 library(showtext)
@@ -7,6 +8,7 @@ library(gtExtras)
 library(scales)
 library(arrow)
 library(gt)
+
 
 # Funções Gráficas The Economist ----
 
@@ -334,164 +336,177 @@ planes <- read_parquet("planes.parquet") |>
   ) |> 
   glimpse()
 
+# Tópico 0 : Análise Geral da Base de Dados----
 
-# Rotas mais movimentadas
+## Auditoria de Estrutura e Dados Faltantes (NAs)
 
-flights |> 
-  filter(situacao == "REALIZADO") |> 
-  count(origem_icao, destino_icao, name = "total_voos") |> 
-  arrange(desc(total_voos)) |> 
-  head(10) |>
-  mutate(rota = fct_reorder(paste(origem_icao, "-", destino_icao), total_voos)) |>
-  ggplot(aes(total_voos, rota, fill = "Principal")) +
-  geom_col(width = 0.75, show.legend = FALSE) +
-  geom_text(aes(label = scales::comma(total_voos, big.mark = ".", decimal.mark = ",")),
-            hjust = -0.2, size = 3.5, family = font_family, colour = "#333333") +
-  scale_fill_manual(values = unname(pal["data_red"])) +
-  scale_x_continuous(labels = fmt_lab("number"), 
-                     expand = expansion(mult = c(0, 0.15))) +
-  labs(title = "Ponte Aérea Imbatível", 
-       subtitle = "As 10 rotas com maior número de voos realizados no Brasil em 2023", 
-       caption = "Fonte: ANAC (Agência Nacional de Aviação Civil) | Dados VRA", 
-       x = NULL, y = NULL) +
-  theme_econ_base() +
-  theme(axis.line.y = element_blank(), 
-        panel.grid.major.x = element_line(colour = econ_base$grid, linewidth = 0.4),
-        panel.grid.major.y = element_blank(), axis.text.y = element_text(hjust = 1))
-
-
-# Empresas mais movimentadas
-
-flights |> 
-  filter(situacao == "REALIZADO") |> 
-  mutate(cia = case_when(str_detect(empresa, "(?i)AZUL") ~ "Azul", 
-                         str_detect(empresa, "(?i)TAM|LATAM") ~ "LATAM", 
-                         str_detect(empresa, "(?i)GOL") ~ "GOL", 
-                         str_detect(empresa, "(?i)PASSAREDO|VOEPASS") ~ "Voepass", 
-                         TRUE ~ "Outras")) |> 
-  filter(cia != "Outras") |> 
-  count(cia, name = "total_voos") |> 
-  mutate(cia = fct_reorder(cia, total_voos)) |> 
-  ggplot(aes(total_voos, cia, fill = "Principal")) +
-  geom_col(width = 0.6, show.legend = FALSE) +
-  geom_text(aes(label = scales::comma(total_voos, big.mark = ".", decimal.mark = ",")),
-            hjust = -0.15, size = 4.5, family = font_family, colour = "#333333") +
-  scale_fill_manual(values = unname(pal["blue1"])) +
-  scale_x_continuous(labels = fmt_lab("number"), expand = expansion(mult = c(0, 0.2))) +
-  labs(title = "O Domínio do Espaço Aéreo", 
-       subtitle = "Volume total de voos realizados pelas 4 grandes companhias do Brasil em 2023", 
-       caption = "Fonte: ANAC | Dados VRA", 
-       x = NULL, y = NULL) +
-  theme_econ_base() +
-  theme(axis.line.y = element_blank(), 
-        panel.grid.major.x = element_line(colour = econ_base$grid, linewidth = 0.4), 
-        panel.grid.major.y = element_blank(), 
-        axis.text.y = element_text(hjust = 1, size = 12, face = "bold"))    
+tibble(Base = c("airports", "flights", "planes"),
+       data = list(airports, flights, planes)) |>
+  mutate(Linhas = map_int(data, nrow),
+         summary = map(data, ~ tibble(Coluna = names(.x),
+                                      Tipo = map_chr(.x, ~ class(.x)[1]),
+                                      Valores_Unicos = map_int(.x, n_distinct),
+                                      NAs = map_int(.x, ~ sum(is.na(.x)))))) |>
+  select(-data) |>
+  unnest(summary) |>
+  mutate(Percentual = NAs / Linhas) |>
+  gt(groupname_col = "Base") |>
+  tab_header(title = "Saúde das Bases de Dados",
+             subtitle = "Auditoria de estrutura, cardinalidade e valores faltantes (NAs)") |>
+  cols_label(Linhas = "Total de Linhas",
+             Coluna = "Coluna",
+             Tipo = "Tipo",
+             Valores_Unicos = "Valores Únicos",
+             NAs = "NAs (Qtd)",
+             Percentual = "NAs (%)") |>
+  fmt_number(columns = c(Linhas, Valores_Unicos, NAs),
+             decimals = 0, dec_mark = ",", sep_mark = ".") |>
+  fmt_percent(columns = Percentual,
+              decimals = 2, dec_mark = ",", sep_mark = ".") |>
+  gt_theme_538() |>
+  tab_source_note(source_note = "Fonte: ANAC | Elaboração Própria")
 
 
-# Atrasos
 
-flights |> 
-  filter(situacao == "REALIZADO", !is.na(atraso_chegada_min)) |> 
-  mutate(cia = case_when(str_detect(empresa, "(?i)AZUL") ~ "Azul", 
-                         str_detect(empresa, "(?i)TAM|LATAM") ~ "LATAM", 
-                         str_detect(empresa, "(?i)GOL") ~ "GOL", 
-                         str_detect(empresa, "(?i)PASSAREDO|VOEPASS") ~ "Voepass", 
-                         TRUE ~ "Outras")) |> 
-  filter(cia != "Outras") |> 
-  group_by(cia) |> 
-  summarise(taxa_atraso = mean(atraso_chegada_min > 15) * 100) |> 
-  mutate(cia = fct_reorder(cia, taxa_atraso)) |> 
-  ggplot(aes(taxa_atraso, cia, fill = "Principal")) +
-  geom_col(width = 0.6, show.legend = FALSE) +
-  geom_text(aes(label = sprintf("%.1f%%", taxa_atraso)), 
-            hjust = -0.15, size = 4.5, family = font_family, colour = "#333333") +
-  scale_fill_manual(values = unname(pal["burgundy"])) +
-  scale_x_continuous(expand = expansion(mult = c(0, 0.2))) +
-  labs(title = "O Relógio da Aviação", 
-       subtitle = "Percentual de voos com atraso superior a 15 minutos na chegada em 2023", 
-       caption = "Fonte: ANAC | Dados VRA \n Critério internacional de pontualidade (>15 min)", 
-       x = NULL, y = NULL) +
-  theme_econ_base() +
-  theme(axis.line.y = element_blank(), 
-        panel.grid.major.x = element_line(colour = econ_base$grid, linewidth = 0.4), 
-        panel.grid.major.y = element_blank(), 
-        axis.text.y = element_text(hjust = 1, size = 12, face = "bold"), 
-        axis.text.x = element_blank(), axis.ticks.x = element_blank())
+## Escopo Temporal e Cardinalidade Macro
 
-# Série Histórica
-
-flights |> 
-  filter(situacao == "REALIZADO", !is.na(partida_real)) |> 
-  mutate(semana = floor_date(as_date(partida_real), "week")) |> 
-  filter(year(semana) == 2023) |> 
-  count(semana, name = "total_voos") |> 
-  ggplot(aes(semana, total_voos)) +
-  geom_area(fill = unname(pal["blue1"]), alpha = 0.1) +
-  geom_line(colour = unname(pal["blue1"]), linewidth = 1.2) +
-  scale_y_continuous(labels = fmt_lab("number"), expand = expansion(mult = c(0, 0.15))) +
-  scale_x_date(date_breaks = "2 months", date_labels = "%b") +
-  labs(title = "A Sazonalidade do Céu Brasileiro", 
-       subtitle = "Volume semanal de voos comerciais realizados ao longo de 2023", 
-       caption = "Fonte: ANAC | Dados VRA", 
-       x = NULL, y = NULL) +
-  theme_econ_base() +
-  theme(axis.line.y = element_blank(), 
-        panel.grid.major.x = element_blank(), 
-        panel.grid.major.y = element_line(colour = econ_base$grid, linewidth = 0.4))
-
-
-# Idade e Peso da Frota
-planes |>
-  filter(is.na(data_cancelamento),
-         !is.na(ano_fabricacao),
-         !is.na(operador)) |>
-  group_by(operador) |>
-  summarise(frota_total = n(),
-            idade_media = mean(2023 - ano_fabricacao, na.rm = TRUE),
-            pmd_medio = mean(pmd, na.rm = TRUE),
-            .groups = "drop") |>
-  filter(frota_total >= 10) |>
-  slice_max(frota_total, n = 15) |>
-  arrange(desc(frota_total)) |>
+flights |>
+  summarise(data_min = format(min(partida_prevista, na.rm = TRUE), "%d/%m/%Y"),
+            data_max = format(max(partida_prevista, na.rm = TRUE), "%d/%m/%Y"),
+            aeroportos = format(n_distinct(origem_icao, na.rm = TRUE), 
+                                big.mark = ".", decimal.mark = ","),
+            empresas = format(n_distinct(empresa, na.rm = TRUE), 
+                              big.mark = ".", decimal.mark = ","),
+            modelos = format(n_distinct(modelo_equipamento, na.rm = TRUE),
+                             big.mark = ".", decimal.mark = ",")) |>
+  pivot_longer(cols = everything(),
+               names_to = "Indicador",
+               values_to = "Valor") |>
+  mutate(Indicador = case_when(Indicador == "data_min" ~ "Data Inicial (Partidas)",
+                               Indicador == "data_max" ~ "Data Final (Partidas)",
+                               Indicador == "aeroportos" ~ "Aeroportos de Origem (Total)",
+                               Indicador == "empresas" ~ "Companhias Aéreas (Total)",
+                               Indicador == "modelos" ~ "Modelos de Equipamento (Total)")) |>
   gt() |>
-  tab_header(title = md("**Raio-X das Frotas Ativas — Aviação Brasileira 2023**"),
-    subtitle = "Grandes operadores | Apenas aeronaves com matrícula ativa no RAB") |>
-  tab_source_note(source_note = "Fonte: ANAC — Registro Aeronáutico Brasileiro (RAB). Elaboração própria.") |>
-  cols_label(operador = "Operador",
-            frota_total = "Frota Total",
-            idade_media = "Idade Média (anos)",
-            pmd_medio = "PMD Médio (kg)") |>
-  fmt_number(columns  = frota_total,
-             decimals = 0,
-             sep_mark = ",") |>
-  fmt_number(columns  = idade_media, decimals = 1) |>
-  fmt_number(columns  = pmd_medio,
-             decimals = 0,
-             sep_mark = ",") |>
-  cols_align(align = "left", columns = operador) |>
-  cols_align(align = "center",
-             columns = c(frota_total, idade_media, pmd_medio)) |>
-  tab_style(style = cell_text(weight = "bold"), locations = cells_column_labels()) |>
-  tab_style(style = cell_fill(color = unname(pal["highlight"])),
-            locations = cells_body(rows = frota_total == max(frota_total))) |>
-  gt_color_rows(columns = idade_media,
-                domain = NULL,
-                palette   = c(unname(pal["blue1"]), unname(pal["data_red"])),
-                direction = 1) |>
-  gt_color_rows(columns = pmd_medio,
-                domain = NULL,
-                palette = c(unname(pal["blue1"]), unname(pal["data_red"])),
-                direction = 1) |>
-  tab_options(table.background.color = unname(pal["print_bkgd"]),
-              table.font.names = font_family,
-              table.font.size = px(13),
-              heading.background.color = unname(pal["print_bkgd"]),
-              heading.title.font.size = px(16),
-              heading.subtitle.font.size = px(12),
-              column_labels.background.color = unname(pal["number_box"]),
-              row.striping.background_color = unname(pal["highlight"]),
-              row.striping.include_table_body = TRUE,
-              source_notes.font.size = px(10),
-              table.border.top.color = unname(pal["blue1"]),
-              table.border.top.width = px(3))
+  tab_header(title = "Escopo Temporal e Operacional",
+             subtitle = "Indicadores macro de cobertura e cardinalidade da base") |>
+  cols_align(align = "left", columns = Indicador) |>
+  cols_align(align = "right", columns = Valor) |>
+  gt_theme_538() |> 
+  tab_source_note(source_note = "Fonte: ANAC | Elaboração Própria")
+
+
+## Perfil da Malha Aeroportuária (Nacional vs. Internacional)
+
+flights |>
+  pivot_longer(cols = c(origem_icao, destino_icao), values_to = "icao") |>
+  drop_na(icao) |>
+  distinct(icao) |>
+  inner_join(airports, by = "icao") |>
+  mutate(tipo = if_else(pais == "BRASIL", "Nacional", "Internacional")) |>
+  count(tipo, pais, name = "aeroportos") |>
+  mutate(pais = if_else(tipo == "Internacional", 
+                        as.character(fct_lump_n(factor(pais), 
+                        n = 5, w = aeroportos, 
+                        other_level = "Outros")),"Brasil")) |>
+  group_by(tipo, pais) |>
+  summarise(aeroportos = sum(aeroportos), .groups = "drop") |>
+  arrange(desc(tipo), desc(aeroportos)) |>
+  mutate(pais = str_to_title(pais)) |>
+  gt(groupname_col = "tipo") |>
+  tab_header(title = "Conectividade da Malha Aeroportuária",
+             subtitle = "Quantidade de aeroportos únicos operacionais em 2023 (Nacional vs. Internacional)") |>
+  cols_label(pais = "País de Origem/Destino", aeroportos = "Aeroportos Conectados") |>
+  fmt_number(columns = aeroportos, 
+             decimals = 0, sep_mark = ".", dec_mark = ",") |>
+  summary_rows( groups = everything(), columns = aeroportos, 
+                fns = list(Subtotal = ~sum(.)), formatter = fmt_number, 
+                decimals = 0, sep_mark = ".", dec_mark = ",") |>
+  gt_theme_538() |>
+  tab_source_note(source_note = "Fonte: ANAC | Elaboração Própria")
+
+## Diversidade da Frota e Equipamentos
+
+flights |>
+  drop_na(modelo_equipamento) |>
+  distinct(modelo_equipamento) |>
+  inner_join(planes, by = join_by(modelo_equipamento == icao_tipo)) |>
+  group_by(categoria) |>
+  summarise(volume = n_distinct(matricula), .groups = "drop") |>
+  slice_max(order_by = volume, n = 10, with_ties = FALSE) |>
+  mutate(categoria = fct_reorder(categoria, volume)) |>
+  ggplot(aes(categoria, volume, fill = "Volume")) +
+    geom_col(show.legend = FALSE) +
+    coord_flip() +
+    scale_y_continuous(labels = fmt_lab("number")) +
+    scale_econ(aes = "fill", scheme = "bars") +
+    labs(title = "Composição física da frota operante",
+         subtitle = "Volume de aeronaves únicas (Top 10 categorias de registro)",
+         caption = "Fonte: ANAC | Elaboração Própria") +
+    theme_econ_base()
+
+# Tópico 1: Visão Geral de Operações e Tendências ----
+
+## Evolução Temporal e Sazonalidade (Volume de Voos)
+flights |>
+  filter(year(partida_prevista) == 2023) |>
+  group_by(mes = month(partida_prevista, label = TRUE)) |>
+  summarise(volume = n(), .groups = "drop") |>
+  ggplot(aes(mes, volume, group = 1, colour = "Volume de Voos")) +
+    geom_line(linewidth = 1, show.legend = FALSE) +
+    scale_y_continuous(labels = fmt_lab("number")) +
+    scale_econ(aes = "colour", scheme = "lines_side") +
+    labs(title = "Estabilidade do Tráfego Aéreo", 
+         subtitle = "Evolução mensal do volume total de voos previstos, 2023", 
+         caption = "Fonte: ANAC | Elaboração Própria") +
+    theme_econ_base() 
+
+
+## Market Share por Oferta de Assentos e Voos Realizados
+
+flights |> 
+  filter(situacao == "REALIZADO") |> 
+  group_by(empresa) |> 
+  summarise(voos = n(), assentos = sum(assentos, na.rm = TRUE)) |> 
+  mutate(empresa = fct_lump_n(empresa, n = 5, w = voos, other_level = "Outras")) |> 
+  group_by(empresa) |> 
+  summarise(voos = sum(voos), assentos = sum(assentos)) |> 
+  mutate(`Voos Realizados` = voos / sum(voos), 
+         `Assentos Ofertados` = assentos / sum(assentos)) |> 
+  select(-c(voos, assentos)) |> 
+  pivot_longer(cols = c(`Voos Realizados`, `Assentos Ofertados`), 
+               names_to = "metrica", values_to = "valor") |> 
+  mutate(empresa = fct_reorder(empresa, valor, .desc = TRUE), 
+         empresa = fct_relevel(empresa, "Outras", after = Inf)) |> 
+  ggplot(aes(empresa, valor, fill = metrica)) +
+    geom_col(position = "dodge") +
+    scale_y_continuous(labels = fmt_lab("percent")) +
+    scale_econ(aes = "fill", scheme = "web") +
+    labs(title = "Concentração do Mercado Aéreo", 
+         subtitle = "Maket share das 5 maiores companhias (voos realizados vs assentos ofertados)", 
+         caption = "Fonte: ANAC | Elaboração Própria") +
+    theme_econ_base()
+  
+
+## KPIs Macro (Taxas de Cancelamento e Atrasos Médios)
+
+flights |>
+  mutate(empresa = fct_lump_n(empresa, n = 5, other_level = "Outras")) |>
+  group_by(empresa) |>
+  summarise(taxa_cancelamento = mean(situacao == "CANCELADO", na.rm = TRUE),
+            atraso_partida = mean(atraso_partida_min[situacao == "REALIZADO"], na.rm = TRUE),
+            atraso_chegada = mean(atraso_chegada_min[situacao == "REALIZADO"], na.rm = TRUE)) |>
+  arrange(desc(taxa_cancelamento)) |>
+  gt() |>
+    tab_header(title = "Performance Operacional por Companhia Aérea",
+              subtitle = "Indicadores médios e distribuição de atrasos nas partidas (2023)") |>
+    cols_label(empresa = "Empresa",
+               taxa_cancelamento = "Cancelamentos",
+               atraso_partida = "Atraso Partida (min)",
+               atraso_chegada = "Atraso Chegada (min)") |>
+    fmt_percent(columns = taxa_cancelamento,
+                decimals = 2, dec_mark = ",", sep_mark = ".") |>
+    fmt_number(columns = c(atraso_partida, atraso_chegada),
+               decimals = 2, dec_mark = ",", sep_mark = ".") |>
+    gt_theme_538() |>
+    tab_source_note(source_note = "Fonte: ANAC | Elaboração Própria")
