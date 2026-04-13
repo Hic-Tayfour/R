@@ -49,9 +49,9 @@ Todos os projetos foram implementados em **R**, acompanhados das respectivas bas
 
 
 Cada pasta contém:
-- 📄 O script principal em R (`.R` ou `.qmd`)
-- 📊 A base de dados utilizada
-- 📘 Um `README.md` descritivo com objetivo, métodos e resultados
+-  O script principal em R (`.R` ou `.qmd`)
+-  A base de dados utilizada
+-  Um `README.md` descritivo com objetivo, métodos e resultados
 
 Sinta-se à vontade para explorar, reutilizar ou adaptar os materiais para seus próprios estudos!
 
