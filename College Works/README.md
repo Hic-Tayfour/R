@@ -44,6 +44,10 @@ Todos os projetos foram implementados em **R**, acompanhados das respectivas bas
 ### 📈 Trabalho de Conclusão de Curso
 - [TCC — (2025.2-2026.1)](https://github.com/Hic-Tayfour/R/tree/main/College%20Works/TCC%20(2025.2%20-%202026.1))
 
+### 📊 R para Ciência de Dados 
+- [R para Ciência de Dados - 2026.1](https://github.com/Hic-Tayfour/R/tree/main/College%20Works/R%20para%20Ci%C3%AAncia%20de%20Dados%202026.1)
+
+
 Cada pasta contém:
 - 📄 O script principal em R (`.R` ou `.qmd`)
 - 📊 A base de dados utilizada
