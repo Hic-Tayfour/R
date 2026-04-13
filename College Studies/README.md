@@ -21,7 +21,7 @@ Segui os capítulos sugeridos, **replicando os códigos, interpretando os concei
 
 ---
 
-### 📦 Bibliotecas utilizadas na faculdade
+###  Bibliotecas utilizadas na faculdade
 
 Neste repositório, também está disponível um **script em R** com todas as bibliotecas que utilizei ao longo da graduação.  
 O script está **organizado por tipo de biblioteca** (ex: manipulação, modelagem, visualização, estatística) e, para cada pacote, há:
