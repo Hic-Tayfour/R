@@ -56,4 +56,4 @@ Cada pasta contém:
 Sinta-se à vontade para explorar, reutilizar ou adaptar os materiais para seus próprios estudos!
 
 Atenciosamente,  
-**Hicham Munir Tayfour**
+**Hicham Tayfour**
