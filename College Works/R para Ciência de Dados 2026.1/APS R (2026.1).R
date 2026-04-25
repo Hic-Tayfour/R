@@ -239,21 +239,28 @@ airports <- read_parquet("airports.parquet") |>
          estado = estado_aera_dromo, 
          pais = paa_s_aera_dromo, 
          aeronave_critica = aeronave_cra_tica) |> 
-  mutate(,latitude = as.numeric(str_replace(latitude, ",", ".")),
+  mutate(latitude = as.numeric(str_replace(latitude, ",", ".")),
          longitude = as.numeric(str_replace(longitude, ",", ".")),
-         across(where(is.character), ~ iconv(.x, from = "UTF-8", to = "windows-1252"))) |> 
-  select(icao, iata, nome_aeroporto, municipio, estado, pais, aeronave_critica, latitude, longitude) |> 
-  set_variable_labels(
-    icao = "Código ICAO do Aeródromo (4 Letras)", 
-    iata = "Código IATA do Aeródromo (3 Letras)", 
-    nome_aeroporto = "Nome oficial e completo do aeroporto",
-    municipio = "Município onde o aeródromo está localizado",
-    estado = "Unidade da Federação (UF)", 
-    pais = "País de localização", 
-    aeronave_critica = "Aeronave crítica para dimensionamento da infraestrutura do aeródromo",
-    latitude = "Latitude geográfica (graus decimais)",
-    longitude = "Longitude geográfica (graus decimais)"
+         across(
+           where(is.character),
+           ~ {
+             x <- iconv(as.character(.x), from = "UTF-8", to = "latin1", sub = "")
+             Encoding(x) <- "UTF-8"
+             x
+           }
+         )
   ) |> 
+  select(icao, iata, nome_aeroporto, municipio, estado, pais,aeronave_critica, latitude, longitude
+  ) |> 
+  set_variable_labels(icao = "Código ICAO do Aeródromo (4 Letras)", 
+                      iata = "Código IATA do Aeródromo (3 Letras)", 
+                      nome_aeroporto = "Nome oficial e completo do aeroporto",
+                      municipio = "Município onde o aeródromo está localizado",
+                      estado = "Unidade da Federação (UF)", 
+                      pais = "País de localização", 
+                      aeronave_critica = "Aeronave crítica para dimensionamento da infraestrutura do aeródromo",
+                      latitude = "Latitude geográfica (graus decimais)",
+                      longitude = "Longitude geográfica (graus decimais)") |> 
   glimpse()
 
 flights <- read_parquet("flights.parquet") |> 
@@ -278,7 +285,15 @@ flights <- read_parquet("flights.parquet") |>
          assentos = as.numeric(assentos), 
          atraso_partida_min = as.numeric(difftime(partida_real, partida_prevista, units = "mins")),
          atraso_chegada_min = as.numeric(difftime(chegada_real, chegada_prevista, units = "mins")),
-         across(where(is.character), ~ iconv(.x, from = "UTF-8", to = "windows-1252"))) |> 
+         across(
+           where(is.character),
+           ~ {
+             x <- iconv(as.character(.x), from = "UTF-8", to = "latin1", sub = "")
+             Encoding(x) <- "UTF-8"
+             x
+           }
+         )
+  ) |> 
   set_variable_labels(icao_empresa = "Sigla ICAO da Empresa Aérea",
                       empresa = "Nome da Empresa Aérea",
                       num_voo = "Número de identificação do voo",
