@@ -220,13 +220,13 @@ fmt_lab <- function(kind = c("number", "percent", "si")) {
 
 # Importando as Bases de Dados
 
-# airports <- read_parquet("airports.parquet") |> 
+# airports <- read_parquet("airports.parquet") |>
 #   glimpse()
 
-# flights <- read_parquet("flights.parquet") |> 
+# flights <- read_parquet("flights.parquet") |>
 #   glimpse()
 
-# planes <- read_parquet("planes.parquet") |> 
+# planes <- read_parquet("planes.parquet") |>
 #   glimpse()
 
 # Tratando as Bases 
@@ -237,19 +237,21 @@ airports <- read_parquet("airports.parquet") |>
          nome_aeroporto = nome_aera_dromo, 
          municipio = munica_pio_aera_dromo, 
          estado = estado_aera_dromo, 
-         pais = paa_s_aera_dromo) |> 
+         pais = paa_s_aera_dromo, 
+         aeronave_critica = aeronave_cra_tica) |> 
   mutate(latitude = as.numeric(str_replace(latitude, ",", ".")),
          longitude = as.numeric(str_replace(longitude, ",", "."))) |> 
-  select(icao, iata, nome_aeroporto, municipio, estado, pais, latitude, longitude) |> 
+  select(icao, iata, nome_aeroporto, municipio, estado, pais, aeronave_critica, latitude, longitude) |> 
   set_variable_labels(
-    icao           = "Código ICAO do Aeródromo (4 Letras)", 
-    iata           = "Código IATA do Aeródromo (3 Letras)", 
+    icao = "Código ICAO do Aeródromo (4 Letras)", 
+    iata = "Código IATA do Aeródromo (3 Letras)", 
     nome_aeroporto = "Nome oficial e completo do aeroporto",
-    municipio      = "Município onde o aeródromo está localizado",
-    estado         = "Unidade da Federação (UF)", 
-    pais           = "País de localização", 
-    latitude       = "Latitude geográfica (graus decimais)",
-    longitude      = "Longitude geográfica (graus decimais)"
+    municipio = "Município onde o aeródromo está localizado",
+    estado = "Unidade da Federação (UF)", 
+    pais = "País de localização", 
+    aeronave_critica = "Aeronave crítica para dimensionamento da infraestrutura do aeródromo",
+    latitude = "Latitude geográfica (graus decimais)",
+    longitude = "Longitude geográfica (graus decimais)"
   ) |> 
   glimpse()
 
@@ -257,10 +259,15 @@ flights <- read_parquet("flights.parquet") |>
   rename(icao_empresa = sigla_icao_empresa_aa_c_rea, 
          empresa = empresa_aa_c_rea, 
          num_voo = n_aomero_voo, 
+         codigo_di = ca3digo_di,
+         codigo_tipo_linha = ca3digo_tipo_linha,
          assentos = n_aomero_de_assentos, 
          origem_icao = sigla_icao_aeroporto_origem,
+         nome_origem = descri_a_a_o_aeroporto_origem,
          destino_icao = sigla_icao_aeroporto_destino,
+         nome_destino = descri_a_a_o_aeroporto_destino,
          situacao = situa_a_a_o_voo,
+         referencia = refer_aancia,
          situacao_partida = situa_a_a_o_partida,
          situacao_chegada = situa_a_a_o_chegada) |> 
   mutate(partida_prevista = dmy_hm(partida_prevista),
@@ -270,70 +277,100 @@ flights <- read_parquet("flights.parquet") |>
          assentos = as.numeric(assentos), 
          atraso_partida_min = as.numeric(difftime(partida_real, partida_prevista, units = "mins")),
          atraso_chegada_min = as.numeric(difftime(chegada_real, chegada_prevista, units = "mins"))) |> 
-  set_variable_labels(
-    icao_empresa       = "Sigla ICAO da Empresa Aérea", 
-    empresa            = "Nome da Empresa Aérea", 
-    num_voo            = "Número de identificação do voo", 
-    modelo_equipamento = "Código do modelo da aeronave (Padrão ICAO)", 
-    assentos           = "Quantidade de assentos comercializados", 
-    origem_icao        = "Código ICAO do aeroporto de origem",
-    destino_icao       = "Código ICAO do aeroporto de destino",
-    partida_prevista   = "Data e hora previstas para a partida (Horário de Brasília)",
-    partida_real       = "Data e hora reais da partida (Horário de Brasília)",
-    chegada_prevista   = "Data e hora previstas para a chegada (Horário de Brasília)",
-    chegada_real       = "Data e hora reais da chegada (Horário de Brasília)",
-    situacao           = "Status final do voo (Realizado, Cancelado, etc)",
-    atraso_partida_min = "Atraso na partida em minutos (Real - Previsto)",
-    atraso_chegada_min = "Atraso na chegada em minutos (Real - Previsto)"
-  ) |> 
+  set_variable_labels(icao_empresa = "Sigla ICAO da Empresa Aérea",
+                      empresa = "Nome da Empresa Aérea",
+                      num_voo = "Número de identificação do voo",
+                      codigo_di = "Código de Autorização de Voo (DI)",
+                      codigo_tipo_linha  = "Código do Tipo de Linha",
+                      modelo_equipamento = "Código do modelo da aeronave (Padrão ICAO)",
+                      assentos = "Quantidade de assentos comercializados",
+                      origem_icao = "Código ICAO do aeroporto de origem",
+                      nome_origem = "Nome oficial do aeroporto de origem",
+                      partida_prevista = "Data e hora previstas para a partida (Horário de Brasília)",
+                      partida_real = "Data e hora reais da partida (Horário de Brasília)",
+                      destino_icao = "Código ICAO do aeroporto de destino",
+                      nome_destino = "Nome oficial do aeroporto de destino",
+                      chegada_prevista = "Data e hora previstas para a chegada (Horário de Brasília)",
+                      chegada_real = "Data e hora reais da chegada (Horário de Brasília)",
+                      situacao = "Status final do voo (Realizado, Cancelado, etc)",
+                      justificativa = "Justificativa para atraso ou cancelamento do voo",
+                      referencia = "Data de referência do voo",
+                      situacao_partida = "Categoria do status de partida (Antecipado, Pontual, Atraso, etc)",
+                      situacao_chegada = "Categoria do status de chegada (Antecipado, Pontual, Atraso, etc)",
+                      atraso_partida_min = "Atraso na partida em minutos (Real - Previsto)",
+                      atraso_chegada_min = "Atraso na chegada em minutos (Real - Previsto)") |>
   glimpse()
 
 planes <- read_parquet("planes.parquet") |>
   rename(matricula = marca,
-         operador = nm_operador, 
+         uf_proprietario = sg_uf,
+         cpf_cnpj_proprietario = cpf_cnpj,
+         operador = nm_operador,
+         cpf_cnpj_operador = cpf_cgc,
+         cert_matricula = nr_cert_matricula,
+         num_serie = nr_serie,
+         categoria = cd_categoria,
+         tipo = cd_tipo,
+         modelo = ds_modelo,
          fabricante = nm_fabricante,
-         modelo = ds_modelo, 
-         icao_tipo = cd_tipo_icao, 
-         ano_fabricacao = nr_ano_fabricacao, 
-         assentos = nr_assentos, 
-         pmd = nr_pmd, 
-         passageiros_max = nr_passageiros_max, 
-         categoria = cd_categoria, 
-         interdicao = cd_interdicao, 
-         motivo_cancelamento = ds_motivo_canc, 
-         validade_ca = dt_validade_ca, 
-         validade_iam = dt_validade_iam, 
-         data_cancelamento = dt_canc) |> 
-  mutate(assentos = as.numeric(assentos),
-         ano_fabricacao = as.numeric(ano_fabricacao), 
-         pmd = as.numeric(pmd), 
-         passageiros_max = as.numeric(passageiros_max), 
-         matricula = str_replace(matricula, "^([A-Z]{2})([A-Z]{3})$", "\\1-\\2"), 
+         classe = cd_cls,
+         pmd = nr_pmd,
+         icao_tipo = cd_tipo_icao,
+         tripulacao_min = nr_tripulacao_min,
+         passageiros_max = nr_passageiros_max,
+         assentos = nr_assentos,
+         ano_fabricacao = nr_ano_fabricacao,
+         validade_iam = dt_validade_iam,
+         validade_ca = dt_validade_ca,
+         data_cancelamento = dt_canc,
+         motivo_cancelamento = ds_motivo_canc,
+         interdicao = cd_interdicao,
+         marca_nac1 = cd_marca_nac1,
+         marca_nac2 = cd_marca_nac2,
+         marca_nac3 = cd_marca_nac3,
+         marca_estrangeira = cd_marca_estrangeira,
+         gravame = ds_gravame) |>
+  mutate(pmd = as.numeric(pmd),
+         tripulacao_min = as.numeric(tripulacao_min),
+         passageiros_max = as.numeric(passageiros_max),
+         assentos = as.numeric(assentos),
+         ano_fabricacao = as.numeric(ano_fabricacao),
+         matricula = str_replace(matricula, "^([A-Z]{2})([A-Z]{3})$", "\\1-\\2"),
          validade_iam = dmy(validade_iam),
          validade_ca = dmy(validade_ca),
          data_cancelamento = as_date(ymd_hms(data_cancelamento))) |>
-  select(matricula, proprietario, operador, uf_operador, fabricante, modelo, icao_tipo,
-         ano_fabricacao, assentos, pmd, categoria, interdicao, motivo_cancelamento,
-         validade_ca, validade_iam, passageiros_max, data_cancelamento) |> 
-  set_variable_labels(
-    matricula           = "Marca de Nacionalidade e Matrícula (ex: PR-GUK)",
-    proprietario        = "Nome do Proprietário da Aeronave",
-    operador            = "Nome do Operador (Companhia Aérea, Táxi Aéreo, etc.)",
-    uf_operador         = "Unidade da Federação do Operador",
-    fabricante          = "Nome do Fabricante da Aeronave (ex: BOEING, AIRBUS)",
-    modelo              = "Designação do Modelo Comercial da Aeronave",
-    icao_tipo           = "Código de Tipo ICAO (Cruza com 'modelo_equipamento' dos Voos)",
-    ano_fabricacao      = "Ano de Fabricação da Aeronave",
-    assentos            = "Número Máximo de Assentos Aprovados",
-    pmd                 = "Peso Máximo de Decolagem Aprovado (Kg)",
-    categoria           = "Categoria de Registro (ex: TPR = Transporte Regular)",
-    interdicao          = "Situação de Interdição (N = Não, M = Manutenção, etc.)",
-    motivo_cancelamento = "Motivo do cancelamento da matrícula (se inativa)",
-    validade_ca         = "Data de Validade do Certificado de Aeronavegabilidade",
-    validade_iam        = "Data de Validade da Inspeção Anual de Manutenção (IAM)",
-    passageiros_max     = "Número Máximo de Passageiros",
-    data_cancelamento   = "Data em que a matrícula foi cancelada"
-  ) |> 
+  set_variable_labels(matricula = "Marca de Nacionalidade e Matrícula (ex: PR-GUK)",
+                      proprietario = "Nome do Proprietário da Aeronave",
+                      outros_proprietarios  = "Nomes de outros proprietários registrados",
+                      uf_proprietario = "Unidade da Federação (UF) do proprietário",
+                      cpf_cnpj_proprietario = "CPF ou CNPJ do proprietário",
+                      operador = "Nome do Operador (Companhia Aérea, Táxi Aéreo, etc.)",
+                      outros_operadores = "Nomes de outros operadores registrados",
+                      uf_operador = "Unidade da Federação do Operador",
+                      cpf_cnpj_operador = "CPF ou CNPJ do operador",
+                      cert_matricula = "Número do Certificado de Matrícula",
+                      num_serie = "Número de série da aeronave",
+                      categoria = "Categoria de Registro (ex: TPR = Transporte Regular)",
+                      tipo = "Código do tipo de aeronave",
+                      modelo = "Designação do Modelo Comercial da Aeronave",
+                      fabricante = "Nome do Fabricante da Aeronave (ex: BOEING, AIRBUS)",
+                      classe = "Classe da aeronave",
+                      pmd = "Peso Máximo de Decolagem Aprovado (Kg)",
+                      icao_tipo = "Código de Tipo ICAO (Cruza com 'modelo_equipamento' dos Voos)",
+                      tripulacao_min = "Quantidade mínima de tripulantes exigida",
+                      passageiros_max = "Número Máximo de Passageiros",
+                      assentos = "Número Máximo de Assentos Aprovados",
+                      ano_fabricacao = "Ano de Fabricação da Aeronave",
+                      validade_iam = "Data de Validade da Inspeção Anual de Manutenção (IAM)",
+                      validade_ca = "Data de Validade do Certificado de Aeronavegabilidade",
+                      data_cancelamento = "Data em que a matrícula foi cancelada",
+                      motivo_cancelamento = "Motivo do cancelamento da matrícula (se inativa)",
+                      interdicao = "Situação de Interdição (N = Não, M = Manutenção, etc.)",
+                      marca_nac1 = "Código de marca nacional anterior 1",
+                      marca_nac2 = "Código de marca nacional anterior 2",
+                      marca_nac3 = "Código de marca nacional anterior 3",
+                      marca_estrangeira = "Marca estrangeira anterior utilizada pela aeronave",
+                      gravame = "Descrição de gravames ou restrições financeiras e legais") |>
   glimpse()
 
 # Tópico 0 : Análise Geral da Base de Dados----
@@ -444,69 +481,3 @@ flights |>
          subtitle = "Volume de aeronaves únicas (Top 10 categorias de registro)",
          caption = "Fonte: ANAC | Elaboração Própria") +
     theme_econ_base()
-
-# Tópico 1: Visão Geral de Operações e Tendências ----
-
-## Evolução Temporal e Sazonalidade (Volume de Voos)
-flights |>
-  filter(year(partida_prevista) == 2023) |>
-  group_by(mes = month(partida_prevista, label = TRUE)) |>
-  summarise(volume = n(), .groups = "drop") |>
-  ggplot(aes(mes, volume, group = 1, colour = "Volume de Voos")) +
-    geom_line(linewidth = 1, show.legend = FALSE) +
-    scale_y_continuous(labels = fmt_lab("number")) +
-    scale_econ(aes = "colour", scheme = "lines_side") +
-    labs(title = "Estabilidade do Tráfego Aéreo", 
-         subtitle = "Evolução mensal do volume total de voos previstos, 2023", 
-         caption = "Fonte: ANAC | Elaboração Própria") +
-    theme_econ_base() 
-
-
-## Market Share por Oferta de Assentos e Voos Realizados
-
-flights |> 
-  filter(situacao == "REALIZADO") |> 
-  group_by(empresa) |> 
-  summarise(voos = n(), assentos = sum(assentos, na.rm = TRUE)) |> 
-  mutate(empresa = fct_lump_n(empresa, n = 5, w = voos, other_level = "Outras")) |> 
-  group_by(empresa) |> 
-  summarise(voos = sum(voos), assentos = sum(assentos)) |> 
-  mutate(`Voos Realizados` = voos / sum(voos), 
-         `Assentos Ofertados` = assentos / sum(assentos)) |> 
-  select(-c(voos, assentos)) |> 
-  pivot_longer(cols = c(`Voos Realizados`, `Assentos Ofertados`), 
-               names_to = "metrica", values_to = "valor") |> 
-  mutate(empresa = fct_reorder(empresa, valor, .desc = TRUE), 
-         empresa = fct_relevel(empresa, "Outras", after = Inf)) |> 
-  ggplot(aes(empresa, valor, fill = metrica)) +
-    geom_col(position = "dodge") +
-    scale_y_continuous(labels = fmt_lab("percent")) +
-    scale_econ(aes = "fill", scheme = "web") +
-    labs(title = "Concentração do Mercado Aéreo", 
-         subtitle = "Maket share das 5 maiores companhias (voos realizados vs assentos ofertados)", 
-         caption = "Fonte: ANAC | Elaboração Própria") +
-    theme_econ_base()
-  
-
-## KPIs Macro (Taxas de Cancelamento e Atrasos Médios)
-
-flights |>
-  mutate(empresa = fct_lump_n(empresa, n = 5, other_level = "Outras")) |>
-  group_by(empresa) |>
-  summarise(taxa_cancelamento = mean(situacao == "CANCELADO", na.rm = TRUE),
-            atraso_partida = mean(atraso_partida_min[situacao == "REALIZADO"], na.rm = TRUE),
-            atraso_chegada = mean(atraso_chegada_min[situacao == "REALIZADO"], na.rm = TRUE)) |>
-  arrange(desc(taxa_cancelamento)) |>
-  gt() |>
-    tab_header(title = "Performance Operacional por Companhia Aérea",
-              subtitle = "Indicadores médios e distribuição de atrasos nas partidas (2023)") |>
-    cols_label(empresa = "Empresa",
-               taxa_cancelamento = "Cancelamentos",
-               atraso_partida = "Atraso Partida (min)",
-               atraso_chegada = "Atraso Chegada (min)") |>
-    fmt_percent(columns = taxa_cancelamento,
-                decimals = 2, dec_mark = ",", sep_mark = ".") |>
-    fmt_number(columns = c(atraso_partida, atraso_chegada),
-               decimals = 2, dec_mark = ",", sep_mark = ".") |>
-    gt_theme_538() |>
-    tab_source_note(source_note = "Fonte: ANAC | Elaboração Própria")
