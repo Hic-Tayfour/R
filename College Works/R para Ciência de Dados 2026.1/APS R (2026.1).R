@@ -444,23 +444,21 @@ flights |>
   inner_join(airports, by = "icao") |>
   mutate(tipo = if_else(pais == "BRASIL", "Nacional", "Internacional")) |>
   count(tipo, pais, name = "aeroportos") |>
-  mutate(pais = if_else(tipo == "Internacional", 
-                        as.character(fct_lump_n(factor(pais), 
-                        n = 5, w = aeroportos, 
-                        other_level = "Outros")),"Brasil")) |>
+  mutate(pais = if_else(tipo == "Internacional", as.character(fct_lump_n(factor(pais),
+                                                n = 5, w = aeroportos, other_level = "Outros")), "Brasil")) |>
   group_by(tipo, pais) |>
-  summarise(aeroportos = sum(aeroportos), .groups = "drop") |>
+  summarise(aeroportos = sum(aeroportos),
+            .groups = "drop") |>
   arrange(desc(tipo), desc(aeroportos)) |>
   mutate(pais = str_to_title(pais)) |>
-  gt(groupname_col = "tipo") |>
+  gt(id = "tbl_conectividade", groupname_col = "tipo") |>
   tab_header(title = "Conectividade da Malha Aeroportuária",
              subtitle = "Quantidade de aeroportos únicos operacionais em 2023 (Nacional vs. Internacional)") |>
-  cols_label(pais = "País de Origem/Destino", aeroportos = "Aeroportos Conectados") |>
-  fmt_number(columns = aeroportos, 
-             decimals = 0, sep_mark = ".", dec_mark = ",") |>
-  summary_rows( groups = everything(), columns = aeroportos, 
-                fns = list(Subtotal = ~sum(.)), formatter = fmt_number, 
-                decimals = 0, sep_mark = ".", dec_mark = ",") |>
+  cols_label(pais = "País de Origem/Destino",
+             aeroportos = "Aeroportos Conectados") |>
+  fmt_number(columns = aeroportos, decimals = 0, sep_mark = ".", dec_mark = ",") |>
+  summary_rows(groups = "Internacional", columns = aeroportos, fns = list(Subtotal = "sum"),
+               formatter = fmt_number, decimals = 0, sep_mark = ".", dec_mark = ",") |>
   gt_theme_538() |>
   tab_source_note(source_note = "Fonte: ANAC | Elaboração Própria")
 
@@ -483,3 +481,69 @@ flights |>
          subtitle = "Volume de aeronaves únicas (Top 10 categorias de registro)",
          caption = "Fonte: ANAC | Elaboração Própria") +
     theme_econ_base()
+
+# Tópico 1: Visão Geral de Operações e Tendências ----
+
+## Evolução Temporal e Sazonalidade (Volume de Voos)
+flights |>
+  filter(year(partida_prevista) == 2023) |>
+  group_by(mes = month(partida_prevista, label = TRUE)) |>
+  summarise(volume = n(), .groups = "drop") |>
+  ggplot(aes(mes, volume, group = 1, colour = "Volume de Voos")) +
+    geom_line(linewidth = 1, show.legend = FALSE) +
+    scale_y_continuous(labels = fmt_lab("number")) +
+    scale_econ(aes = "colour", scheme = "lines_side") +
+    labs(title = "Estabilidade do Tráfego Aéreo", 
+         subtitle = "Evolução mensal do volume total de voos previstos, 2023", 
+         caption = "Fonte: ANAC | Elaboração Própria") +
+    theme_econ_base() 
+
+
+## Market Share por Oferta de Assentos e Voos Realizados
+
+flights |> 
+  filter(situacao == "REALIZADO") |> 
+  group_by(empresa) |> 
+  summarise(voos = n(), assentos = sum(assentos, na.rm = TRUE)) |> 
+  mutate(empresa = fct_lump_n(empresa, n = 5, w = voos, other_level = "Outras")) |> 
+  group_by(empresa) |> 
+  summarise(voos = sum(voos), assentos = sum(assentos)) |> 
+  mutate(`Voos Realizados` = voos / sum(voos), 
+         `Assentos Ofertados` = assentos / sum(assentos)) |> 
+  select(-c(voos, assentos)) |> 
+  pivot_longer(cols = c(`Voos Realizados`, `Assentos Ofertados`), 
+               names_to = "metrica", values_to = "valor") |> 
+  mutate(empresa = fct_reorder(empresa, valor, .desc = TRUE), 
+         empresa = fct_relevel(empresa, "Outras", after = Inf)) |> 
+  ggplot(aes(empresa, valor, fill = metrica)) +
+    geom_col(position = "dodge") +
+    scale_y_continuous(labels = fmt_lab("percent")) +
+    scale_econ(aes = "fill", scheme = "web") +
+    labs(title = "Concentração do Mercado Aéreo", 
+         subtitle = "Maket share das 5 maiores companhias (voos realizados vs assentos ofertados)", 
+         caption = "Fonte: ANAC | Elaboração Própria") +
+    theme_econ_base()
+  
+
+## KPIs Macro (Taxas de Cancelamento e Atrasos Médios)
+
+flights |>
+  mutate(empresa = fct_lump_n(empresa, n = 5, other_level = "Outras")) |>
+  group_by(empresa) |>
+  summarise(taxa_cancelamento = mean(situacao == "CANCELADO", na.rm = TRUE),
+            atraso_partida = mean(atraso_partida_min[situacao == "REALIZADO"], na.rm = TRUE),
+            atraso_chegada = mean(atraso_chegada_min[situacao == "REALIZADO"], na.rm = TRUE)) |>
+  arrange(desc(taxa_cancelamento)) |>
+  gt() |>
+    tab_header(title = "Performance Operacional por Companhia Aérea",
+              subtitle = "Indicadores médios e distribuição de atrasos nas partidas (2023)") |>
+    cols_label(empresa = "Empresa",
+               taxa_cancelamento = "Cancelamentos",
+               atraso_partida = "Atraso Partida (min)",
+               atraso_chegada = "Atraso Chegada (min)") |>
+    fmt_percent(columns = taxa_cancelamento,
+                decimals = 2, dec_mark = ",", sep_mark = ".") |>
+    fmt_number(columns = c(atraso_partida, atraso_chegada),
+               decimals = 2, dec_mark = ",", sep_mark = ".") |>
+    gt_theme_538() |>
+    tab_source_note(source_note = "Fonte: ANAC | Elaboração Própria")
