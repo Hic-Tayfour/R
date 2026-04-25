@@ -239,9 +239,9 @@ airports <- read_parquet("airports.parquet") |>
          estado = estado_aera_dromo, 
          pais = paa_s_aera_dromo, 
          aeronave_critica = aeronave_cra_tica) |> 
-  mutate(across(where(is.character), ~ iconv(.x, from = "UTF-8", to = "windows-1252")),
-         latitude = as.numeric(str_replace(latitude, ",", ".")),
-         longitude = as.numeric(str_replace(longitude, ",", "."))) |> 
+  mutate(,latitude = as.numeric(str_replace(latitude, ",", ".")),
+         longitude = as.numeric(str_replace(longitude, ",", ".")),
+         across(where(is.character), ~ iconv(.x, from = "UTF-8", to = "windows-1252"))) |> 
   select(icao, iata, nome_aeroporto, municipio, estado, pais, aeronave_critica, latitude, longitude) |> 
   set_variable_labels(
     icao = "Código ICAO do Aeródromo (4 Letras)", 
@@ -271,14 +271,14 @@ flights <- read_parquet("flights.parquet") |>
          referencia = refer_aancia,
          situacao_partida = situa_a_a_o_partida,
          situacao_chegada = situa_a_a_o_chegada) |> 
-  mutate(across(where(is.character), ~ iconv(.x, from = "UTF-8", to = "windows-1252")),
-         partida_prevista = dmy_hm(partida_prevista),
+  mutate(partida_prevista = dmy_hm(partida_prevista),
          partida_real = dmy_hm(partida_real), 
          chegada_prevista = dmy_hm(chegada_prevista),
          chegada_real = dmy_hm(chegada_real), 
          assentos = as.numeric(assentos), 
          atraso_partida_min = as.numeric(difftime(partida_real, partida_prevista, units = "mins")),
-         atraso_chegada_min = as.numeric(difftime(chegada_real, chegada_prevista, units = "mins"))) |> 
+         atraso_chegada_min = as.numeric(difftime(chegada_real, chegada_prevista, units = "mins")),
+         across(where(is.character), ~ iconv(.x, from = "UTF-8", to = "windows-1252"))) |> 
   set_variable_labels(icao_empresa = "Sigla ICAO da Empresa Aérea",
                       empresa = "Nome da Empresa Aérea",
                       num_voo = "Número de identificação do voo",
