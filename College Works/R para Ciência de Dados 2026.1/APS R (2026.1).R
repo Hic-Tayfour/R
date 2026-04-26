@@ -1,14 +1,19 @@
 # Bibliotecas 
 
+library(rnaturalearthdata)   
+library(rnaturalearth)       
+library(countrycode)
 library(tidymodels)
 library(tidyverse)
 library(labelled)
 library(showtext)
 library(gtExtras)
+library(stringi)
 library(scales)
 library(arrow)
+library(geobr)               
 library(gt)
-
+library(sf)                  
 
 # Funções Gráficas The Economist ----
 
@@ -231,6 +236,33 @@ fmt_lab <- function(kind = c("number", "percent", "si")) {
 
 # Tratando as Bases 
 
+pais_iso3 <- c(
+  "AFRICA DO SUL" = "ZAF", "ALEMANHA" = "DEU", "ANGOLA" = "AGO", "ANGUILLA" = "AIA", "ANTIGUA E BARBUDA" = "ATG",
+  "ANTILHAS HOLANDESAS" = "NLD", "ARABIA SAUDITA" = "SAU", "ARGENTINA" = "ARG", "ARUBA" = "ABW", "AUSTRALIA" = "AUS",
+  "AUSTRIA" = "AUT", "BAHAMAS" = "BHS", "BAHREIN" = "BHR", "BANGLADESH" = "BGD", "BARBADOS" = "BRB", "BELIZE" = "BLZ",
+  "BENIM" = "BEN", "BERMUDAS" = "BMU", "BOLIVIA" = "BOL", "BOTSUANA" = "BWA", "BRASIL" = "BRA", "BRUNEI" = "BRN",
+  "BULGARIA" = "BGR", "BURKINA FASSO" = "BFA", "CABO VERDE" = "CPV", "CAMBOJA" = "KHM", "CANADA" = "CAN", "CHADE" = "TCD",
+  "CHILE" = "CHL", "CHINA" = "CHN", "CHIPRE" = "CYP", "COMORES" = "COM", "CONGO" = "COG", "COREIA DO SUL" = "KOR",
+  "COSTA DO MARFIM" = "CIV", "COSTA RICA" = "CRI", "CROACIA" = "HRV", "CUBA" = "CUB", "DJIBOUTI" = "DJI",
+  "DOMINICA" = "DMA", "EGITO" = "EGY", "EL SALVADOR" = "SLV", "EMIRADOS ARABES UNIDOS" = "ARE", "EQUADOR" = "ECU",
+  "ERITREIA" = "ERI", "ESLOVAQUIA" = "SVK", "ESPANHA" = "ESP", "ESTADOS UNIDOS DA AMERICA" = "USA", "FILIPINAS" = "PHL",
+  "FORMOSA TAIWAN" = "TWN", "GANA" = "GHA", "GIBRALTAR" = "GIB", "GRANADA" = "GRD", "GUADALUPE" = "GLP", "GUAM" = "USA",
+  "GUATEMALA" = "GTM", "GUIANA" = "GUY", "GUIANA FRANCESA" = "GUF", "HAITI" = "HTI", "HOLANDA" = "NLD", "HONDURAS" = "HND",
+  "HONG KONG" = "HKG", "HUNGRIA" = "HUN", "ILHAS CANARIAS" = "ESP", "ILHAS CAYMAN" = "CYM", "ILHAS MARSHALL" = "MHL",
+  "ILHAS TURCAS E CAICOS" = "TCA", "ILHAS VIRGENS AMERICANAS" = "USA", "INDIA" = "IND", "IRAQUE" = "IRQ", "IRLANDA" = "IRL",
+  "ISRAEL" = "ISR", "ITALIA" = "ITA", "JAMAICA" = "JAM", "KOSOVO" = "XKX", "KUWAIT" = "KWT", "LAOS" = "LAO", "LESOTO" = "LSO",
+  "LIBANO" = "LBN", "LIBIA" = "LBY", "LUXEMBURGO" = "LUX", "MACAU" = "MAC", "MADAGASCAR" = "MDG", "MALASIA" = "MYS",
+  "MALAUI" = "MWI", "MALDIVAS" = "MDV", "MALI" = "MLI", "MALTA" = "MLT", "MARIANAS SETENTRIONAIS" = "USA", "MARROCOS" = "MAR",
+  "MARTINICA" = "MTQ", "MAURICIA" = "MUS", "MAYOTTE" = "MYT", "MIANMAR" = "MMR", "MOLDAVIA" = "MDA", "MONTENEGRO" = "MNE",
+  "MONTSERRAT" = "MSR", "NAMIBIA" = "NAM", "NAURU" = "NRU", "NEPAL" = "NPL", "NICARAGUA" = "NIC", "NIGER" = "NER",
+  "NORUEGA" = "NOR", "PALAU" = "PLW", "PANAMA" = "PAN", "PARAGUAI" = "PRY", "PERU" = "PER", "PORTO RICO" = "USA",
+  "PORTUGAL" = "PRT", "QATAR" = "QAT", "REINO UNIDO" = "GBR", "SEICHELES" = "SYC", "SENEGAL" = "SEN", "SERRA LEOA" = "SLE",
+  "SINGAPURA" = "SGP", "SIRIA" = "SYR", "SOMALIA" = "SOM", "SRI LANKA" = "LKA", "SURINAME" = "SUR", "TIMOR LESTE" = "TLS",
+  "TOGO" = "TGO", "TRINIDAD E TOBAGO" = "TTO", "TUNISIA" = "TUN", "TURQUIA" = "TUR", "TUVALU" = "TUV", "UGANDA" = "UGA",
+  "URUGUAI" = "URY", "VENEZUELA" = "VEN", "ZIMBABUE" = "ZWE"
+)
+
+
 airports <- read_parquet("airports.parquet") |> 
   rename(icao = sigla_icao_aera_dromo,
          iata = sigla_iata_aera_dromo, 
@@ -242,20 +274,25 @@ airports <- read_parquet("airports.parquet") |>
   mutate(latitude = as.numeric(str_replace(latitude, ",", ".")),
          longitude = as.numeric(str_replace(longitude, ",", ".")),
          across(where(is.character),~ {
-             x <- iconv(as.character(.x), from = "UTF-8", to = "latin1", sub = "")
-             Encoding(x) <- "UTF-8"
-             x})) |> 
-  select(icao, iata, nome_aeroporto, municipio, estado, pais,aeronave_critica, latitude, longitude) |> 
+           x <- iconv(as.character(.x), from = "UTF-8", to = "latin1", sub = "")
+           Encoding(x) <- "UTF-8"
+           x})) |> 
+  mutate(pais_limpo = stringi::stri_trans_general(str_to_upper(str_squish(pais)), "Latin-ASCII") |> 
+  str_replace_all("[^A-Z0-9 ]", " ") |> str_squish(), iso_a3 = unname(pais_iso3[pais_limpo])) |> 
+  select(icao, iata, nome_aeroporto, municipio, estado, pais, iso_a3, aeronave_critica, latitude, longitude) |> 
   set_variable_labels(icao = "Código ICAO do Aeródromo (4 Letras)", 
                       iata = "Código IATA do Aeródromo (3 Letras)", 
                       nome_aeroporto = "Nome oficial e completo do aeroporto",
                       municipio = "Município onde o aeródromo está localizado",
                       estado = "Unidade da Federação (UF)", 
                       pais = "País de localização", 
+                      iso_a3 = "Código ISO-3 do País", 
                       aeronave_critica = "Aeronave crítica para dimensionamento da infraestrutura do aeródromo",
                       latitude = "Latitude geográfica (graus decimais)",
                       longitude = "Longitude geográfica (graus decimais)") |> 
   glimpse()
+
+rm(pais_iso3)
 
 flights <- read_parquet("flights.parquet") |> 
   rename(icao_empresa = sigla_icao_empresa_aa_c_rea, 
@@ -551,3 +588,242 @@ flights |>
                decimals = 2, dec_mark = ",", sep_mark = ".") |>
     gt_theme_538() |>
     tab_source_note(source_note = "Fonte: ANAC | Elaboração Própria")
+
+# Tópico 2: Logística e Malha Aérea ----
+
+## Mapeamento de Rotas e Conexões Principais
+
+flights |> 
+  filter(!is.na(partida_real)) |> 
+  count(origem_icao, destino_icao, name = "volume_voos") |> 
+  slice_max(order_by = volume_voos, n = 20) |> 
+  gt() |> 
+    tab_header(title = "To 20 Rotas por Volumes de Voos Realizados") |> 
+    fmt_number(columns = volume_voos, decimals = 0) |> 
+  gt_theme_538() |>
+  tab_source_note(source_note = "Fonte: ANAC | Elaboração Própria")
+  
+flights |> 
+  filter(!is.na(partida_real)) |> 
+  group_by(origem_icao) |> 
+  summarise(conexao = n_distinct(destino_icao)) |> 
+  slice_max(order_by = conexao, n = 10) |>
+  mutate(origem_icao = fct_reorder(origem_icao, conexao)) |> 
+  ggplot(aes(conexao, origem_icao)) +
+    geom_col(fill = pal["blue1"]) +
+    labs(title = "Hubs Centrais da Malha Aérea", 
+         subtitle = "Top 10 aeroportos classificados por volume de destinos únicos diretos",
+         caption = "Fonte: ANAC | Elaboração Própria") +
+    scale_econ() +
+    theme_econ_base()
+
+## Cálculo de Distâncias Geográficas entre Aeroportos (calc_dist)
+
+flights |>
+  drop_na(partida_real) |>
+  mutate(empresa = fct_lump_n(empresa, n = 3)) |>
+  filter(empresa != "Other") |>
+  left_join(airports, by = c("origem_icao" = "icao")) |>
+  left_join(airports, by = c("destino_icao" = "icao"), suffix = c("_orig", "_dest")) |>
+  drop_na(longitude_orig, latitude_orig, longitude_dest, latitude_dest) |>
+  mutate(dist_km = geosphere::distHaversine(cbind(longitude_orig, latitude_orig), 
+                                            cbind(longitude_dest, latitude_dest)) / 1000) |>
+  ggplot(aes(dist_km, fill = empresa, colour = empresa)) +
+    geom_density(alpha = 0.5) +
+    scale_econ(aes = "fill", scheme = "web") +
+    scale_econ(aes = "colour", scheme = "web") +
+    scale_x_continuous(labels = fmt_lab("number")) +
+    scale_y_continuous(labels = NULL) +
+    theme_econ_base() +
+    theme(legend.position = "top") +
+    labs(title = "Perfil de Distância da Malha Aérea",
+         subtitle = "Distribuição das rotas em quilômetros operadas pelas três maiores empresas",
+         fill = NULL,
+         colour = NULL,
+         caption = "Fonte: Base de Voos e Aeroportos | Elaboração Própria")
+  
+
+## Identificação de Hubs e Nós Estratégicos
+
+flights |>
+  filter(!is.na(partida_real)) |>
+  group_by(origem_icao) |>
+  summarise(partidas_totais = n(),
+            assentos_ofertados = sum(assentos, na.rm = TRUE),
+            media_voos_diarios = n() / n_distinct(as.Date(partida_real))) |>
+  mutate(pct_partidas = partidas_totais / sum(partidas_totais)) |>
+  filter(pct_partidas > 0.05) |>
+  left_join(select(airports, icao, nome_aeroporto), by = c("origem_icao" = "icao")) |>
+  mutate(nome_aeroporto = coalesce(nome_aeroporto, 
+                                   case_when(origem_icao == "SBGR" ~ "Guarulhos (Gov. André Franco Montoro)",
+                                             TRUE ~ origem_icao))) |>
+  arrange(desc(pct_partidas)) |>
+  select(origem_icao, nome_aeroporto, partidas_totais, 
+         pct_partidas, assentos_ofertados, media_voos_diarios) |>
+  gt() |>
+  tab_header(title = "Hubs Estratégicos da Malha Aérea",
+             subtitle = "Aeroportos responsáveis por mais de 5% do volume total de partidas") |>
+  cols_label(origem_icao = "Código ICAO",
+             nome_aeroporto = "Aeroporto",
+             partidas_totais = "Total de Partidas",
+             pct_partidas = "Share da Malha",
+             assentos_ofertados = "Assentos Ofertados",
+             media_voos_diarios = "Voos/Dia") |>
+  fmt_number(columns = c(partidas_totais, assentos_ofertados),
+             decimals = 0, sep_mark = ".", dec_mark = ",") |>
+  fmt_number(columns = media_voos_diarios,
+             decimals = 1, sep_mark = ".", dec_mark = ",") |>
+  fmt_percent(columns = pct_partidas,
+              decimals = 1, sep_mark = ".", dec_mark = ",") |> 
+  gt_theme_538() |>
+  tab_source_note(source_note = "Fonte: ANAC | Elaboração Própria")
+
+# Distribuição Espacial dos Hubs
+
+ne_countries(scale = "medium", returnclass = "sf") |>
+  filter(name_long != "Antarctica") |>
+  ggplot() +
+  geom_sf(fill = "white", colour = "gray9", linewidth = 0.18) +
+  geom_sf(data = flights |>
+      left_join(airports |> 
+                  select(icao, pais_origem = pais, longitude, latitude), by = c("origem_icao" = "icao")) |>
+      left_join(airports |> select(icao, pais_destino = pais), by = c("destino_icao" = "icao")) |>
+      filter(pais_origem != pais_destino) |>
+      group_by(origem_icao) |>
+      summarise(total_voos = n(),
+                total_assentos = sum(assentos, na.rm = TRUE),
+                longitude = first(longitude),
+                latitude = first(latitude)) |>
+      ungroup() |>
+      mutate(pct_voos = total_voos / sum(total_voos),
+             classificacao = if_else(pct_voos > 0.05, 
+                                     "Hub Internacional (> 5%)", "Conexão Secundária")) |>
+      drop_na(longitude, latitude) |>
+      arrange(pct_voos) |>
+      st_as_sf(coords = c("longitude", "latitude"), crs = 4326), 
+      mapping = aes(colour = classificacao, size = total_assentos),
+      alpha = 0.8) +
+    scale_econ(aes = "colour") +
+    scale_size_continuous(range = c(0.8, 6), labels = fmt_lab("number")) +
+    coord_sf(xlim = c(-180, 180), ylim = c(-58, 84), expand = FALSE) +
+    theme_econ_base() +
+    theme(axis.text = element_blank(),
+          axis.line.x = element_blank(),
+          axis.ticks.x = element_blank(),
+          panel.grid.major.y = element_blank(),
+          legend.position = "top",
+          legend.box = "vertical",
+          plot.caption = element_text(hjust = 0, colour = pal["land_text"])) +
+  guides(colour = guide_legend(override.aes = list(size = 4, alpha = 1), order = 1),
+         size = guide_legend(override.aes = list(colour = "gray50"), order = 2)) +
+  labs(title = "Conectividade Global: Hubs Internacionais",
+       subtitle = "Volume de assentos ofertados (excluindo voos domésticos) por aeroporto de origem",
+        colour = NULL,
+        size = "Assentos Ofertados",
+        caption = "Fonte: ANAC e Natural Earth | Elaboração Própria")
+
+read_state(year = 2019, showProgress = FALSE) |>
+  ggplot() +
+  geom_sf(fill = "white", colour = "gray9", linewidth = 0.4) +
+  geom_sf(data = flights |>
+            group_by(origem_icao) |>
+            summarise(total_voos = n(),
+                      total_assentos = sum(assentos, na.rm = TRUE)) |>
+            ungroup() |>
+            mutate(pct_voos = total_voos / sum(total_voos),
+                   classificacao = if_else(pct_voos > 0.05, 
+                                           "Hub Principal (> 5%)", "Conexão Secundária")) |>
+            left_join(airports, by = c("origem_icao" = "icao")) |>
+            filter(iso_a3 == "BRA", longitude < -34.5) |>
+            drop_na(longitude, latitude) |>
+            arrange(pct_voos) |>
+            st_as_sf(coords = c("longitude", "latitude"), crs = 4326) |>
+            st_transform(4674),
+            mapping = aes(colour = classificacao, size = total_assentos), alpha = 0.8) +
+  scale_econ(aes = "colour") +
+  scale_size_continuous(range = c(0.8, 6), labels = fmt_lab("number")) +
+  coord_sf(xlim = c(-74, -34.5), ylim = c(-34, 6)) +
+  theme_econ_base() +
+  theme(axis.text = element_blank(),
+        axis.line.x = element_blank(),
+        axis.ticks.x = element_blank(),
+        panel.grid.major.y = element_blank(),
+        legend.position = "top",
+        legend.box = "vertical",
+        plot.caption = element_text(hjust = 0, colour = pal["land_text"])) +
+  guides(colour = guide_legend(override.aes = list(size = 4, alpha = 1), order = 1),
+         size = guide_legend(override.aes = list(colour = "gray50"), order = 2)) +
+  labs(title = "Distribuição da Malha Aérea no Brasil Continental",
+       subtitle = "Volume de assentos ofertados (excluindo operações em ilhas oceânicas)",
+       colour = NULL,
+       size = "Assentos Ofertados",
+       caption = "Fonte: ANAC e IBGE via geobr | Elaboração Própria")
+
+# Tópico 3: Performance de Pontualidade ----
+
+## Distribuição de Atrasos (Partida vs. Chegada)
+
+flights |> 
+  filter(situacao == "REALIZADO") |>
+  select(atraso_partida_min, atraso_chegada_min) |> 
+  pivot_longer(cols = everything(), names_to = "tipo_atraso", values_to = "minutos") |> 
+  filter(minutos >= -30, minutos <= 150) |> 
+  mutate(tipo_atraso = case_when(tipo_atraso == "atraso_partida_min" ~ "Partida", 
+                                 tipo_atraso == "atraso_chegada_min" ~ "Chegada")) |> 
+  ggplot(aes(minutos, fill = tipo_atraso)) +
+    geom_density(alpha = 0.7, colour = NA) +
+    scale_econ(aes = "fill") +
+    theme_econ_base() +
+    labs(title = "Distribuição de Atrasos: Partidas e Chegadas", 
+         subtitle = "Densidades de minutos de atraso para voos realizados no período", 
+         x = "Minutos de Atraso (valores negativos indicam adiantamento)", 
+         y = "", 
+         fill = "Etapa do Voo", 
+         caption = "Fonte: ANAC | Elaboração Própria")
+  
+  
+
+## Eficiência Operacional por Aeroporto de Origem e Destino
+
+flights |> 
+  filter(situacao == "REALIZADO", !is.na(atraso_partida_min)) |> 
+  group_by(nome_origem) |> 
+  summarise(total_voos = n(), 
+            media_atraso = mean(atraso_partida_min)) |>
+  filter(total_voos > 1000) |> 
+  slice_min(order_by = media_atraso, n = 10) |> 
+  arrange(media_atraso) |> 
+  gt() |> 
+    tab_header(title = "Top 10 Aeroportos Mais Pontuais", 
+               subtitle = "Aeroportos com menor média de atraso na partida (>1.000 voos realizados)") |> 
+    cols_label(nome_origem = "Aeroporto de Origem", 
+               total_voos = "total de Voos", 
+               media_atraso = "Atraso Médio (min)") |> 
+    fmt_number(columns = media_atraso, decimals = 2) |> 
+    fmt_number(columns = total_voos, decimals = 0, use_seps = TRUE) |> 
+  gt_theme_538() |>
+  tab_source_note(source_note = "Fonte: ANAC | Elaboração Própria")
+  
+
+## Análise de Impacto por Período do Dia e Turno
+
+flights |> 
+  mutate(empresa = fct_lump_n(empresa, n = 3)) |> 
+  filter(empresa != "Other", !is.na(partida_prevista)) |> 
+  mutate(turno = case_when(hour(partida_prevista) >= 0 & hour(partida_prevista) < 6 ~ "Madrugada",
+                           hour(partida_prevista) >= 6 & hour(partida_prevista) < 12 ~ "Manhã",
+                           hour(partida_prevista) >= 12 & hour(partida_prevista) < 18 ~ "Tarde",
+                           hour(partida_prevista) >= 18 ~ "Noite"),
+         turno = factor(turno, levels = c("Madrugada", "Manhã", "Tarde", "Noite"))) |> 
+  group_by(empresa, turno) |> 
+  summarise(pct_atraso = mean(atraso_partida_min > 15, na.rm = TRUE), 
+            .groups = "drop") |> 
+  ggplot(aes(empresa, pct_atraso, fill = turno)) +
+    geom_col(position = "stack") +
+    scale_y_continuous(labels = fmt_lab("percent")) +
+    scale_econ(aes = "fill", scheme = "stacked") +
+    theme_econ_base() +
+    labs(title = "Impacto de Atrasos por Período do Dia", 
+         subtitle = "Taxa de atrasos (>15 min) por turno nas principais emrpesas", 
+         caption = "Fonte: ANAC | Elaboração Própria", 
+         fill = "Turno")
