@@ -827,3 +827,129 @@ flights |>
          subtitle = "Taxa de atrasos (>15 min) por turno nas principais emrpesas", 
          caption = "Fonte: ANAC | Elaboração Própria", 
          fill = "Turno")
+
+
+# Tópico 4: Frota e Capacidade (Aeronaves) ----
+
+## Perfil dos Fabricantes (Boeing, Airbus, Embraer)
+
+flights |>
+  left_join(planes |>
+              drop_na(icao_tipo, fabricante) |>
+              count(icao_tipo, fabricante) |>
+              group_by(icao_tipo) |>
+              slice_max(n, n = 1, with_ties = FALSE) |>
+              select(-n),
+            by = c("modelo_equipamento" = "icao_tipo")) |>
+  drop_na(fabricante) |>
+  count(fabricante, name = "total") |>
+  slice_max(total, n = 5) |>
+  mutate(fabricante = fct_reorder(fabricante, total)) |>
+  ggplot(aes(total, fabricante, fill = fabricante)) +
+    geom_col(show.legend = FALSE) +
+    scale_x_continuous(labels = fmt_lab("number")) +
+    scale_econ(aes = "fill") +
+    theme_econ_base() +
+    labs(title = "Top 5 Fabricantes por Volume de Voos",
+         subtitle = "Total de decolagens realizadas por fabricante da aeronave",
+         caption = "Fonte: Bases Flights e Planes | Elaboração Própria",
+         x = "", y = "")
+
+## Idade Média da Frota Operante e Ciclo de Vida
+
+planes |> 
+  drop_na(operador, ano_fabricacao) |> 
+  filter(ano_fabricacao > 1900) |>
+  mutate(idade = 2023 - ano_fabricacao, 
+         operador = fct_lump_n(operador, n = 5)) |> 
+  filter(operador != "Other") |> 
+  mutate(operador = fct_infreq(fct_drop(operador))) |> 
+  ggplot(aes(idade, fill = operador)) +
+    geom_density(alpha = 0.8, colour = "transparent") +
+    geom_vline(aes(xintercept = media_idade),
+               data = ~ .x |> 
+                 group_by(operador) |> 
+                 summarise(media_idade = mean(idade)), colour = "#0C0C0C", linetype = "dashed", linewidth = 0.6) +
+  facet_wrap(~operador, ncol = 2, scale = "free_y") +
+  scale_x_continuous(labels =  fmt_lab("number")) +
+  scale_econ(aes = "fill") +
+  theme_econ_base() +
+  theme(legend.position = "none") +
+  labs(title = "Perfil Etário da Frota Operante",
+       subtitle = "Distribuição da idade e média (linha tracejada) para as 5 maiores operadoras",
+       caption = "Fonte: Base Planes | Elaboração Própria",
+       x = "",
+       y = "")
+                 
+
+## Distribuição de Assentos por Modelo de Equipamento (ICAO Type)
+
+flights |> 
+  drop_na(modelo_equipamento) |> 
+  group_by(icao_tipo = modelo_equipamento) |> 
+  summarise(total_assentos = sum(assentos, na.rm = TRUE)) |> 
+  slice_max(total_assentos, n = 10) |> 
+  left_join(planes |> 
+              drop_na(icao_tipo, fabricante) |> 
+              count(icao_tipo, fabricante) |> 
+              group_by(icao_tipo) |> 
+              slice_max(n, n = 1, with_ties = FALSE) |> 
+              select(-n), by = "icao_tipo") |> 
+  select(icao_tipo, fabricante, total_assentos) |> 
+  gt() |> 
+    tab_header(title = "Top 10 Modelos de Aeronaves", 
+               subtitle = "Maior volume de assentos ofertados no ano") |> 
+    cols_label(icao_tipo = "Código de ICAO", 
+               fabricante = "Fabricante Principal", 
+               total_assentos = "Assentos Ofertados") |> 
+  fmt_number(columns = total_assentos, 
+            decimals = 0, sep_mark = ".", dec_mark = ",") |>
+  gt_theme_538() |>
+  tab_source_note(source_note = "Fonte: ANAC | Elaboração Própria")
+  
+
+
+# Tópico 5: Perfil e Comportamento de Tráfego ----
+
+## Análise de Ocupação (Assentos Ofertados vs. Disponibilidade)
+
+flights |>
+  drop_na(partida_prevista, empresa) |>
+  mutate(empresa = fct_lump_n(empresa, n = 5)) |>
+  filter(empresa != "Other") |>
+  mutate(empresa = fct_drop(empresa)) |>
+  group_by(empresa, mes = lubridate::floor_date(partida_prevista, "month")) |>
+  summarise(voos = n(), assentos = sum(assentos, na.rm = TRUE), .groups = "drop") |>
+  ggplot(aes(voos, assentos)) +
+    geom_point(alpha = 0.6, colour = unname(pal["blue1"]), size = 2) +
+    geom_smooth(method = "lm", se = FALSE, colour = unname(pal["data_red"]), linewidth = 0.8) +
+    facet_wrap(~ empresa, scales = "free", ncol = 3) +
+    scale_x_log10(labels = fmt_lab("number")) +
+    scale_y_log10(labels = fmt_lab("number")) +
+    theme_econ_base() +
+    labs(title = "Dinâmica de Frequência e Capacidade",
+         subtitle = "Relação mensal entre voos e assentos (escala logarítmica base 10)",
+         caption = "Fonte: Base Flights | Elaboração Própria",
+         x = "Total de Voos Realizados (log10)",
+         y = "Total de Assentos Ofertados (log10)")
+
+
+## Sazonalidade por Natureza da Linha (Doméstica vs. Internacional)
+
+flights |> 
+  drop_na(partida_prevista, codigo_tipo_linha) |> 
+  filter(lubridate::as_date(partida_prevista) <= "2023-12-31") |> 
+  mutate(mes = lubridate::floor_date(partida_prevista, "month"), 
+         tipo_linha = if_else(str_detect(str_to_upper(codigo_tipo_linha), "^I|^X|^G"), "Internacional", "Doméstica")) |> 
+  group_by(tipo_linha, mes) |> 
+  summarise(voos = n(), .groups = "drop") |> 
+  ggplot(aes(mes, voos, colour = tipo_linha)) +
+    geom_line(linewidth = 0.9, show.legend = TRUE) +
+    facet_wrap(~ tipo_linha, scales = "free_y") +
+    scale_y_continuous(labels = fmt_lab("number")) +
+    scale_econ(aes = "colour") +
+    theme_econ_base() +
+    labs(title = "Evolução Temporal do Mercado Aéreo", 
+         subtitle = "Evolução mensal do volume de decolagens (até dez/2023)",
+         caption = "Fonte: Base Flights | Elaboração Própria",
+         x = "", y = "")
