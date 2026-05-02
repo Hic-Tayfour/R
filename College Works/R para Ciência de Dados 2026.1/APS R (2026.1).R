@@ -6,9 +6,9 @@ library(countrycode)
 library(tidymodels)
 library(tidyverse)
 library(labelled)
-library(showtext)
 library(gtExtras)
 library(stringi)
+library(bonsai)
 library(scales)
 library(arrow)
 library(geobr)               
@@ -19,51 +19,59 @@ library(sf)
 
 # Definição do tibble de cores 
 
-econ_colors_tbl <- tribble(
+econ_colors_tbl <- tibble::tribble(
   ~category,           ~color_name,    ~hex,
-  # Cores principais e para dados
-  "branding",          "econ_red",     "#E3120B", 
-  "main",              "data_red",     "#DB444B", 
-  "main",              "blue1",        "#006BA2", 
-  "main",              "blue2",        "#3EBCD2", 
-  "main",              "green",        "#379A8B", 
-  "main",              "yellow",       "#EBB434", 
-  "main",              "olive",        "#B4BA39", 
-  "main",              "purple",       "#9A607F", 
-  "main",              "gold",         "#D1B07C", 
   
-  # Cores secundárias e para texto 
+  # Branding
+  "branding",          "econ_red",     "#E3120B",
+  
+  # Main (web palette)
+  "main",              "data_red",     "#DB444B",
+  "main",              "blue1",        "#006BA2",
+  "main",              "blue2",        "#3EBCD2",
+  "main",              "green",        "#379A8B",
+  "main",              "yellow",       "#EBB434",
+  "main",              "olive",        "#B4BA39",
+  "main",              "purple",       "#9A607F",
+  "main",              "gold",         "#D1B07C",
+  "main",              "grey",         "#758D99",
+  
+  # Text
+  "text",              "base_text",    "#3F5661",
   "text",              "red_text",     "#CC334C",
   "text",              "blue2_text",   "#0097A7",
+  
+  # Secondary
   "secondary",         "mustard",      "#E6B83C",
   "secondary",         "burgundy",     "#A63D57",
   "secondary",         "mauve",        "#B48A9B",
   "secondary",         "teal",         "#008080",
   "secondary",         "aqua",         "#6FC7C7",
   
-  # Suporte para claridade
+  # Supporting bright
   "supporting_bright", "purple_b",     "#924C7A",
   "supporting_bright", "pink",         "#DA3C78",
   "supporting_bright", "orange",       "#F7A11A",
   "supporting_bright", "lime",         "#B3D334",
   
-  # Suporte para escuro
+  # Supporting dark
   "supporting_dark",   "navy",         "#003D73",
   "supporting_dark",   "cyan_dk",      "#005F73",
   "supporting_dark",   "green_dk",     "#385F44",
   
-  # Fundo
-  "background",        "print_bkgd",   "#E9EDF0", 
+  # Background
+  "background",        "print_bkgd",   "#E9EDF0",
   "background",        "highlight",    "#DDE8EF",
   "background",        "number_box",   "#C2D3E0",
   
-  # Para mapas
+  # Maps
   "maps",              "sea",          "#EBF5FB",
   "maps",              "land",         "#EBEBEB",
   "maps",              "land_text",    "#6D6E71",
   
-  # Neutro
-  "neutral",           "grid_lines",   "#B7C6CF", 
+  # Neutral
+  "neutral",           "text_black",   "#0C0C0C",
+  "neutral",           "grid_lines",   "#B7C6CF",
   "neutral",           "grey_box",     "#7C8C99",
   "neutral",           "grey_text",    "#333333",
   "neutral",           "black25",      "#BFBFBF",
@@ -71,34 +79,85 @@ econ_colors_tbl <- tribble(
   "neutral",           "black75",      "#404040",
   "neutral",           "black100",     "#000000",
   
-  # Mesma claridade
-  "equal_lightness",   "red",          "#A81829", 
-  "equal_lightness",   "blue",         "#00588D", 
-  "equal_lightness",   "cyan",         "#005F73", 
-  "equal_lightness",   "green",        "#005F52", 
-  "equal_lightness",   "yellow",       "#714C00", 
-  "equal_lightness",   "olive",        "#4C5900", 
-  "equal_lightness",   "purple",       "#78405F", 
-  "equal_lightness",   "gold",         "#674E1F", 
-  "equal_lightness",   "grey",         "#3F5661"  
+  # Equal lightness
+  "equal_lightness",   "red",          "#A81829",
+  "equal_lightness",   "blue",         "#00588D",
+  "equal_lightness",   "cyan",         "#005F73",
+  "equal_lightness",   "green",        "#005F52",
+  "equal_lightness",   "yellow",       "#714C00",
+  "equal_lightness",   "olive",        "#4C5900",
+  "equal_lightness",   "purple",       "#78405F",
+  "equal_lightness",   "gold",         "#674E1F",
+  "equal_lightness",   "grey",         "#3F5661",
+  
+  # Boxes / Nav (5 níveis)
+  "boxes_nav",         "red_1",        "#C7303C",
+  "boxes_nav",         "blue_1",       "#1270A8",
+  "boxes_nav",         "cyan_1",       "#00788D",
+  "boxes_nav",         "green_1",      "#00786B",
+  "boxes_nav",         "yellow_1",     "#8D6300",
+  "boxes_nav",         "olive_1",      "#667100",
+  "boxes_nav",         "purple_1",     "#925977",
+  "boxes_nav",         "gold_1",       "#826636",
+  "boxes_nav",         "grey_1",       "#576E79",
+  
+  "boxes_nav",         "red_2",        "#E64E53",
+  "boxes_nav",         "blue_2",       "#3D89C3",
+  "boxes_nav",         "cyan_2",       "#0092A7",
+  "boxes_nav",         "green_2",      "#2E9284",
+  "boxes_nav",         "yellow_2",     "#AA7C00",
+  "boxes_nav",         "olive_2",      "#818A00",
+  "boxes_nav",         "purple_2",     "#AD7291",
+  "boxes_nav",         "gold_2",       "#9D7F4E",
+  "boxes_nav",         "grey_2",       "#6F8793",
+  
+  "boxes_nav",         "red_3",        "#FF6B6C",
+  "boxes_nav",         "blue_3",       "#5DA4DF",
+  "boxes_nav",         "cyan_3",       "#25ADC2",
+  "boxes_nav",         "green_3",      "#4DAD9E",
+  "boxes_nav",         "yellow_3",     "#C89608",
+  "boxes_nav",         "olive_3",      "#9DA521",
+  "boxes_nav",         "purple_3",     "#C98CAC",
+  "boxes_nav",         "gold_3",       "#B99966",
+  "boxes_nav",         "grey_3",       "#89A2AE",
+  
+  "boxes_nav",         "red_4",        "#FF8785",
+  "boxes_nav",         "blue_4",       "#7BBFFC",
+  "boxes_nav",         "cyan_4",       "#4EC8DE",
+  "boxes_nav",         "green_4",      "#69C9B9",
+  "boxes_nav",         "yellow_4",     "#E7B030",
+  "boxes_nav",         "olive_4",      "#BAC03F",
+  "boxes_nav",         "purple_4",     "#E6A6C7",
+  "boxes_nav",         "gold_4",       "#D5B480",
+  "boxes_nav",         "grey_4",       "#A4BDC9",
+  
+  "boxes_nav",         "red_5",        "#FFA39F",
+  "boxes_nav",         "blue_5",       "#98DAFF",
+  "boxes_nav",         "cyan_5",       "#6FE4FB",
+  "boxes_nav",         "green_5",      "#86E5D4",
+  "boxes_nav",         "yellow_5",     "#FFCB4D",
+  "boxes_nav",         "olive_5",      "#D7DB5A",
+  "boxes_nav",         "purple_5",     "#FFC2E3",
+  "boxes_nav",         "gold_5",       "#F2CF9A",
+  "boxes_nav",         "grey_5",       "#BFD8E5"
 )
 
 # Vetor de busca
 
-pal <- econ_colors_tbl %>%
-  mutate(color_name = case_when(
+pal <- econ_colors_tbl |>
+  dplyr::mutate(color_name = dplyr::case_when(
     category == "equal_lightness" ~ paste0(color_name, "_eq"),
     category == "text" ~ paste0(color_name, "_txt"), 
     TRUE ~ color_name
-  )) %>%
-  dplyr::select(color_name, hex) %>%
-  deframe()
+  )) |>
+  dplyr::select(color_name, hex) |>
+  tibble::deframe()
 
 # Configuração de Fonte
 
 (font_family <- if ("Roboto Condensed" %in% systemfonts::system_fonts()$family) 
   "Roboto Condensed" else "sans")
-showtext_auto()
+showtext::showtext_auto()
 
 # Definição de Bases
 
@@ -137,53 +196,53 @@ econ_scheme <- list(
 
 # Funções de Tema e Escala
 theme_econ_base <- function(base_family = font_family) {
-  theme_minimal(base_family = base_family) +
-    theme(
-      plot.background  = element_rect(fill = econ_base$bg, colour = NA),
-      panel.background = element_rect(fill = econ_base$bg, colour = NA),
+  ggplot2::theme_minimal(base_family = base_family) +
+    ggplot2::theme(
+      plot.background  = ggplot2::element_rect(fill = econ_base$bg, colour = NA),
+      panel.background = ggplot2::element_rect(fill = econ_base$bg, colour = NA),
       
       # Títulos e Legendas
       plot.title.position = "plot",
-      plot.title     = element_text(
+      plot.title     = ggplot2::element_text(
         face = "bold",
         size = 20,
         hjust = 0,
         colour = econ_base$text,
-        margin = margin(b = 4)
+        margin = ggplot2::margin(b = 4)
       ),
-      plot.subtitle  = element_text(
+      plot.subtitle  = ggplot2::element_text(
         size = 12.5,
         hjust = 0,
         colour = econ_base$text,
-        margin = margin(b = 10)
+        margin = ggplot2::margin(b = 10)
       ),
-      plot.caption   = element_text(
+      plot.caption   = ggplot2::element_text(
         size = 9,
         colour = "#404040",
         hjust = 0,
-        margin = margin(t = 10)
+        margin = ggplot2::margin(t = 10)
       ),
       
       # Eixos
-      axis.title     = element_blank(),
-      axis.text      = element_text(size = 10, colour = econ_base$text),
-      axis.line.x    = element_line(colour = econ_base$text, linewidth = 0.6),
-      axis.ticks.x   = element_line(colour = econ_base$text, linewidth = 0.6),
-      axis.ticks.y   = element_blank(),
+      axis.title     = ggplot2::element_blank(),
+      axis.text      = ggplot2::element_text(size = 10, colour = econ_base$text),
+      axis.line.x    = ggplot2::element_line(colour = econ_base$text, linewidth = 0.6),
+      axis.ticks.x   = ggplot2::element_line(colour = econ_base$text, linewidth = 0.6),
+      axis.ticks.y   = ggplot2::element_blank(),
       
       # Grid
-      panel.grid.major.y = element_line(colour = econ_base$grid, linewidth = 0.4),
-      panel.grid.major.x = element_blank(),
-      panel.grid.minor   = element_blank(),
+      panel.grid.major.y = ggplot2::element_line(colour = econ_base$grid, linewidth = 0.4),
+      panel.grid.major.x = ggplot2::element_blank(),
+      panel.grid.minor   = ggplot2::element_blank(),
       
       # Legenda
       legend.position = "top",
       legend.justification = "left",
-      legend.title    = element_blank(),
-      legend.text     = element_text(size = 10, colour = econ_base$text),
-      legend.margin   = margin(t = 0, b = 5),
+      legend.title    = ggplot2::element_blank(),
+      legend.text     = ggplot2::element_text(size = 10, colour = econ_base$text),
+      legend.margin   = ggplot2::margin(t = 0, b = 5),
       
-      plot.margin     = margin(16, 16, 12, 16)
+      plot.margin     = ggplot2::margin(16, 16, 12, 16)
     )
 }
 
@@ -206,9 +265,9 @@ scale_econ <- function(aes = c("colour", "fill"),
     pal_vec <- rev(pal_vec)
   
   if (aes == "colour") {
-    scale_colour_manual(values = pal_vec, ...)
+    ggplot2::scale_colour_manual(values = pal_vec, ...)
   } else {
-    scale_fill_manual(values = pal_vec, ...)
+    ggplot2::scale_fill_manual(values = pal_vec, ...)
   }
 }
 
@@ -216,9 +275,9 @@ fmt_lab <- function(kind = c("number", "percent", "si")) {
   kind <- match.arg(kind)
   switch(
     kind,
-    number  = label_number(big.mark = ",", decimal.mark = "."), 
-    percent = label_percent(accuracy = 1),
-    si      = label_number(scale_cut = cut_short_scale())
+    number  = scales::label_number(big.mark = ",", decimal.mark = "."), 
+    percent = scales::label_percent(accuracy = 1),
+    si      = scales::label_number(scale_cut = scales::cut_short_scale())
   )
 }
 # ----
@@ -421,30 +480,29 @@ planes <- read_parquet("planes.parquet") |>
 ## Auditoria de Estrutura e Dados Faltantes (NAs)
 
 tibble(Base = c("airports", "flights", "planes"),
-       data = list(airports, flights, planes)) |>
+       data = list(airports, flights, planes)) |> 
   mutate(Linhas = map_int(data, nrow),
          summary = map(data, ~ tibble(Coluna = names(.x),
                                       Tipo = map_chr(.x, ~ class(.x)[1]),
                                       Valores_Unicos = map_int(.x, n_distinct),
-                                      NAs = map_int(.x, ~ sum(is.na(.x)))))) |>
-  select(-data) |>
-  unnest(summary) |>
-  mutate(Percentual = NAs / Linhas) |>
-  gt(groupname_col = "Base") |>
-  tab_header(title = "Saúde das Bases de Dados",
-             subtitle = "Auditoria de estrutura, cardinalidade e valores faltantes (NAs)") |>
-  cols_label(Linhas = "Total de Linhas",
-             Coluna = "Coluna",
-             Tipo = "Tipo",
-             Valores_Unicos = "Valores Únicos",
-             NAs = "NAs (Qtd)",
-             Percentual = "NAs (%)") |>
-  fmt_number(columns = c(Linhas, Valores_Unicos, NAs),
-             decimals = 0, dec_mark = ",", sep_mark = ".") |>
-  fmt_percent(columns = Percentual,
-              decimals = 2, dec_mark = ",", sep_mark = ".") |>
-  gt_theme_538() |>
-  tab_source_note(source_note = "Fonte: ANAC | Elaboração Própria")
+                                      NAs = map_int(.x, ~ sum(is.na(.x)))))) |> 
+  select(-data) |> 
+  unnest(summary) |> 
+  mutate(Percentual = NAs / Linhas) |> 
+  gt(groupname_col = "Base") |> 
+  tab_header(title = md("**Saúde das Bases de Dados**"),
+             subtitle = "Auditoria de estrutura, cardinalidade e valores faltantes (NAs)") |> 
+  cols_label(Linhas = "Total de Linhas", Coluna = "Coluna", Tipo = "Tipo", 
+             Valores_Unicos = "Valores Únicos", NAs = "NAs (Qtd)", Percentual = "NAs (%)") |> 
+  fmt_number(columns = c(Linhas, Valores_Unicos, NAs), decimals = 0, dec_mark = ",", sep_mark = ".") |> 
+  fmt_percent(columns = Percentual, decimals = 1, dec_mark = ",", sep_mark = ".") |> 
+  cols_align(align = "center", columns = c(Linhas, Tipo, Valores_Unicos, NAs, Percentual)) |> 
+  cols_align(align = "left", columns = Coluna) |> 
+  gt_color_rows(columns = Percentual, palette = c("#ffffff", "#E64E53"), domain = c(0, 1)) |> 
+  tab_source_note(source_note = "Fonte: ANAC | Elaboração Própria") |> 
+  tab_options(heading.align = "left", column_labels.font.weight = "bold", column_labels.border.top.width = px(3), 
+              column_labels.border.top.color = "#E3120B", table.border.bottom.color = "black", 
+              table_body.hlines.color = "#ececec", table.border.top.style = "hidden")
 
 
 
@@ -453,12 +511,9 @@ tibble(Base = c("airports", "flights", "planes"),
 flights |>
   summarise(data_min = format(min(partida_prevista, na.rm = TRUE), "%d/%m/%Y"),
             data_max = format(max(partida_prevista, na.rm = TRUE), "%d/%m/%Y"),
-            aeroportos = format(n_distinct(origem_icao, na.rm = TRUE), 
-                                big.mark = ".", decimal.mark = ","),
-            empresas = format(n_distinct(empresa, na.rm = TRUE), 
-                              big.mark = ".", decimal.mark = ","),
-            modelos = format(n_distinct(modelo_equipamento, na.rm = TRUE),
-                             big.mark = ".", decimal.mark = ",")) |>
+            aeroportos = format(n_distinct(origem_icao, na.rm = TRUE), big.mark = ".", decimal.mark = ","),
+            empresas = format(n_distinct(empresa, na.rm = TRUE), big.mark = ".", decimal.mark = ","),
+            modelos = format(n_distinct(modelo_equipamento, na.rm = TRUE), big.mark = ".", decimal.mark = ",")) |>
   pivot_longer(cols = everything(),
                names_to = "Indicador",
                values_to = "Valor") |>
@@ -468,12 +523,18 @@ flights |>
                                Indicador == "empresas" ~ "Companhias Aéreas (Total)",
                                Indicador == "modelos" ~ "Modelos de Equipamento (Total)")) |>
   gt() |>
-  tab_header(title = "Escopo Temporal e Operacional",
-             subtitle = "Indicadores macro de cobertura e cardinalidade da base") |>
-  cols_align(align = "left", columns = Indicador) |>
-  cols_align(align = "right", columns = Valor) |>
-  gt_theme_538() |> 
-  tab_source_note(source_note = "Fonte: ANAC | Elaboração Própria")
+    tab_header(title = md("**Escopo Temporal e Operacional**"),
+               subtitle = "Indicadores macro de cobertura e cardinalidade da base") |>
+    cols_align(align = "left", columns = Indicador) |>
+    cols_align(align = "right", columns = Valor) |>
+    tab_source_note(source_note = "Fonte: ANAC | Elaboração Própria") |>
+    tab_options(heading.align = "left", 
+                column_labels.font.weight = "bold", 
+                column_labels.border.top.width = px(3), 
+                column_labels.border.top.color = "#E3120B", 
+                table.border.bottom.color = "black", 
+                table_body.hlines.color = "#ececec", 
+                table.border.top.style = "hidden")
 
 
 ## Perfil da Malha Aeroportuária (Nacional vs. Internacional)
@@ -482,26 +543,28 @@ flights |>
   pivot_longer(cols = c(origem_icao, destino_icao), values_to = "icao") |>
   drop_na(icao) |>
   distinct(icao) |>
-  inner_join(airports, by = "icao") |>
+  inner_join(airports, by = join_by(icao)) |>
   mutate(tipo = if_else(pais == "BRASIL", "Nacional", "Internacional")) |>
   count(tipo, pais, name = "aeroportos") |>
-  mutate(pais = if_else(tipo == "Internacional", as.character(fct_lump_n(factor(pais),
-                                                n = 5, w = aeroportos, other_level = "Outros")), "Brasil")) |>
-  group_by(tipo, pais) |>
-  summarise(aeroportos = sum(aeroportos),
-            .groups = "drop") |>
+  mutate(pais = if_else(tipo == "Internacional", 
+                        as.character(fct_lump_n(factor(pais), n = 5, w = aeroportos, other_level = "Outros")), 
+                        "Brasil")) |>
+  summarise(aeroportos = sum(aeroportos), .by = c(tipo, pais)) |>
   arrange(desc(tipo), desc(aeroportos)) |>
   mutate(pais = str_to_title(pais)) |>
   gt(id = "tbl_conectividade", groupname_col = "tipo") |>
-  tab_header(title = "Conectividade da Malha Aeroportuária",
-             subtitle = "Quantidade de aeroportos únicos operacionais em 2023 (Nacional vs. Internacional)") |>
-  cols_label(pais = "País de Origem/Destino",
-             aeroportos = "Aeroportos Conectados") |>
-  fmt_number(columns = aeroportos, decimals = 0, sep_mark = ".", dec_mark = ",") |>
-  summary_rows(groups = "Internacional", columns = aeroportos, fns = list(Subtotal = "sum"),
-               formatter = fmt_number, decimals = 0, sep_mark = ".", dec_mark = ",") |>
-  gt_theme_538() |>
-  tab_source_note(source_note = "Fonte: ANAC | Elaboração Própria")
+    tab_header(title = md("**Conectividade da Malha Aeroportuária**"),
+               subtitle = "Quantidade de aeroportos únicos operacionais em 2023 (Nacional vs. Internacional)") |>
+    cols_label(pais = "País de Origem/Destino", aeroportos = "Aeroportos Conectados") |>
+    fmt_number(columns = aeroportos, decimals = 0, use_seps = TRUE, sep_mark = ".") |>
+    summary_rows(groups = "Internacional", columns = aeroportos, fns = list(Subtotal = ~sum(.)),
+                 formatter = fmt_number, decimals = 0, use_seps = TRUE, sep_mark = ".") |>
+    cols_align(align = "left", columns = pais) |>
+    cols_align(align = "center", columns = aeroportos) |>
+    tab_source_note(source_note = "Fonte: ANAC | Elaboração Própria") |>
+    tab_options(heading.align = "left", column_labels.font.weight = "bold", column_labels.border.top.width = px(3),
+                column_labels.border.top.color = "#E3120B", table.border.bottom.color = "black",
+                table_body.hlines.color = "#ececec", table.border.top.style = "hidden")
 
 ## Diversidade da Frota e Equipamentos
 
@@ -570,38 +633,45 @@ flights |>
 
 flights |>
   mutate(empresa = fct_lump_n(empresa, n = 5, other_level = "Outras")) |>
-  group_by(empresa) |>
   summarise(taxa_cancelamento = mean(situacao == "CANCELADO", na.rm = TRUE),
-            atraso_partida = mean(atraso_partida_min[situacao == "REALIZADO"], na.rm = TRUE),
-            atraso_chegada = mean(atraso_chegada_min[situacao == "REALIZADO"], na.rm = TRUE)) |>
+            atraso_partida    = mean(atraso_partida_min[situacao == "REALIZADO"], na.rm = TRUE),
+            atraso_chegada    = mean(atraso_chegada_min[situacao == "REALIZADO"], na.rm = TRUE),
+            .by               = empresa) |>
   arrange(desc(taxa_cancelamento)) |>
   gt() |>
-    tab_header(title = "Performance Operacional por Companhia Aérea",
-              subtitle = "Indicadores médios e distribuição de atrasos nas partidas (2023)") |>
-    cols_label(empresa = "Empresa",
-               taxa_cancelamento = "Cancelamentos",
-               atraso_partida = "Atraso Partida (min)",
-               atraso_chegada = "Atraso Chegada (min)") |>
-    fmt_percent(columns = taxa_cancelamento,
-                decimals = 2, dec_mark = ",", sep_mark = ".") |>
-    fmt_number(columns = c(atraso_partida, atraso_chegada),
-               decimals = 2, dec_mark = ",", sep_mark = ".") |>
-    gt_theme_538() |>
-    tab_source_note(source_note = "Fonte: ANAC | Elaboração Própria")
+    tab_header(title = md("**Performance Operacional por Companhia Aérea**"),
+               subtitle = "Indicadores médios e distribuição de atrasos nas partidas (2023)") |>
+    cols_label(empresa = "Empresa", taxa_cancelamento = "Cancelamentos",
+               atraso_partida = "Atraso Partida (min)", atraso_chegada = "Atraso Chegada (min)") |>
+    fmt_percent(columns = taxa_cancelamento, decimals = 1, dec_mark = ",", sep_mark = ".") |>
+    fmt_number(columns = c(atraso_partida, atraso_chegada), decimals = 1, dec_mark = ",", sep_mark = ".") |>
+    cols_align(align = "left", columns = empresa) |>
+    cols_align(align = "center", columns = c(taxa_cancelamento, atraso_partida, atraso_chegada)) |>
+    gt_color_rows(columns = taxa_cancelamento, palette = c("#ffffff", "#E64E53"), domain = c(0, NA)) |>
+    tab_source_note(source_note = "Fonte: ANAC | Elaboração Própria") |>
+    tab_options(heading.align = "left", column_labels.font.weight = "bold", column_labels.border.top.width = px(3),
+                column_labels.border.top.color = "#E3120B", table.border.bottom.color = "black",
+                table_body.hlines.color = "#ececec", table.border.top.style = "hidden")
 
 # Tópico 2: Logística e Malha Aérea ----
 
 ## Mapeamento de Rotas e Conexões Principais
 
 flights |> 
-  filter(!is.na(partida_real)) |> 
+  drop_na(partida_real) |> 
   count(origem_icao, destino_icao, name = "volume_voos") |> 
   slice_max(order_by = volume_voos, n = 20) |> 
   gt() |> 
-    tab_header(title = "To 20 Rotas por Volumes de Voos Realizados") |> 
-    fmt_number(columns = volume_voos, decimals = 0) |> 
-  gt_theme_538() |>
-  tab_source_note(source_note = "Fonte: ANAC | Elaboração Própria")
+    tab_header(title = md("**Top 20 Rotas por Volumes de Voos Realizados**")) |> 
+    cols_label(origem_icao = "Origem (ICAO)", destino_icao = "Destino (ICAO)", volume_voos = "Total de Voos") |> 
+    fmt_number(columns = volume_voos, decimals = 0, dec_mark = ",", sep_mark = ".") |> 
+    cols_align(align = "left", columns = c(origem_icao, destino_icao)) |> 
+    cols_align(align = "center", columns = volume_voos) |> 
+    gt_color_rows(columns = volume_voos, palette = c("#ffffff", "#3D89C3")) |> 
+    tab_source_note(source_note = "Fonte: ANAC | Elaboração Própria") |> 
+    tab_options(heading.align = "left", column_labels.font.weight = "bold", column_labels.border.top.width = px(3),
+                column_labels.border.top.color = "#E3120B", table.border.bottom.color = "black", 
+                table_body.hlines.color = "#ececec", table.border.top.style = "hidden")
   
 flights |> 
   filter(!is.na(partida_real)) |> 
@@ -646,14 +716,14 @@ flights |>
 ## Identificação de Hubs e Nós Estratégicos
 
 flights |>
-  filter(!is.na(partida_real)) |>
-  group_by(origem_icao) |>
-  summarise(partidas_totais = n(),
+  drop_na(partida_real) |>
+  summarise(partidas_totais    = n(),
             assentos_ofertados = sum(assentos, na.rm = TRUE),
-            media_voos_diarios = n() / n_distinct(as.Date(partida_real))) |>
+            media_voos_diarios = n() / n_distinct(as.Date(partida_real)),
+            .by                = origem_icao) |>
   mutate(pct_partidas = partidas_totais / sum(partidas_totais)) |>
   filter(pct_partidas > 0.05) |>
-  left_join(select(airports, icao, nome_aeroporto), by = c("origem_icao" = "icao")) |>
+  left_join(select(airports, icao, nome_aeroporto), by = join_by(origem_icao == icao)) |>
   mutate(nome_aeroporto = coalesce(nome_aeroporto, 
                                    case_when(origem_icao == "SBGR" ~ "Guarulhos (Gov. André Franco Montoro)",
                                              TRUE ~ origem_icao))) |>
@@ -661,22 +731,22 @@ flights |>
   select(origem_icao, nome_aeroporto, partidas_totais, 
          pct_partidas, assentos_ofertados, media_voos_diarios) |>
   gt() |>
-  tab_header(title = "Hubs Estratégicos da Malha Aérea",
-             subtitle = "Aeroportos responsáveis por mais de 5% do volume total de partidas") |>
-  cols_label(origem_icao = "Código ICAO",
-             nome_aeroporto = "Aeroporto",
-             partidas_totais = "Total de Partidas",
-             pct_partidas = "Share da Malha",
-             assentos_ofertados = "Assentos Ofertados",
-             media_voos_diarios = "Voos/Dia") |>
-  fmt_number(columns = c(partidas_totais, assentos_ofertados),
-             decimals = 0, sep_mark = ".", dec_mark = ",") |>
-  fmt_number(columns = media_voos_diarios,
-             decimals = 1, sep_mark = ".", dec_mark = ",") |>
-  fmt_percent(columns = pct_partidas,
-              decimals = 1, sep_mark = ".", dec_mark = ",") |> 
-  gt_theme_538() |>
-  tab_source_note(source_note = "Fonte: ANAC | Elaboração Própria")
+    tab_header(title = md("**Hubs Estratégicos da Malha Aérea**"),
+               subtitle = "Aeroportos responsáveis por mais de 5% do volume total de partidas") |>
+    cols_label(origem_icao = "Código ICAO", nome_aeroporto = "Aeroporto",
+               partidas_totais = "Total de Partidas", pct_partidas = "Share da Malha",
+               assentos_ofertados = "Assentos Ofertados", media_voos_diarios = "Voos/Dia") |>
+    fmt_number(columns = c(partidas_totais, assentos_ofertados), decimals = 0, dec_mark = ",", sep_mark = ".") |>
+    fmt_number(columns = media_voos_diarios, decimals = 1, dec_mark = ",", sep_mark = ".") |>
+    fmt_percent(columns = pct_partidas, decimals = 1, dec_mark = ",", sep_mark = ".") |> 
+    cols_align(align = "left", columns = c(origem_icao, nome_aeroporto)) |>
+    cols_align(align = "center", columns = c(partidas_totais, pct_partidas, assentos_ofertados, 
+                                             media_voos_diarios)) |>
+    gt_color_rows(columns = pct_partidas, palette = c("#ffffff", "#3D89C3")) |>
+    tab_source_note(source_note = "Fonte: ANAC | Elaboração Própria") |>
+    tab_options(heading.align = "left", column_labels.font.weight = "bold", column_labels.border.top.width = px(3),
+                column_labels.border.top.color = "#E3120B", table.border.bottom.color = "black",
+                table_body.hlines.color = "#ececec", table.border.top.style = "hidden")
 
 # Distribuição Espacial dos Hubs
 
@@ -786,23 +856,28 @@ flights |>
 ## Eficiência Operacional por Aeroporto de Origem e Destino
 
 flights |> 
-  filter(situacao == "REALIZADO", !is.na(atraso_partida_min)) |> 
-  group_by(nome_origem) |> 
-  summarise(total_voos = n(), 
-            media_atraso = mean(atraso_partida_min)) |>
+  filter(situacao == "REALIZADO") |> 
+  drop_na(atraso_partida_min) |> 
+  summarise(total_voos   = n(), 
+            media_atraso = mean(atraso_partida_min),
+            .by          = nome_origem) |>
   filter(total_voos > 1000) |> 
   slice_min(order_by = media_atraso, n = 10) |> 
   arrange(media_atraso) |> 
   gt() |> 
-    tab_header(title = "Top 10 Aeroportos Mais Pontuais", 
+    tab_header(title = md("**Top 10 Aeroportos Mais Pontuais**"), 
                subtitle = "Aeroportos com menor média de atraso na partida (>1.000 voos realizados)") |> 
-    cols_label(nome_origem = "Aeroporto de Origem", 
-               total_voos = "total de Voos", 
+    cols_label(nome_origem = "Aeroporto de Origem", total_voos = "Total de Voos", 
                media_atraso = "Atraso Médio (min)") |> 
-    fmt_number(columns = media_atraso, decimals = 2) |> 
-    fmt_number(columns = total_voos, decimals = 0, use_seps = TRUE) |> 
-  gt_theme_538() |>
-  tab_source_note(source_note = "Fonte: ANAC | Elaboração Própria")
+    fmt_number(columns = media_atraso, decimals = 1, dec_mark = ",", sep_mark = ".") |> 
+    fmt_number(columns = total_voos, decimals = 0, dec_mark = ",", sep_mark = ".") |> 
+    cols_align(align = "left", columns = nome_origem) |> 
+    cols_align(align = "center", columns = c(total_voos, media_atraso)) |> 
+    gt_color_rows(columns = media_atraso, palette = c("#ffffff", "#3D89C3")) |> 
+    tab_source_note(source_note = "Fonte: ANAC | Elaboração Própria") |> 
+    tab_options(heading.align = "left", column_labels.font.weight = "bold", column_labels.border.top.width = px(3),
+                column_labels.border.top.color = "#E3120B", table.border.bottom.color = "black", 
+                table_body.hlines.color = "#ececec", table.border.top.style = "hidden")
   
 
 ## Análise de Impacto por Período do Dia e Turno
@@ -852,7 +927,7 @@ flights |>
     theme_econ_base() +
     labs(title = "Top 5 Fabricantes por Volume de Voos",
          subtitle = "Total de decolagens realizadas por fabricante da aeronave",
-         caption = "Fonte: Bases Flights e Planes | Elaboração Própria",
+         caption = "Fonte: ANAC | Elaboração Própria",
          x = "", y = "")
 
 ## Idade Média da Frota Operante e Ciclo de Vida
@@ -877,7 +952,7 @@ planes |>
   theme(legend.position = "none") +
   labs(title = "Perfil Etário da Frota Operante",
        subtitle = "Distribuição da idade e média (linha tracejada) para as 5 maiores operadoras",
-       caption = "Fonte: Base Planes | Elaboração Própria",
+       caption = "Fonte: ANAC | Elaboração Própria",
        x = "",
        y = "")
                  
@@ -886,26 +961,29 @@ planes |>
 
 flights |> 
   drop_na(modelo_equipamento) |> 
-  group_by(icao_tipo = modelo_equipamento) |> 
-  summarise(total_assentos = sum(assentos, na.rm = TRUE)) |> 
+  rename(icao_tipo = modelo_equipamento) |> 
+  summarise(total_assentos = sum(assentos, na.rm = TRUE), .by = icao_tipo) |> 
   slice_max(total_assentos, n = 10) |> 
   left_join(planes |> 
               drop_na(icao_tipo, fabricante) |> 
               count(icao_tipo, fabricante) |> 
-              group_by(icao_tipo) |> 
-              slice_max(n, n = 1, with_ties = FALSE) |> 
-              select(-n), by = "icao_tipo") |> 
+              slice_max(n, n = 1, by = icao_tipo, with_ties = FALSE) |> 
+              select(-n), 
+            by = join_by(icao_tipo)) |> 
   select(icao_tipo, fabricante, total_assentos) |> 
   gt() |> 
-    tab_header(title = "Top 10 Modelos de Aeronaves", 
+    tab_header(title = md("**Top 10 Modelos de Aeronaves**"), 
                subtitle = "Maior volume de assentos ofertados no ano") |> 
-    cols_label(icao_tipo = "Código de ICAO", 
-               fabricante = "Fabricante Principal", 
+    cols_label(icao_tipo = "Código de ICAO", fabricante = "Fabricante Principal", 
                total_assentos = "Assentos Ofertados") |> 
-  fmt_number(columns = total_assentos, 
-            decimals = 0, sep_mark = ".", dec_mark = ",") |>
-  gt_theme_538() |>
-  tab_source_note(source_note = "Fonte: ANAC | Elaboração Própria")
+    fmt_number(columns = total_assentos, decimals = 0, dec_mark = ",", sep_mark = ".") |> 
+    cols_align(align = "left", columns = c(icao_tipo, fabricante)) |> 
+    cols_align(align = "center", columns = total_assentos) |> 
+    gt_color_rows(columns = total_assentos, palette = c("#ffffff", "#3D89C3")) |> 
+    tab_source_note(source_note = "Fonte: ANAC | Elaboração Própria") |> 
+    tab_options(heading.align = "left", column_labels.font.weight = "bold", column_labels.border.top.width = px(3),
+                column_labels.border.top.color = "#E3120B", table.border.bottom.color = "black", 
+                table_body.hlines.color = "#ececec", table.border.top.style = "hidden")
   
 
 
@@ -929,7 +1007,7 @@ flights |>
     theme_econ_base() +
     labs(title = "Dinâmica de Frequência e Capacidade",
          subtitle = "Relação mensal entre voos e assentos (escala logarítmica base 10)",
-         caption = "Fonte: Base Flights | Elaboração Própria",
+         caption = "Fonte: ANAC | Elaboração Própria",
          x = "Total de Voos Realizados (log10)",
          y = "Total de Assentos Ofertados (log10)")
 
@@ -940,7 +1018,8 @@ flights |>
   drop_na(partida_prevista, codigo_tipo_linha) |> 
   filter(lubridate::as_date(partida_prevista) <= "2023-12-31") |> 
   mutate(mes = lubridate::floor_date(partida_prevista, "month"), 
-         tipo_linha = if_else(str_detect(str_to_upper(codigo_tipo_linha), "^I|^X|^G"), "Internacional", "Doméstica")) |> 
+         tipo_linha = if_else(str_detect(str_to_upper(codigo_tipo_linha), "^I|^X|^G"), 
+                              "Internacional", "Doméstica")) |> 
   group_by(tipo_linha, mes) |> 
   summarise(voos = n(), .groups = "drop") |> 
   ggplot(aes(mes, voos, colour = tipo_linha)) +
@@ -951,5 +1030,286 @@ flights |>
     theme_econ_base() +
     labs(title = "Evolução Temporal do Mercado Aéreo", 
          subtitle = "Evolução mensal do volume de decolagens (até dez/2023)",
-         caption = "Fonte: Base Flights | Elaboração Própria",
+         caption = "Fonte: ANAC | Elaboração Própria",
          x = "", y = "")
+
+
+# Tópico 6: Dinâmica Regional ----
+
+## Agrupamento por UF e Região (get_region)
+
+flights |> 
+  left_join(airports, by = c("origem_icao" = "icao")) |> 
+  drop_na(estado) |> 
+  mutate(regiao = case_when(estado %in% c("AL", "BA", "CE", "MA", "PB", "PE", "PI", "RN", "SE") ~ "Nordeste",
+                            estado %in% c("AC", "AP", "AM", "PA", "RO", "RR", "TO") ~ "Norte",
+                            estado %in% c("DF", "GO", "MT", "MS") ~ "Centro-Oeste",
+                            estado %in% c("MG", "ES", "RJ", "SP") ~ "Sudeste",
+                            estado %in% c("RS", "PR", "SC") ~ "Sul",
+         .default = NA_character_)) |>
+  drop_na(regiao) |> 
+  count(regiao, name = "total_voos") |> 
+  mutate(regiao = fct_reorder(regiao, total_voos)) |> 
+  ggplot(aes(regiao, total_voos, fill = regiao)) +
+    geom_col() +
+    scale_y_continuous(labels = fmt_lab("number")) +
+    scale_econ(aes = "fill") +
+    theme_econ_base() +
+    theme(legend.position = "none") +
+    labs(title = "Volume de Partidas por Região", 
+         subtitle = "Quantidade total de voos agrupados pelas grandes regiões do Brasil", 
+         caption = "Fonte: ANAC | Elaboração Própria")
+  
+
+## Matriz de Fluxos Migratórios entre Regiões Brasileiras
+
+flights |> 
+  left_join(airports |> 
+              select(icao, estado), by = c("origem_icao" = "icao")) |> 
+  rename(estado_origem = estado) |> 
+  left_join(airports |> 
+              select(icao, estado), by = c("destino_icao" = "icao")) |> 
+  rename(estado_destino = estado) |> 
+  drop_na(estado_origem, estado_destino) |> 
+  mutate(regiao_origem = case_when(estado_origem %in% 
+                                     c("AL", "BA", "CE", "MA", "PB", "PE", "PI", "RN", "SE") ~ "Nordeste",
+                                   estado_origem %in% 
+                                     c("AC", "AP", "AM", "PA", "RO", "RR", "TO") ~ "Norte",
+                                   estado_origem %in% 
+                                     c("DF", "GO", "MT", "MS") ~ "Centro-Oeste",
+                                   estado_origem %in% 
+                                     c("MG", "ES", "RJ", "SP") ~ "Sudeste",
+                                   estado_origem %in% 
+                                     c("RS", "PR", "SC") ~ "Sul",
+                                  .default = NA_character_),
+         regiao_destino = case_when(estado_destino %in% 
+                                      c("AL", "BA", "CE", "MA", "PB", "PE", "PI", "RN", "SE") ~ "Nordeste",
+                                    estado_destino %in% 
+                                      c("AC", "AP", "AM", "PA", "RO", "RR", "TO") ~ "Norte",
+                                    estado_destino %in% 
+                                      c("DF", "GO", "MT", "MS") ~ "Centro-Oeste",
+                                    estado_destino %in% 
+                                      c("MG", "ES", "RJ", "SP") ~ "Sudeste",
+                                    estado_destino %in% 
+                                      c("RS", "PR", "SC") ~ "Sul",
+                                   .default = NA_character_)) |> 
+  drop_na(regiao_origem, regiao_destino) |> 
+  count(regiao_origem, regiao_destino, name = "total_voos") |> 
+  mutate(categoria_fluxo = cut(total_voos, breaks = 5, labels = c("Muito Baixo", "Baixo", 
+                                                                  "Médio", 
+                                                                  "Alto", "Muito Alto"))) |> 
+  ggplot(aes(regiao_destino, regiao_origem, fill = categoria_fluxo)) +
+    geom_tile(colour = "white", linewidth = 0.5) +
+    scale_econ(aes = "fill", scheme = "equal") +
+    theme_econ_base() +
+    theme(panel.grid = element_blank(), axis.text.x = element_text(angle = 45, hjust = 1)) +
+    labs(title = "Matriz de Fluxos aéreos Inter-Regionais", 
+         subtitle = "Intensidade do volume de voos agrupados por macrorregiões de origem e destino", 
+         caption = "Fonte: ANAC | Elaboração Própria")
+         
+  
+## Densidade de Tráfego por Estado
+
+read_state(year = 2020, showProgress = FALSE) |> 
+  left_join(flights |> 
+              filter(year(partida_real) == 2023) |> 
+              left_join(airports, by = c("origem_icao" = "icao")) |> 
+              drop_na(estado) |> 
+              count(estado, name= "total_partidas"), 
+            by = c("abbrev_state" = "estado")) |> 
+  mutate(total_partidas = replace_na(total_partidas, 0)) |> 
+  ggplot() +
+    geom_sf(aes(fill = total_partidas), colour = "gray9", linewidth = 0.4) +
+    scale_fill_gradient(low = unname(pal["green"]), high = unname(pal["econ_red"]), 
+                        na.value = "white", labels = fmt_lab("number")) +
+    theme_econ_base() +
+    theme(axis.text = element_blank(), axis.line.x = element_blank(), 
+          axis.ticks.x = element_blank(), plot.caption = element_text(hjust = 0, colour = pal["land_text"]), 
+          legend.position = "none") +
+    labs(title = "Intensidade do tráfego aéreo nacional",
+         subtitle = "Quantidade total de partidas realizadas por unidade federativa em 2023",
+         fill = "Total de Partidas",
+         caption = "Fonte: ANAC e IBGE via geobr | Elaboração Própria")
+
+# Tópico 7: Tabelas e Rankings (GT) ----
+
+## Ranking de Rotas Mais Movimentadas e Rentáveis
+flights |> 
+  drop_na(origem_icao, destino_icao) |> 
+  summarise(total_voos = n(), atraso_medio = mean(atraso_partida_min, na.rm = TRUE), 
+            .by = c(origem_icao, nome_origem, destino_icao, nome_destino)) |> 
+  arrange(desc(total_voos)) |> 
+  slice_head(n = 15) |> 
+  mutate(rota = paste(origem_icao, "->", destino_icao),
+         rank = row_number(), .before = 1) |> 
+  select(rank, rota, nome_origem, nome_destino, total_voos, atraso_medio) |> 
+  gt() |> 
+    tab_header(title = md("**As 15 Rotas Mais Voadas**"), 
+               subtitle = "Volume absoluto de voos e atraso médio na origem") |> 
+    cols_label(rank = "Posição", rota = "Rota (ICAO)", nome_origem = "Aeroporto de Origem", 
+               nome_destino = "Aeroporto de Destino", total_voos = "Total de Voos", 
+               atraso_medio = "Atraso Médio (min)") |> 
+    fmt_number(columns = atraso_medio, decimals = 1, dec_mark = ",", force_sign = TRUE) |> 
+    cols_align(align = "center", columns = c(rank, rota, total_voos, atraso_medio)) |> 
+    gt_color_rows(columns = atraso_medio, palette = c("#3D89C3", "#ffffff", "#E64E53")) |> 
+    tab_source_note(source_note = "Fonte: ANAC | Elaboração Própria") |> 
+    tab_options(heading.align = "left", column_labels.font.weight = "bold", column_labels.border.top.width = px(3),
+                column_labels.border.top.color = "#E64E53", table.border.bottom.color = "black", 
+                table_body.hlines.color = "#ececec", table.border.top.style = "hidden")
+
+## Tabelas de Performance Comparativa entre Companhias Aéreas
+
+flights |> 
+  drop_na(empresa) |> 
+  summarise(total_voos = n(), total_assentos = sum(assentos, na.rm = TRUE), 
+            taxa_cancelamento = mean(situacao == "CANCELADO" | is.na(partida_real), na.rm = TRUE), 
+                                     atraso_medio = mean(atraso_partida_min, na.rm = TRUE),
+            .by = empresa) |> 
+  arrange(desc(total_voos)) |> 
+  slice_head(n = 15) |> 
+  gt() |> 
+    tab_header(title = md("**Performance Oprecional Por Empresa**"),
+               subtitle = "Volume de voos, oferta de assentos, cancelamento e atraso médio") |> 
+    cols_label(empresa = "Companhia Área", total_voos = "Total de Voos", total_assentos = "Assentos Ofertados", 
+               taxa_cancelamento = "Cancelamentos (%)", atraso_medio = "Atraso Médio (min)") |> 
+    fmt_number(columns = c(total_voos, total_assentos), 
+               decimals = 0, use_seps = TRUE, sep_mark = ".") |> 
+    fmt_percent(columns = taxa_cancelamento, 
+                decimals = 1, dec_mark = ",", sep_mark = ",") |> 
+    fmt_number(columns = atraso_medio, 
+               decimals = 1, dec_mark = ",", force_sign = TRUE) |> 
+    cols_align(align = "center", columns = c(total_voos, total_assentos, taxa_cancelamento, atraso_medio)) |> 
+    gt_color_rows(columns = taxa_cancelamento, palette = c("#3D89C3", "#ffffff", "#E64E53"), 
+                  domain  = c(0, 1)) |>
+    gt_color_rows(columns = atraso_medio, palette = c("#3D89C3", "#ffffff", "#E64E53")) |>
+    tab_source_note(source_note = "Fonte: ANAC | Elaboração Própria") |>
+    tab_options(heading.align = "left", column_labels.font.weight = "bold", 
+                column_labels.border.top.width = px(3), column_labels.border.top.color = "#E3120B",  
+                table.border.bottom.color = "black", table_body.hlines.color = "#ececec", 
+                table.border.top.style = "hidden")
+
+
+# Tópico 8: Previsão de Atrasos e Predição Conformal (CatBoost) ----
+
+## Engenharia de Features para Séries Temporais
+
+db <- flights |> 
+  drop_na(atraso_partida_min, partida_prevista)
+
+rec <- recipe(atraso_partida_min ~ ., data = db) |> 
+  step_mutate(hora_prevista = hour(partida_prevista)) |>
+  step_date(partida_prevista, features = c("dow", "month"), keep_original_cols = FALSE) |> 
+  step_rm(partida_real, chegada_real, chegada_prevista, situacao_partida, situacao_chegada, atraso_chegada_min, 
+          num_voo, nome_origem, nome_destino, icao_empresa, codigo_di) 
+  
+## Treinamento do Modelo CatBoost para Estimativa de Atrasos
+
+cb_sep <- boost_tree(trees = 50, tree_depth = 6, learn_rate = 0.05) |> 
+  set_engine("catboost") |> 
+  set_mode("regression")
+
+cb_wf <- workflow() |> 
+  add_recipe(rec) |> 
+  add_model(cb_sep)
+
+## Aplicação de Predição Conformal (Intervalos de Confiança)
+
+splits <- initial_validation_split(db, prop = c(0.7, 0.15))
+
+trn <- training(splits)
+cal <- validation(splits)
+tst <- testing(splits)
+
+cb_fit <- cb_wf |> 
+  fit(data = trn)
+
+mu_hat_cal <- predict(cb_fit, new_data = cal) |> 
+  pull(.pred)
+
+R <- abs(cal$atraso_partida_min - mu_hat_cal)
+
+alpha <- 0.1
+n_cal <- length(R)
+idx   <- ceiling((length(R) + 1) * (1 - alpha))
+q_hat <- sort(R)[idx]
+
+tst_preds <- tst |> 
+  select(atraso_partida_min) |> 
+  mutate(
+    mu_hat = predict(cb_fit, new_data = tst) |> pull(.pred),
+    lower  = mu_hat - q_hat,
+    upper  = mu_hat + q_hat
+  )
+
+mean(tst_preds$atraso_partida_min >= tst_preds$lower & tst_preds$atraso_partida_min <= tst_preds$upper) 
+
+tst_preds |> 
+  mutate(id = row_number()) |> 
+  slice_head(n = 20) |> 
+  ggplot(aes(id, mu_hat)) +
+    geom_errorbar(aes(ymin = lower, ymax = upper), colour = "#3D89C3", width = 0.2, alpha = 0.7) +
+    geom_point(colour = "#3D89C3", size = 1.5) +
+    geom_point(aes(id, atraso_partida_min), colour = "#E64E53", size = 1.5) +
+    scale_y_continuous(labels = fmt_lab("number")) +
+    labs(title = "Predição Conformal: Observado vs. Estimado",
+         subtitle = "Amostra de 50 voos (Azul: Predição e Banda 90% | Vermelho: Atraso Real)",
+         x = "Unidade da amostra (Teste)",
+         y = "Atraso na Partida (min)",
+         caption = "Fonte: ANAC | Elaboração Própria") +
+    theme_econ_base()
+    
+# Tópico 9: Classificação de Grupos de Aeroportos (K-Means) ----
+
+## Seleção de Atributos (Volume, Atraso Médio e Conectividade)
+
+db_ap <- flights |> 
+  drop_na(origem_icao, destino_icao) |> 
+  summarise(volume = n(), conectividade = n_distinct(destino_icao), 
+            atraso_medio = mean(atraso_partida_min, na.rm = TRUE), 
+            .by = c(origem_icao, nome_origem)) |> 
+  drop_na()
+
+X_ap <- db_ap |> 
+  select(volume, conectividade, atraso_medio) |> 
+  scale()
+
+rownames(X_ap) <- db_ap$origem_icao
+
+## Clusterização e Perfilamento dos Grupos de Aeroportos
+
+km_res <- kmeans(X_ap, centers = 4, nstart = 20)
+
+db_ap_clust <- db_ap |> 
+  mutate(cluster = as.factor(km_res$cluster)) |> 
+  left_join(airports, by = c("origem_icao" = "icao")) |> 
+  drop_na(longitude, latitude)
+
+db_ap_clust |> 
+  ggplot(aes(volume, atraso_medio, colour = cluster)) +
+    geom_point(size = 3, alpha = 0.7) +
+    scale_x_continuous(labels = fmt_lab("number")) +
+    scale_y_continuous(labels = fmt_lab("number")) +
+    scale_econ(aes = "colour", scheme = "web") +
+    labs(title    = "Perfilamento Operacional de Aeroportos",
+         subtitle = "Clusters gerados via K-Means (k=4) por volume e atraso",
+         colour   = "Cluster",
+         caption  = "Fonte: ANAC | Elaboração Própria") +
+    theme_econ_base()
+
+
+ne_countries(scale = "medium", returnclass = "sf") |> 
+  filter(name_long != "Antarctica") |> 
+  ggplot() +
+  geom_sf(fill = "#ececec", colour = "gray9", linewidth = 0.3) +
+  geom_sf(data = db_ap_clust |> 
+            st_as_sf(coords = c("longitude", "latitude"), crs = 4326), 
+          aes(colour = cluster), size = 1.5, alpha = 0.8) +
+  scale_econ(aes = "colour", scheme = "web") +
+  labs(title    = "Distribuição Geográfica dos Clusters Operacionais",
+       subtitle = "Classificação da rede global de aeroportos conectada à base de voos",
+       colour   = "Cluster",
+       caption  = "Fonte: ANAC e Natural Earth | Elaboração Própria.") +
+  theme_econ_base() +
+  theme(axis.text  = element_blank(),
+        axis.ticks = element_blank(),
+        panel.grid = element_blank())
