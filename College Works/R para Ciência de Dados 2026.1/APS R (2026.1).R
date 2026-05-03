@@ -10,6 +10,7 @@ library(gtExtras)
 library(stringi)
 library(bonsai)
 library(scales)
+library(ranger)
 library(arrow)
 library(geobr)               
 library(gt)
@@ -1290,10 +1291,10 @@ db_ap_clust |>
     scale_x_continuous(labels = fmt_lab("number")) +
     scale_y_continuous(labels = fmt_lab("number")) +
     scale_econ(aes = "colour", scheme = "web") +
-    labs(title    = "Perfilamento Operacional de Aeroportos",
+    labs(title = "Perfilamento Operacional de Aeroportos",
          subtitle = "Clusters gerados via K-Means (k=4) por volume e atraso",
-         colour   = "Cluster",
-         caption  = "Fonte: ANAC | Elaboração Própria") +
+         colour = "Cluster",
+         caption = "Fonte: ANAC | Elaboração Própria") +
     theme_econ_base()
 
 
@@ -1305,11 +1306,149 @@ ne_countries(scale = "medium", returnclass = "sf") |>
             st_as_sf(coords = c("longitude", "latitude"), crs = 4326), 
           aes(colour = cluster), size = 1.5, alpha = 0.8) +
   scale_econ(aes = "colour", scheme = "web") +
-  labs(title    = "Distribuição Geográfica dos Clusters Operacionais",
+  labs(title = "Distribuição Geográfica dos Clusters Operacionais",
        subtitle = "Classificação da rede global de aeroportos conectada à base de voos",
-       colour   = "Cluster",
-       caption  = "Fonte: ANAC e Natural Earth | Elaboração Própria.") +
+       colour = "Cluster",
+       caption = "Fonte: ANAC e Natural Earth | Elaboração Própria.") +
   theme_econ_base() +
   theme(axis.text  = element_blank(),
         axis.ticks = element_blank(),
         panel.grid = element_blank())
+
+
+
+# Tópico 10: Classificação de Status de Voo (Ranger) ----
+
+## Modelagem Random Forest para Predição de Cancelamentos
+
+db <- flights |> 
+  ungroup() |> 
+  mutate(situacao = str_to_title(situacao)) |> 
+  filter(situacao %in% c("Cancelado", "Realizado")) |>
+  mutate(situacao = factor(situacao, levels = c("Cancelado", "Realizado"))) |>
+  drop_na(partida_prevista, situacao) |> 
+  droplevels() 
+
+set.seed(42)
+splits <- initial_split(db, prop = 0.8, strata = situacao)
+
+trn <- training(splits)
+tst <- testing(splits)
+
+rec <- recipe(situacao ~., data = trn) |> 
+  step_mutate(hora_prevista = hour(partida_prevista)) |> 
+  step_date(partida_prevista, features = c("dow", "month"), keep_original_cols = FALSE) |> 
+  step_rm(partida_real, chegada_real, chegada_prevista, situacao_partida, 
+          situacao_chegada, atraso_partida_min, atraso_chegada_min, justificativa, 
+          referencia, num_voo, nome_origem, nome_destino, icao_empresa, codigo_di)
+
+rf <- rand_forest(trees = 50, min_n = 10) |> 
+  set_engine("ranger", importance = "impurity") |> 
+  set_mode("classification")
+  
+fit_rf <- workflow() |> 
+  add_recipe(rec) |> 
+  add_model(rf) |> 
+  fit(data = trn)
+  
+res_tst <- predict(fit_rf, new_data = tst, type = "prob") |> 
+  bind_cols(predict(fit_rf, new_data = tst, type = "class")) |>
+  bind_cols(tst |> select(situacao))
+
+res_tst |> 
+  metrics(truth = situacao, estimate = .pred_class) |> 
+  bind_rows(roc_auc(res_tst, truth = situacao, .pred_Cancelado)) |> 
+  gt() |> 
+    tab_header(title = md("**Performance do Random Forest**"), 
+               subtitle = "Avaliação na amostra de teste (20%)") |> 
+    cols_label(.metric = "Métrica", .estimator = "Estimador", .estimate = "Valor Estimado") |> 
+    fmt_number(columns = .estimate, decimals = 3, dec_mark = ",", sep_mark = ".") |> 
+    cols_align(align = "center", columns = c(.estimator, .estimate)) |> 
+    gt_color_rows(columns = .estimate, palette = c("#E64E53", "#ffffff", "#3D89C3"), domain = c(0, 1)) |> 
+    tab_source_note(source_note = "Fonte: ANAC | Elaboração Própria") |> 
+    tab_options(heading.align = "left", 
+                column_labels.font.weight = "bold", 
+                column_labels.border.top.width = px(3), 
+                column_labels.border.top.color = "#E3120B",  
+                table.border.bottom.color = "black", 
+                table_body.hlines.color = "#ececec", 
+                table.border.top.style = "hidden")
+    
+
+## Análise de Importância de Variáveis (Feature Importance)
+
+extract_fit_engine(fit_rf)$variable.importance |> 
+  enframe(name = "Variavel", value = "Importancia") |> 
+  mutate(Variavel = fct_reorder(Variavel, Importancia)) |> 
+  ggplot(aes(Importancia, Variavel)) +
+    geom_col(fill = pal["blue1"], width = 0.65, alpha = 0.9) +
+    scale_x_continuous(labels = fmt_lab("number")) +
+    labs(title = "Importância das Variáveis (Feature Importance)",
+         subtitle = "Redução média de impureza (Gini) no modelo Random Forest",
+         x = "Importância da Variável",
+         y = NULL,
+         caption = "Fonte: ANAC | Elaboração Própria") +
+    theme_econ_base()
+
+# Tópico 11: Análise de Recorrência e Malha ----
+
+## Identificação de Rotas com Alta Frequência Operacional
+
+flights |> 
+  drop_na(partida_real) |> 
+  mutate(situacao = str_to_title(situacao)) |> 
+  filter(situacao == "Realizado", year(partida_real) == 2023) |>
+  summarise(dias_operados = n_distinct(as.Date(partida_real)),
+            total_voos = n(), .by = c(origem_icao, nome_origem, destino_icao, nome_destino)) |>
+  filter(dias_operados > 350) |> 
+  arrange(desc(dias_operados), desc(total_voos)) |> 
+  gt() |> 
+    tab_header(title = md("**Rotas de Alta Frequência Operacional (2023)**"),
+               subtitle = "Trechos que registraram voos em mais de 350 dias ao longo do ano") |> 
+    cols_label(origem_icao = "Origem (ICAO)", nome_origem = "Aeroporto Origem", 
+               destino_icao = "Destino (ICAO)", nome_destino = "Aeroporto Destino", 
+               dias_operados = "Dias Operados", total_voos = "Volume Total (Voos)") |> 
+    fmt_number(columns = total_voos,  decimals = 0,  use_seps = TRUE,  sep_mark = ".") |> 
+    cols_align(align = "center", columns = c(origem_icao, destino_icao, dias_operados, total_voos)) |> 
+    tab_source_note(source_note = "Fonte: ANAC | Elaboração Própria") |> 
+    tab_options(heading.align = "left", 
+                column_labels.font.weight = "bold", 
+                column_labels.border.top.width = px(3), 
+                column_labels.border.top.color = "#E3120B",  
+                table.border.bottom.color = "black", 
+                table_body.hlines.color = "#ececec", 
+                table.border.top.style = "hidden")
+
+## Estabilidade da Malha e Taxa de Recompra de Slots
+
+flights |> 
+  drop_na(origem_icao) |> 
+  mutate(situacao = str_to_title(situacao)) |> 
+  summarise(total_slots = n(),
+            voos_realizados = sum(situacao == "Realizado" & !is.na(partida_real), na.rm = TRUE),
+            taxa_resiliencia = voos_realizados / total_slots, .by = c(origem_icao, nome_origem)) |> 
+  filter(total_slots >= 500) |> 
+  arrange(desc(taxa_resiliencia), desc(total_slots)) |> 
+  slice_head(n = 15) |> 
+  gt() |> 
+    tab_header(title = md("**Estabilidade da Malha: Resiliência de Slots por Aeroporto**"),
+               subtitle = "Proporção de voos realizados em relação à alocação de slots na origem") |> 
+    cols_label(origem_icao = "Origem (ICAO)", nome_origem = "Aeroporto", 
+               total_slots = "Slots Previstos", voos_realizados = "Voos Realizados", 
+               taxa_resiliencia = "Taxa de Resiliência (%)") |>
+    fmt_number(columns = c(total_slots, voos_realizados),
+               decimals = 0,use_seps = TRUE,sep_mark = ".") |> 
+    fmt_percent(columns = taxa_resiliencia, decimals = 1,
+                dec_mark = ",", sep_mark = ".") |> 
+    cols_align(align = "center", columns = c(origem_icao, total_slots, voos_realizados, taxa_resiliencia)) |> 
+    gt_color_rows(columns = taxa_resiliencia, palette = c("#E64E53", "#ffffff", "#3D89C3"), 
+                  domain  = c(0, 1)) |>
+    tab_source_note(source_note = "Fonte: ANAC | Elaboração Própria 
+                    (Nota: amostra restrita a aeroportos com >= 500 slots)") |>
+    tab_options(heading.align = "left", 
+                column_labels.font.weight = "bold", 
+                column_labels.border.top.width = px(3), 
+                column_labels.border.top.color = "#E3120B",  
+                table.border.bottom.color = "black", 
+                table_body.hlines.color = "#ececec", 
+                table.border.top.style = "hidden")  
