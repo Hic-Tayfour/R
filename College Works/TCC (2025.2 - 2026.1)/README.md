@@ -36,23 +36,23 @@ A análise combina:
 
 O trabalho parte do arcabouço de **resultados potenciais** de Neyman-Rubin. Para cada indivíduo, existem dois resultados potenciais:
 
-\[
+$$
 Y_i(1) \quad \text{e} \quad Y_i(0)
-\]
+$$
 
 Como apenas um deles é observado, a estimação do ITE exige prever o contrafactual não observado:
 
-\[
+$$
 ITE_i = Y_i(1) - Y_i(0)
-\]
+$$
 
 Modelos de Machine Learning conseguem produzir boas previsões pontuais, mas normalmente não oferecem **quantificação de incerteza rigorosa em amostras finitas**. A Predição Conformal resolve essa lacuna ao construir intervalos com garantia **distribution-free**, isto é, sem depender da especificação correta da distribuição dos dados.
 
 Em dados observacionais, porém, tratados e controles podem ter distribuições diferentes de covariadas. A WCP corrige esse problema usando pesos baseados no escore de propensão:
 
-\[
+$$
 w(x) = \frac{e(x)}{1-e(x)}
-\]
+$$
 
 ---
 
