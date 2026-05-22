@@ -1,18 +1,50 @@
 ---
-title: "Análise da Operação Aérea Brasileira"
-subtitle: "Atrasos, cancelamentos, malha, capacidade e modelagem preditiva<br>Grupo 3: Malha Aérea e Frota Brasileira"
-author:
-  - "Hicham Munir Tayfour, [hichamt@al.insper.edu.br](mailto:hichamt@al.insper.edu.br)"
-  - "Laura Borri Magro, [laurabm1@al.insper.edu.br](mailto:laurabm1@al.insper.edu.br)"
-  - "Pedro Henrique Lima Zimmermann, [pedrohlz@al.insper.edu.br](mailto:pedrohlz@al.insper.edu.br)"
-  - "Mariam Eduarda Mesquita Netto de Faria, [mariaemnf@al.insper.edu.br](mailto:mariaemnf@al.insper.edu.br)"
-date: "`r format(Sys.Date(), '%d/%m/%Y')`"
+title: |
+  <div style="text-align: center; margin-top: 30px;">
+    <h1 style="font-size: 24px;"><strong>INSPER – INSTITUTO DE ENSINO E PESQUISA</strong></h1>
+    <h2 style="font-style: italic; font-size: 20px;">Curso de Administração e Economia</h2>
+    <div style="margin-top: 30px;"></div>
+    <h3 style="font-size: 20px;">R para Ciência de Dados</h3>
+    <p style="font-size: 18px;"><strong>Tema:</strong> Grupo 3: Malha Aérea e Frota Brasileira</p>
+    <p style="font-size: 18px;"><strong>Relatório:</strong> Análise da Operação Aérea Brasileira</p>
+    <p style="font-size: 16px;">Atrasos, cancelamentos, malha, capacidade e modelagem preditiva</p>
+  </div>
+
+subtitle: |
+  <div style="text-align: center; margin-top: 30px;">
+    <p style="font-size: 16px;"><strong>Professores:</strong></p>
+    <p style="font-size: 15px;">Prof. Paulo Cilas Marques Filho<br>
+    Prof. Auxiliar Gabriela Kurzweil Magini</p>
+  </div>
+
+author: |
+  <div style="text-align: center; margin-top: 30px;">
+    <p style="font-size: 16px;"><strong>Integrantes:</strong></p>
+    <p style="font-size: 14px;">
+      Hicham Munir Tayfour – <a href="mailto:hichamt@al.insper.edu.br">hichamt@al.insper.edu.br</a><br>
+      Laura Borri Magro – <a href="mailto:laurabm1@al.insper.edu.br">laurabm1@al.insper.edu.br</a><br>
+      Pedro Henrique Lima Zimmermann – <a href="mailto:pedrohlz@al.insper.edu.br">pedrohlz@al.insper.edu.br</a><br>
+      Mariam Eduarda Mesquita Netto de Faria – <a href="mailto:mariaemnf@al.insper.edu.br">mariaemnf@al.insper.edu.br</a>
+    </p>
+  </div>
+
+date: |
+  <div style="text-align: center; margin-top: 20px;">
+    <p><strong>São Paulo – `r format(Sys.Date(), '%d/%m/%Y')`</strong></p>
+  </div>
+
 output:
   html_document:
     toc: true
-    toc_depth: 3
+    toc_float: true
     number_sections: true
+    theme: flatly
+    highlight: tango
     df_print: paged
+
+fontsize: 12pt
+encoding: UTF-8
+lang: pt-BR
 ---
 
 ```{r setup, include=FALSE}
@@ -44,6 +76,9 @@ library(arrow)
 library(geobr)
 library(gt)
 library(sf)
+library(lubridate)
+library(showtext)
+library(systemfonts)
 library(geosphere)
 
 ```
@@ -202,33 +237,33 @@ econ_scheme <- list(
 
 ## Funções de Tema e Escala
 
-theme_econ_base <- function(base_family = font_family) {
-  ggplot2::theme_minimal(base_family = base_family) +
+theme_econ_base <- function(base_family = font_family, base_size = 13) {
+  ggplot2::theme_minimal(base_family = base_family, base_size = base_size) +
     ggplot2::theme(
       plot.background  = ggplot2::element_rect(fill = econ_base$bg, colour = NA),
       panel.background = ggplot2::element_rect(fill = econ_base$bg, colour = NA),
       plot.title.position = "plot",
       plot.title = ggplot2::element_text(
         face = "bold",
-        size = 20,
+        size = 24,
         hjust = 0,
         colour = econ_base$text,
         margin = ggplot2::margin(b = 4)
       ),
       plot.subtitle = ggplot2::element_text(
-        size = 12.5,
+        size = 15,
         hjust = 0,
         colour = econ_base$text,
         margin = ggplot2::margin(b = 10)
       ),
       plot.caption = ggplot2::element_text(
-        size = 9,
+        size = 11,
         colour = "#404040",
         hjust = 0,
         margin = ggplot2::margin(t = 10)
       ),
       axis.title = ggplot2::element_blank(),
-      axis.text = ggplot2::element_text(size = 10, colour = econ_base$text),
+      axis.text = ggplot2::element_text(size = 12, colour = econ_base$text),
       axis.line.x = ggplot2::element_line(colour = econ_base$text, linewidth = 0.6),
       axis.ticks.x = ggplot2::element_line(colour = econ_base$text, linewidth = 0.6),
       axis.ticks.y = ggplot2::element_blank(),
@@ -238,8 +273,9 @@ theme_econ_base <- function(base_family = font_family) {
       legend.position = "top",
       legend.justification = "left",
       legend.title = ggplot2::element_blank(),
-      legend.text = ggplot2::element_text(size = 10, colour = econ_base$text),
+      legend.text = ggplot2::element_text(size = 12, colour = econ_base$text),
       legend.margin = ggplot2::margin(t = 0, b = 5),
+      strip.text = ggplot2::element_text(size = 12, face = "bold", colour = econ_base$text),
       plot.margin = ggplot2::margin(16, 16, 12, 16)
     )
 }
