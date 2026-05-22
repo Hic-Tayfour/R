@@ -1,4 +1,68 @@
+---
+title: |
+  <div style="text-align: center; margin-top: 30px;">
+    <h1 style="font-size: 24px;"><strong>INSPER – INSTITUTO DE ENSINO E PESQUISA</strong></h1>
+    <h2 style="font-style: italic; font-size: 20px;">Curso de Economia</h2>
+    <div style="margin-top: 30px;"></div>
+    <h3 style="font-size: 20px;">Problemas em Economia</h3>
+    <p style="font-size: 18px;"><strong>Tema:</strong> Grupo 3: Malha Aérea e Frota Brasileira</p>
+    <p style="font-size: 18px;"><strong>Relatório:</strong> Análise da Operação Aérea Brasileira</p>
+    <p style="font-size: 16px;">Atrasos, cancelamentos, malha, capacidade e modelagem preditiva</p>
+  </div>
+
+subtitle: |
+  <div style="text-align: center; margin-top: 30px;">
+    <p style="font-size: 16px;"><strong>Professores:</strong></p>
+    <p style="font-size: 15px;">Prof. Paulo Cilas Marques Filho<br>
+    Prof. Auxiliar Gabriela Kurzweil Magini</p>
+  </div>
+
+author: |
+  <div style="text-align: center; margin-top: 30px;">
+    <p style="font-size: 16px;"><strong>Integrantes:</strong></p>
+    <p style="font-size: 14px;">
+      Hicham Munir Tayfour – <a href="mailto:hichamt@al.insper.edu.br">hichamt@al.insper.edu.br</a><br>
+      Laura Borri Magro – <a href="mailto:laurabm1@al.insper.edu.br">laurabm1@al.insper.edu.br</a><br>
+      Pedro Henrique Lima Zimmermann – <a href="mailto:pedrohlz@al.insper.edu.br">pedrohlz@al.insper.edu.br</a><br>
+      Mariam Eduarda Mesquita Netto de Faria – <a href="mailto:mariaemnf@al.insper.edu.br">mariaemnf@al.insper.edu.br</a>
+    </p>
+  </div>
+
+date: |
+  <div style="text-align: center; margin-top: 20px;">
+    <p><strong>São Paulo – `r format(Sys.Date(), '%d/%m/%Y')`</strong></p>
+  </div>
+
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    number_sections: true
+    theme: flatly
+    highlight: tango
+    df_print: paged
+
+fontsize: 12pt
+encoding: UTF-8
+lang: pt-BR
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo = TRUE,
+  warning = FALSE,
+  message = FALSE,
+  fig.width = 10,
+  fig.height = 6,
+  dpi = 144,
+  fig.retina = 2,
+  out.width = "100%"
+)
+```
+
 # Bibliotecas
+
+```{r bibliotecas}
 
 library(rnaturalearthdata)
 library(rnaturalearth)
@@ -12,8 +76,16 @@ library(arrow)
 library(geobr)
 library(gt)
 library(sf)
+library(lubridate)
+library(showtext)
+library(systemfonts)
+library(geosphere)
 
-# Funções Gráficas The Economist ----
+```
+
+# Funções Gráficas The Economist
+
+```{r tema-economist}
 
 ## Definição do tibble de cores
 
@@ -165,33 +237,33 @@ econ_scheme <- list(
 
 ## Funções de Tema e Escala
 
-theme_econ_base <- function(base_family = font_family) {
-  ggplot2::theme_minimal(base_family = base_family) +
+theme_econ_base <- function(base_family = font_family, base_size = 13) {
+  ggplot2::theme_minimal(base_family = base_family, base_size = base_size) +
     ggplot2::theme(
       plot.background  = ggplot2::element_rect(fill = econ_base$bg, colour = NA),
       panel.background = ggplot2::element_rect(fill = econ_base$bg, colour = NA),
       plot.title.position = "plot",
       plot.title = ggplot2::element_text(
         face = "bold",
-        size = 20,
+        size = 24,
         hjust = 0,
         colour = econ_base$text,
         margin = ggplot2::margin(b = 4)
       ),
       plot.subtitle = ggplot2::element_text(
-        size = 12.5,
+        size = 15,
         hjust = 0,
         colour = econ_base$text,
         margin = ggplot2::margin(b = 10)
       ),
       plot.caption = ggplot2::element_text(
-        size = 9,
+        size = 11,
         colour = "#404040",
         hjust = 0,
         margin = ggplot2::margin(t = 10)
       ),
       axis.title = ggplot2::element_blank(),
-      axis.text = ggplot2::element_text(size = 10, colour = econ_base$text),
+      axis.text = ggplot2::element_text(size = 12, colour = econ_base$text),
       axis.line.x = ggplot2::element_line(colour = econ_base$text, linewidth = 0.6),
       axis.ticks.x = ggplot2::element_line(colour = econ_base$text, linewidth = 0.6),
       axis.ticks.y = ggplot2::element_blank(),
@@ -201,8 +273,9 @@ theme_econ_base <- function(base_family = font_family) {
       legend.position = "top",
       legend.justification = "left",
       legend.title = ggplot2::element_blank(),
-      legend.text = ggplot2::element_text(size = 10, colour = econ_base$text),
+      legend.text = ggplot2::element_text(size = 12, colour = econ_base$text),
       legend.margin = ggplot2::margin(t = 0, b = 5),
+      strip.text = ggplot2::element_text(size = 12, face = "bold", colour = econ_base$text),
       plot.margin = ggplot2::margin(16, 16, 12, 16)
     )
 }
@@ -240,9 +313,13 @@ fmt_lab <- function(kind = c("number", "percent", "si")) {
 }
 # ----
 
+```
+
 # Base de Dados
 
 ## Dicionário de Países para ISO-3
+
+```{r dicionario-paises}
 
 pais_iso3 <- c(
   "AFRICA DO SUL" = "ZAF", "ALEMANHA" = "DEU", "ANGOLA" = "AGO", "ANGUILLA" = "AIA", "ANTIGUA E BARBUDA" = "ATG",
@@ -270,7 +347,11 @@ pais_iso3 <- c(
   "URUGUAI" = "URY", "VENEZUELA" = "VEN", "ZIMBABUE" = "ZWE"
 )
 
+```
+
 ## Importação e Tratamento das Bases
+
+```{r importacao-bases}
 
 airports <- read_parquet("airports.parquet") |>
   rename(icao = sigla_icao_aera_dromo,
@@ -426,9 +507,13 @@ planes <- read_parquet("planes.parquet") |>
                       marca_estrangeira = "Marca estrangeira anterior utilizada pela aeronave",
                       gravame = "Descrição de gravames ou restrições financeiras e legais")
 
-# Tópico 1: Base Analítica e Qualidade dos Dados ----
+```
+
+# Tópico 1: Base Analítica e Qualidade dos Dados
 
 ## Diagnóstico Inicial das Bases
+
+```{r diagnostico-bases}
 
 tibble(Base = c("airports", "flights", "planes"),
        dados = list(airports, flights, planes),
@@ -473,7 +558,11 @@ tibble(Base = c("airports", "flights", "planes"),
               table_body.hlines.color = "#ececec",
               table.border.top.style = "hidden")
 
+```
+
 ## Criação da Base Analítica de Voos
+
+```{r base-voos}
 
 voos <- flights |>
   mutate(situacao_norm = str_to_upper(str_squish(stringi::stri_trans_general(situacao, "Latin-ASCII"))),
@@ -542,7 +631,11 @@ voos <- flights |>
                       regiao_destino = "Região do aeroporto de destino (Brasil)") |>
   glimpse()
 
+```
+
 ## Classificação Metodológica dos Voos
+
+```{r classificacao-voos}
 
 voos |>
   count(status_metodologico, situacao, name = "voos") |>
@@ -570,7 +663,11 @@ voos |>
               table_body.hlines.color = "#ececec",
               table.border.top.style = "hidden")
 
+```
+
 ## Auditoria dos Desfechos
+
+```{r auditoria-desfechos}
 
 voos |>
   select(atraso_partida_min, atraso_chegada_min) |>
@@ -611,7 +708,11 @@ voos |>
               table_body.hlines.color = "#ececec",
               table.border.top.style = "hidden")
 
+```
+
 ## Validação das Chaves com Aeroportos
+
+```{r validacao-chaves}
 
 tibble(Chave = c("Origem", "Destino"),
        Voos = nrow(voos),
@@ -650,9 +751,13 @@ tibble(Chave = c("Origem", "Destino"),
               table_body.hlines.color = "#ececec",
               table.border.top.style = "hidden")
 
-# Tópico 2: Definição dos Desfechos de Performance ----
+```
+
+# Tópico 2: Definição dos Desfechos de Performance
 
 ## Indicador de Atraso Relevante
+
+```{r indicador-atraso}
 
 voos_real <- voos |>
   filter(voo_realizado, !is.na(atraso_chegada_min)) |>
@@ -683,7 +788,11 @@ voos_real |>
               table_body.hlines.color = "#ececec",
               table.border.top.style = "hidden")
 
+```
+
 ## Indicador de Cancelamento
+
+```{r indicador-cancelamento}
 
 voos |>
   count(situacao, cancelado, name = "voos") |>
@@ -731,7 +840,11 @@ voos |>
               table_body.hlines.color = "#ececec",
               table.border.top.style = "hidden")
 
+```
+
 ## Decomposição do Atraso: Média, Mediana e Indicador Binário
+
+```{r decomposicao-atrasos}
 
 voos_real |>
   summarise(`Média do Atraso de Chegada` = mean(atraso_chegada_min, na.rm = TRUE),
@@ -750,7 +863,11 @@ voos_real |>
   theme_econ_base() +
   theme(axis.text.x = element_text(angle = 20, hjust = 1))
 
+```
+
 ## Quadro Metodológico dos Desfechos
+
+```{r quadro-desfechos}
 
 tribble(
   ~ Desfecho,                     ~ Definicao,                              ~ Unidade_Analise,                       ~ Base_Usada,        ~ Limitacao,
@@ -775,9 +892,13 @@ tribble(
               table_body.hlines.color = "#ececec",
               table.border.top.style = "hidden")
 
-# Tópico 3: Diagnóstico Geral da Operação em 2023 ----
+```
+
+# Tópico 3: Diagnóstico Geral da Operação em 2023
 
 ## Painel Geral da Operação
+
+```{r painel-geral}
 
 voos |>
   filter(year(partida_prevista) == 2023 | is.na(partida_prevista)) |>
@@ -805,7 +926,11 @@ voos |>
               table_body.hlines.color = "#ececec",
               table.border.top.style = "hidden")
 
+```
+
 ## Principais Companhias por Volume de Voos
+
+```{r ranking-empresas}
 
 rk_emp <- voos |>
   drop_na(empresa) |>
@@ -849,7 +974,11 @@ rk_emp |>
               table_body.hlines.color = "#ececec",
               table.border.top.style = "hidden")
 
+```
+
 ## Principais Aeroportos de Origem por Partidas
+
+```{r ranking-aeroportos}
 
 rk_orig <- voos |>
   drop_na(origem_icao) |>
@@ -894,7 +1023,11 @@ rk_orig |>
               table_body.hlines.color = "#ececec",
               table.border.top.style = "hidden")
 
+```
+
 ## Top 20 Rotas Mais Voadas
+
+```{r rotas-mais-voadas}
 
 voos |>
   drop_na(origem_icao, destino_icao) |>
@@ -936,7 +1069,11 @@ voos |>
               table_body.hlines.color = "#ececec",
               table.border.top.style = "hidden")
 
+```
+
 ## Sazonalidade Mensal da Operação Aérea em 2023
+
+```{r sazonalidade-operacao}
 
 voos |>
   filter(year(partida_prevista) == 2023) |>
@@ -956,9 +1093,13 @@ voos |>
        caption = "Fonte: ANAC | Elaboração Própria") +
   theme_econ_base()
 
-# Tópico 4: Fatores Associados a Atrasos ----
+```
+
+# Tópico 4: Fatores Associados a Atrasos
 
 ## Distribuição dos Atrasos de Chegada
+
+```{r distribuicao-atrasos}
 
 voos_real |>
   filter(between(atraso_chegada_min, -30, 150)) |>
@@ -1007,7 +1148,11 @@ voos_real |>
               table_body.hlines.color = "#ececec",
               table.border.top.style = "hidden")
 
+```
+
 ## Atraso Relevante por Companhia
+
+```{r atraso-companhia}
 
 voos_real |>
   drop_na(empresa) |>
@@ -1044,7 +1189,11 @@ voos_real |>
               table_body.hlines.color = "#ececec",
               table.border.top.style = "hidden")
 
+```
+
 ## Atraso Relevante por Aeroporto de Origem
+
+```{r atraso-aeroporto}
 
 voos_real |>
   drop_na(origem_icao) |>
@@ -1084,7 +1233,11 @@ voos_real |>
               table_body.hlines.color = "#ececec",
               table.border.top.style = "hidden")
 
+```
+
 ## Atraso Relevante por Turno de Partida
+
+```{r atraso-turno}
 
 voos_real |>
   drop_na(turno) |>
@@ -1101,7 +1254,11 @@ voos_real |>
        caption = "Fonte: ANAC | Elaboração Própria") +
   theme_econ_base()
 
+```
+
 ## Sazonalidade Mensal do Atraso Relevante
+
+```{r sazonalidade-atraso}
 
 voos_real |>
   filter(year(mes) == 2023) |>
@@ -1119,7 +1276,11 @@ voos_real |>
        caption = "Fonte: ANAC | Elaboração Própria") +
   theme_econ_base()
 
+```
+
 ## Heatmap de Atraso por Mês e Turno
+
+```{r heatmap-atraso}
 
 voos_real |>
   filter(year(mes) == 2023) |>
@@ -1138,9 +1299,13 @@ voos_real |>
   theme_econ_base() +
   theme(panel.grid = element_blank())
 
-# Tópico 5: Fatores Associados a Cancelamentos ----
+```
+
+# Tópico 5: Fatores Associados a Cancelamentos
 
 ## Taxa Geral de Cancelamento
+
+```{r taxa-cancelamento}
 
 voos |>
   summarise(total_voos = n(),
@@ -1165,7 +1330,11 @@ voos |>
               table_body.hlines.color = "#ececec",
               table.border.top.style = "hidden")
 
+```
+
 ## Cancelamento por Companhia
+
+```{r cancelamento-companhia}
 
 voos |>
   drop_na(empresa) |>
@@ -1198,7 +1367,11 @@ voos |>
               table_body.hlines.color = "#ececec",
               table.border.top.style = "hidden")
 
+```
+
 ## Taxa de Cancelamento por Aeroporto de Origem
+
+```{r cancelamento-aeroporto}
 
 rk_canc <- voos |>
   drop_na(origem_icao) |>
@@ -1246,7 +1419,11 @@ rk_canc |>
               table_body.hlines.color = "#ececec",
               table.border.top.style = "hidden")
 
+```
+
 ## Sazonalidade Mensal da Taxa de Cancelamento
+
+```{r sazonalidade-cancelamento}
 
 voos |>
   filter(year(partida_prevista) == 2023) |>
@@ -1264,7 +1441,11 @@ voos |>
        caption = "Fonte: ANAC | Elaboração Própria") +
   theme_econ_base()
 
+```
+
 ## Volume Operacional e Taxa de Cancelamento por Aeroporto
+
+```{r volume-cancelamento}
 
 voos |>
   drop_na(origem_icao) |>
@@ -1284,9 +1465,13 @@ voos |>
        caption = "Fonte: ANAC | Elaboração Própria") +
   theme_econ_base()
 
-# Tópico 6: Malha, Rotas e Geografia ----
+```
+
+# Tópico 6: Malha, Rotas e Geografia
 
 ## Conectividade e Desempenho por Aeroporto
+
+```{r conectividade-aeroportos}
 
 ap_perf <- voos |>
   drop_na(origem_icao) |>
@@ -1345,7 +1530,11 @@ ap_perf |>
               table_body.hlines.color = "#ececec",
               table.border.top.style = "hidden")
 
+```
+
 ## Desempenho Operacional: Hubs vs. Demais Aeroportos
+
+```{r hubs-aeroportos}
 
 voos |>
   left_join(ap_perf |> select(origem_icao, status_hub), by = "origem_icao") |>
@@ -1402,7 +1591,11 @@ voos |>
               table_body.hlines.color = "#ececec",
               table.border.top.style = "hidden")
 
+```
+
 ## Distribuição Geográfica dos Aeroportos por Atraso Relevante
+
+```{r mapa-aeroportos}
 
 read_state(year = 2020, showProgress = FALSE) |>
   ggplot() +
@@ -1429,7 +1622,11 @@ read_state(year = 2020, showProgress = FALSE) |>
         axis.line.x = element_blank(),
         panel.grid = element_blank())
 
+```
+
 ## Fluxos Regionais e Taxa de Atraso Relevante
+
+```{r fluxos-regionais}
 
 voos_real |>
   drop_na(regiao_origem, regiao_destino) |>
@@ -1448,7 +1645,11 @@ voos_real |>
   theme(panel.grid = element_blank(),
         axis.text.x = element_text(angle = 45, hjust = 1))
 
+```
+
 ## Rotas Críticas: Alto Volume e Desempenho Pior que a Média
+
+```{r rotas-criticas}
 
 voos |>
   drop_na(origem_icao, destino_icao) |>
@@ -1492,9 +1693,13 @@ voos |>
               table_body.hlines.color = "#ececec",
               table.border.top.style = "hidden")
 
-# Tópico 7: Capacidade, Distância e Frota ----
+```
+
+# Tópico 7: Capacidade, Distância e Frota
 
 ## Capacidade Ofertada por Companhia e Tipo de Linha
+
+```{r capacidade-companhia}
 
 voos |>
   filter(year(partida_prevista) == 2023, !is.na(empresa)) |>
@@ -1512,7 +1717,11 @@ voos |>
        caption = "Fonte: ANAC | Elaboração Própria") +
   theme_econ_base()
 
+```
+
 ## Distância das Rotas por Status de Atraso
+
+```{r distancia-rotas}
 
 voos_real |>
   filter(!is.na(longitude_origem), !is.na(latitude_origem),
@@ -1530,7 +1739,11 @@ voos_real |>
        caption = "Fonte: ANAC | Elaboração Própria") +
   theme_econ_base()
 
+```
+
 ## Perfil de Distância das Cinco Maiores Companhias
+
+```{r perfil-distancia}
 
 voos_real |>
   drop_na(empresa) |>
@@ -1550,7 +1763,11 @@ voos_real |>
        caption = "Fonte: ANAC | Elaboração Própria") +
   theme_econ_base()
 
+```
+
 ## Validação da Chave da Frota
+
+```{r validacao-frota}
 
 tibble(
   Chave = c("planes$icao_tipo", "planes$modelo"),
@@ -1606,7 +1823,11 @@ tibble(
               table_body.hlines.color = "#ececec",
               table.border.top.style = "hidden")
 
+```
+
 ## Modelo de Equipamento e Desempenho Operacional
+
+```{r equipamento-desempenho}
 
 voos |>
   drop_na(modelo_equipamento) |>
@@ -1645,7 +1866,11 @@ voos |>
               table_body.hlines.color = "#ececec",
               table.border.top.style = "hidden")
 
+```
+
 ## Idade Aproximada do Equipamento e Desempenho
+
+```{r idade-equipamento}
 
 voos |>
   left_join(planes |>
@@ -1687,9 +1912,13 @@ voos |>
               table_body.hlines.color = "#ececec",
               table.border.top.style = "hidden")
 
-# Tópico 8: Modelagem de Fatores Associados a Atrasos (Random Forest) ----
+```
+
+# Tópico 8: Modelagem de Fatores Associados a Atrasos (Random Forest)
 
 ## Escolha do Problema de Modelagem
+
+```{r escolha-modelagem}
 
 tribble(
   ~ Problema,                       ~ Classe,                                ~ Variaveis_Disponiveis,                                                            ~ Clareza_Interpretativa,                                  ~ Decisao,
@@ -1712,7 +1941,11 @@ tribble(
               table_body.hlines.color = "#ececec",
               table.border.top.style = "hidden")
 
+```
+
 ## Separação de Treino e Teste (Split Temporal)
+
+```{r split-temporal}
 
 db_mod <- voos_real |>
   filter(year(partida_prevista) == 2023) |>
@@ -1777,7 +2010,11 @@ bind_rows(
               table_body.hlines.color = "#ececec",
               table.border.top.style = "hidden")
 
+```
+
 ## Modelo Baseline: Classe Majoritária
+
+```{r baseline-rf}
 
 classe_maj <- trn |>
   count(alvo_atraso) |>
@@ -1809,7 +2046,11 @@ tst |>
               table_body.hlines.color = "#ececec",
               table.border.top.style = "hidden")
 
+```
+
 ## Modelo Principal: Random Forest
+
+```{r modelo-rf}
 
 set.seed(1234)
 
@@ -1856,7 +2097,11 @@ metricas_bin(pred_rf, truth = alvo_atraso, estimate = .pred_class) |>
               table_body.hlines.color = "#ececec",
               table.border.top.style = "hidden")
 
+```
+
 ## Matriz de Confusão
+
+```{r matriz-confusao}
 
 conf_mat(pred_rf, truth = alvo_atraso, estimate = .pred_class)$table |>
   as.data.frame() |>
@@ -1877,7 +2122,11 @@ conf_mat(pred_rf, truth = alvo_atraso, estimate = .pred_class)$table |>
               table_body.hlines.color = "#ececec",
               table.border.top.style = "hidden")
 
+```
+
 ## Principais Variáveis Associadas ao Atraso Relevante
+
+```{r importancia-variaveis}
 
 extract_fit_parsnip(fit_rf)$fit$variable.importance |>
   enframe(name = "term", value = "importancia") |>
@@ -1891,9 +2140,13 @@ extract_fit_parsnip(fit_rf)$fit$variable.importance |>
        caption = "Fonte: ANAC | Elaboração Própria") +
   theme_econ_base()
 
-# Tópico 9: Classificação de Grupos de Aeroportos (K-Means) ----
+```
+
+# Tópico 9: Classificação de Grupos de Aeroportos (K-Means)
 
 ## Seleção de Atributos (Volume, Conectividade e Atraso de Partida)
+
+```{r atributos-cluster}
 
 db_ap <- voos |>
   drop_na(origem_icao, destino_icao) |>
@@ -1909,7 +2162,11 @@ X_ap <- db_ap |>
 
 rownames(X_ap) <- db_ap$origem_icao
 
+```
+
 ## Clusterização e Perfilamento dos Grupos de Aeroportos
+
+```{r clusters-aeroportos}
 
 km_res <- kmeans(X_ap, centers = 4, nstart = 20)
 
@@ -1930,7 +2187,11 @@ db_ap_clust |>
        caption = "Fonte: ANAC | Elaboração Própria") +
   theme_econ_base()
 
+```
+
 ## Distribuição Geográfica dos Clusters Operacionais
+
+```{r mapa-clusters}
 
 ne_countries(scale = "medium", returnclass = "sf") |>
   filter(name_long != "Antarctica") |>
@@ -1949,9 +2210,13 @@ ne_countries(scale = "medium", returnclass = "sf") |>
         axis.ticks = element_blank(),
         panel.grid = element_blank())
 
-# Tópico 10: Síntese Executiva ----
+```
+
+# Tópico 10: Síntese Executiva
 
 ## Tabela Final de KPIs por Companhia
+
+```{r sintese-executiva}
 
 voos |>
   drop_na(empresa) |>
@@ -1999,3 +2264,6 @@ voos |>
               table.border.bottom.color = "black",
               table_body.hlines.color = "#ececec",
               table.border.top.style = "hidden")
+```
+
+
