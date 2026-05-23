@@ -24,7 +24,7 @@ A análise combina:
 - `2 - CP for ITE - PS Unknow(4 dgps).R`  
   Simulações com DGPs sintéticos usando **Escore de Propensão estimado** via Random Forest.
 
-- `3 -  CP for ITE - Star.R`  
+- `3 - CP for ITE - Star.R`  
   Aplicação empírica na base **STAR Tennessee**, experimento educacional sobre tamanho de sala e desempenho em matemática.
 
 - `4 - CP for ITE - HI.R`  
