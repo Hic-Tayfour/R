@@ -18,16 +18,16 @@ A análise combina:
 
 ### Estrutura do Projeto
 
-- `1- Lei Candes - PS Know(4 dgps).R`  
+- `1 - CP for ITE - PS Know(4 dgps).R`  
   Simulações com DGPs sintéticos usando **Escore de Propensão conhecido**.
 
-- `2- Lei Candes - PS Unknow(4 dgps).R`  
+- `2 - CP for ITE - PS Unknow(4 dgps).R`  
   Simulações com DGPs sintéticos usando **Escore de Propensão estimado** via Random Forest.
 
-- `3-  Lei Candes - Star.R`  
+- `3 -  CP for ITE - Star.R`  
   Aplicação empírica na base **STAR Tennessee**, experimento educacional sobre tamanho de sala e desempenho em matemática.
 
-- `4- Lei Candes - HI.R`  
+- `4 - CP for ITE - HI.R`  
   Aplicação empírica na base **Health Insurance (HI)**, estudo observacional sobre seguro-saúde do cônjuge e horas trabalhadas por esposas.
 
 ---
@@ -162,10 +162,10 @@ A principal conclusão é que a WCP funciona melhor como uma ferramenta de **aud
 2. Execute os scripts na ordem desejada:
 
    ```r
-   source("1- Lei Candes - PS Know(4 dgps).R")
-   source("2- Lei Candes - PS Unknow(4 dgps).R")
-   source("3-  Lei Candes - Star.R")
-   source("4- Lei Candes - HI.R")
+   source("1 - CP for ITE - PS Know(4 dgps).R")
+   source("2 - CP for ITE - PS Unknow(4 dgps).R")
+   source("3 - CP for ITE - Star.R")
+   source("4 - CP for ITE - HI.R")
    ```
 
 3. Nos scripts de simulação, altere o objeto `dgp` para escolher o processo gerador:
