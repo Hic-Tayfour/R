@@ -47,6 +47,20 @@ encoding: UTF-8
 lang: pt-BR
 ---
 
+# Introdução
+
+O transporte aéreo constitui uma infraestrutura crítica para a integração econômica e territorial do Brasil. Sua eficiência operacional afeta diretamente passageiros, companhias aéreas e a logística nacional. Atrasos e cancelamentos não representam apenas inconvenientes individuais, pois seus efeitos se estendem pela malha aérea, comprometem conexões, elevam custos operacionais e revelam gargalos estruturais em aeroportos, rotas e frota. 
+
+Este relatório analisa a operação aérea brasileira em 2023 a partir de microdados públicos da Agência Nacional de Aviação Civil (ANAC), complementados por malhas geográficas do IBGE, via pacote `geobr`, e do Natural Earth.
+
+O objetivo central do trabalho é diagnosticar o desempenho operacional da aviação brasileira em 2023 a partir de dois desfechos distintos e complementares: o atraso relevante de chegada, definido como atraso superior a 15 minutos e calculado apenas entre voos realizados, e o cancelamento, identificado pela situação do voo e analisado sobre toda a base. A separação metodológica desses desfechos é uma decisão central do trabalho, pois eles medem fenômenos diferentes. Enquanto o atraso representa a piora de um voo concluído, o cancelamento corresponde à não realização da viagem.
+
+Em primeiro lugar, analisamos como atrasos e cancelamentos variam entre companhias, aeroportos, rotas e turnos. Em seguida, examinamos o papel da sazonalidade mensal e do acúmulo de atrasos ao longo do dia operacional. Também avaliamos se a centralidade dos aeroportos na malha aérea, especialmente no caso dos hubs, e a localização geográfica ajudam a explicar diferenças de desempenho. Além disso, consideramos associações entre capacidade, distância, perfil de frota e resultados operacionais.
+
+Por fim, o trabalho incorpora métodos de aprendizado de máquina com dois propósitos complementares. Um modelo supervisionado de Random Forest é utilizado para avaliar a capacidade de previsão de atrasos relevantes e identificar os fatores mais associados a esse desfecho. Além disso, é gerado um agrupamento por K-Means para classificar aeroportos segundo perfis operacionais semelhantes. As bases utilizadas, suas chaves de integração e principais limitações são documentadas na seção de diagnóstico.
+
+
+
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(
   echo = TRUE,
@@ -2210,4 +2224,14 @@ voos |>
                 table.border.top.style = "hidden")
 ```
 
+# Conclusão
 
+A análise da operação aérea brasileira em 2023 revela uma malha de grande escala, com quase 960 mil voos, 118 companhias e 389 aeroportos de origem. Apesar dessa dimensão, os resultados mostram uma operação heterogênea, o que reforça a necessidade de avaliar o desempenho por recortes específicos, e não apenas pela média geral. Os dois desfechos estudados apresentam dinâmicas próprias: o atraso relevante atinge 18,9% dos voos realizados, enquanto o cancelamento, mais severo, fica em 5,4%, com padrões de sazonalidade e geografia distintos.
+
+Quanto ao atraso, identificamos três padrões principais. O primeiro é temporal: o desempenho piora ao longo do dia operacional, com voos noturnos superando 20% de atraso relevante, contra aproximadamente 15% na madrugada e na manhã. Esse comportamento se intensifica no último trimestre, com pico próximo de 25% em outubro, sugerindo propagação de atrasos pela malha. O segundo padrão é estrutural: o eixo paulista, formado por Guarulhos, Congonhas e Viracopos, além da rota entre Congonhas e Santos Dumont, tem peso desproporcional no resultado agregado por causa do alto volume de voos, mesmo quando as taxas não são muito superiores à média. O terceiro ponto é que a distância da rota, isoladamente, não separa de forma clara voos atrasados e pontuais, indicando que o atraso é um fenômeno multifatorial.
+
+O cancelamento segue uma lógica diferente. As maiores taxas estão em aeroportos internacionais de menor volume, como Madrid, Quito e Doha, e em companhias internacionais e algumas cargueiras, com Ibéria e Qatar acima de 70%. Em contraste, os grandes hubs domésticos apresentam regularidade relativamente maior. A comparação entre hubs e demais aeroportos reforça essa diferença: o atraso relevante é quase idêntico, com 19,0% nos hubs e 18,6% nos demais aeroportos, mas a taxa de cancelamento dos aeroportos menos centrais, de 12,2%, é cerca de três vezes a dos hubs, de 4,1%. A análise de frota, condicionada à cobertura parcial da chave `icao_tipo`, de 63,7%, tem caráter exploratório e não evidencia uma relação linear simples entre idade do equipamento e desempenho operacional.
+
+Na modelagem, o Random Forest confirma o caráter associativo das evidências descritivas. Variáveis temporais, como mês e dia da semana, e variáveis de estrutura da malha, como assentos, destino e conectividade da origem, aparecem entre os fatores mais importantes. Ainda assim, o modelo permanece conservador, com alta especificidade de 0,986, baixa sensibilidade de 0,071 e AUC de 0,662. Esse resultado reflete tanto o desbalanceamento do alvo quanto o aumento da taxa de atrasos no período de teste. Portanto, sua utilidade é mais explicativa do que operacional: o modelo ajuda a identificar fatores de risco, mas não deve ser tratado como classificador final. O K-Means, por sua vez, reforça que a escala operacional é o principal eixo de diferenciação entre aeroportos.
+
+A avaliação de desempenho aéreo não pode depender de um único indicador. Ela exige combinar volume, capacidade, atraso, cancelamento e contexto de malha. As principais limitações do estudo são a ausência de justificativas completas para os desfechos, o que impede inferência causal, a presença de registros com horários inconsistentes e a cobertura parcial da base de frota. Essas limitações delimitam o alcance das conclusões e apontam extensões naturais para o trabalho, como incorporar dados meteorológicos e de tráfego, modelar a propagação de atrasos, tratar o desbalanceamento da variável-alvo e analisar o cancelamento como um desfecho próprio.
