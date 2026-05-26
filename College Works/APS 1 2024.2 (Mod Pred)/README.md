@@ -1,85 +1,115 @@
-## 📘 APS — Modelagem Preditiva (Insper | 2024.2)
+## APS 1 - Modelagem Preditiva (2024.2)
 
-### 🎯 Objetivo do Trabalho
-Aplicar métodos de aprendizado supervisionado para resolver dois problemas reais:
-1. **Classificação de churn bancário** (clientes que cancelam ou não um serviço).
-2. **Regressão de preços de carros usados** da marca Mercedes.
+### Objetivo do Trabalho
 
-Além disso, o relatório discute detalhadamente o funcionamento das **Random Forests**, com ênfase em conceitos como bagging, aleatorização de splits, erro out-of-bag, entre outros.
+Este projeto aplica métodos de aprendizado supervisionado a dois problemas preditivos: **classificação de churn bancário** e **regressão de preços de veículos usados**.
+
+Além das aplicações empíricas, o trabalho discute a fundamentação de **Random Forests**, incluindo árvores de decisão, bagging, bootstrap, aleatorização de splits e erro out-of-bag.
 
 ---
 
-### 📂 Aplicação 1 — Previsão de Churn
+### Estrutura do Projeto
 
-- Base: `churn.csv`  
-- Variável-alvo: `Exited` (1 = cliente cancelou; 0 = manteve).
-- Modelos utilizados:
-  - Regressão Logística
-  - Árvore de Decisão
+- `APS - Aplicação 1.R`
+  Script da aplicação de classificação de churn bancário.
+
+- `APS - Aplicação 2.R`
+  Script da aplicação de regressão de preços de veículos usados.
+
+- `churn.csv`
+  Base de clientes bancários utilizada na aplicação de classificação.
+
+- `used_cars.csv`
+  Base de veículos usados utilizada na aplicação de regressão.
+
+---
+
+### Aplicação 1 - Churn Bancário
+
+A primeira aplicação prevê se um cliente cancelou ou não um serviço bancário.
+
+- Variável-alvo: `Exited`
+- Modelos avaliados:
+  - Regressão logística
+  - Árvore de decisão
   - Random Forest
   - CatBoost
 
-#### 🔍 Avaliação
-- AUC (Área sob a curva ROC)
-- Curvas ROC comparativas com `pROC` + `ggplot2`
-- Melhor ponto de corte (threshold), sensibilidade, especificidade e acurácia.
+As métricas incluem AUC, curvas ROC, ponto de corte, sensibilidade, especificidade e acurácia.
 
 ---
 
-### 📂 Aplicação 2 — Previsão de Preços de Veículos Usados
+### Aplicação 2 - Preço de Veículos Usados
 
-- Base: `used_cars.csv`  
-- Variável-alvo: `price` (preço do carro)
-- Modelos utilizados:
-  - Regressão Linear Múltipla
-  - Árvore de Regressão
+A segunda aplicação prevê preços de veículos usados da marca Mercedes.
+
+- Variável-alvo: `price`
+- Modelos avaliados:
+  - Regressão linear múltipla
+  - Árvore de regressão
   - Random Forest
   - CatBoost
 
-#### 🔍 Avaliação
-- RMSE (Root Mean Squared Error) nos conjuntos de treino e teste.
-- Comparação entre os modelos com tabelas `gt`.
-- Visualização dos preços previstos vs. observados.
+As métricas incluem RMSE em treino e teste, comparação entre modelos e gráficos de valores previstos versus observados.
 
 ---
 
-### 📚 Parte Teórica (Random Forest)
+### Fundamentação Teórica
 
-O relatório inclui:
+O relatório discute Random Forests a partir dos seguintes blocos:
 
-1. 🌳 **Treinamento de uma Árvore de Regressão**  
-   - Etapas, divisão de nós, minimização de erro, desenvolvimento histórico e figuras manuais.
+1. **Árvores de Regressão**
+   Divisão recursiva de nós, minimização de erro e interpretação da estrutura da árvore.
 
-2. 🎲 **Bagging e Bootstrap**  
-   - Fundamentos estatísticos, diferenças do uso clássico x preditivo, papel do overfitting e variância.
+2. **Bagging e Bootstrap**
+   Uso de reamostragem para reduzir variância e estabilizar previsões.
 
-3. ✂️ **Aleatorização dos Splits (Breiman)**  
-   - Intuição do ganho de performance via redução da correlação entre árvores.
+3. **Aleatorização de Splits**
+   Redução da correlação entre árvores por seleção aleatória de variáveis candidatas.
 
-4. 📉 **Erro Out-of-Bag (OOB)**  
-   - Cálculo e interpretação como alternativa à validação cruzada.
+4. **Erro Out-of-Bag**
+   Avaliação interna do modelo sem necessidade de validação cruzada tradicional.
 
 ---
 
-### 💻 Tecnologias Utilizadas
+### Tecnologias Utilizadas
 
 - Linguagem: **R**
-- Bibliotecas:
-  - `tidyverse`, `rpart`, `rpart.plot`, `ranger`, `catboost`, `pROC`, `gt`, `rsample`, `ggplot2`
+- Pacotes principais:
+  - `rpart.plot`
+  - `tidyverse`
+  - `catboost`
+  - `rsample`
+  - `ranger`
+  - `rpart`
+  - `class`
+  - `pROC`
+  - `tree`
+  - `gt`
 
 ---
 
-### ▶️ Como Executar
+### Como Reproduzir
 
-1. Coloque os arquivos `churn.csv` e `used_cars.csv` no mesmo diretório dos scripts.
-2. Execute os scripts no RStudio (ou outro ambiente R) com os pacotes instalados.
-3. O código gera:
-   - Tabelas comparativas com `gt`
-   - Gráficos ROC e visualizações de árvore
-   - Métricas como AUC, RMSE e thresholds ideais
+1. Mantenha `churn.csv` e `used_cars.csv` no diretório do projeto.
+
+2. Execute a aplicação de churn:
+
+   ```r
+   source("APS - Aplicação 1.R")
+   ```
+
+3. Execute a aplicação de preços:
+
+   ```r
+   source("APS - Aplicação 2.R")
+   ```
 
 ---
 
-Atenciosamente,  
-Hicham Tayfour
+### Conclusão
 
+O projeto compara modelos lineares, árvores, Random Forests e CatBoost em tarefas de classificação e regressão. A parte teórica conecta a implementação empírica aos fundamentos estatísticos dos métodos de ensemble.
+
+Atenciosamente,
+**Hicham Tayfour**

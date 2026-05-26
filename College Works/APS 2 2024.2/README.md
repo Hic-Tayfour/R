@@ -1,67 +1,102 @@
-## 📘 APS 2 — Economia do Gênero e Modelos de Variável Dependente Binária (Microeconomia IV - Insper)
+## APS 2 - Economia do Gênero e Bem-Estar Subjetivo (Microeconomia IV | 2024.2)
 
-### 🎯 Objetivo do Trabalho
-Investigar como valores sociais associados a normas de gênero influenciam o bem-estar subjetivo, mensurado por uma variável binária de felicidade, com base nos dados da pesquisa **World Values Survey (WVS)**.
+### Objetivo do Trabalho
 
----
+Este projeto investiga como valores sociais associados a normas de gênero se relacionam com o bem-estar subjetivo, medido por uma variável binária de felicidade.
 
-### 🌍 Base de Dados: World Values Survey
-- Survey internacional com dados individuais de diversos países e ondas.
-- Indicadores utilizados:
-  - **Felicidade**: Pergunta "Taking all things together, would you say you are..."
-    - Reclassificada como variável binária `happy_binary` (1 = feliz, 0 = não feliz).
-  - **Normas de gênero**:
-    - `Q32`: Ser dona de casa é tão satisfatório quanto trabalhar.
-    - `Q33`: Homens devem ter prioridade de emprego.
-    - `Q29`: Homens são melhores líderes políticos.
-  - Outras variáveis: idade, gênero, estado civil, peso amostral.
+A análise utiliza dados da **World Values Survey (WVS)** e modelos de variável dependente binária.
 
 ---
 
-### 🧪 Etapas da Análise
+### Estrutura do Projeto
 
-#### **Etapa I — Teoria Econômica**
-- A investigação parte do modelo de identidade de gênero de **Akerlof e Kranton (2000)**, adaptado por **Chang (2011)**.
-- Argumento: **Prescrições sociais sobre papéis de gênero moldam o bem-estar subjetivo**, especialmente para mulheres, ao criar conflitos entre identidade e comportamento.
-- Hipótese econômica: **Valores mais tradicionais de gênero estão associados a menor probabilidade de relatar-se feliz.**
+- `APS 2 - Bloco 2.R`
+  Script principal com tratamento da base, estatísticas descritivas, visualizações e regressões.
 
-#### **Etapa II — Estatísticas Descritivas**
-- Foram estimadas médias ponderadas para:
-  - Distribuição de felicidade.
-  - Concordância com frases normativas de gênero.
-- Resultados apresentados em tabela `gt` e gráficos de barra por nível de felicidade.
+- `APS 2 - Bloco 2.qmd`
+  Relatório em Quarto com narrativa, código e resultados.
 
-#### **Etapa III — Regressões**
-- Modelos estimados com base em desenho amostral (`svydesign`):
-  - **Logit** e **Probit** com `svyglm()`.
-  - Cálculo dos **efeitos marginais** com `svycontrast()`.
-- Especificação:
-
-  $$
-  \text{happy}_i = \beta_0 + \beta_1 \cdot \text{housewife}_i + \beta_2 \cdot \text{priority}_i + \beta_3 \cdot \text{leaders}_i + \beta_4 \cdot \text{gender}_i + \beta_5 \cdot \text{age}_i + \beta_6 \cdot \text{marital}_i + \varepsilon_i
-  $$
-
-- Resultados comparados entre os modelos com `stargazer`.
+- `wvs_world.zip`
+  Base de dados da World Values Survey utilizada no trabalho.
 
 ---
 
-### 📈 Visualizações
-- Gráficos de barra:
-  - Concordância com normas de gênero, por nível de felicidade.
-- Histograma e densidade do sentimento de felicidade.
+### Fundamentação Teórica
+
+O trabalho parte de modelos de identidade de gênero, com destaque para a ideia de que prescrições sociais sobre papéis masculinos e femininos podem afetar o bem-estar subjetivo.
+
+A hipótese econômica é que valores mais tradicionais de gênero estão associados a menor probabilidade de relatar felicidade, especialmente quando há conflito entre identidade, normas sociais e escolhas individuais.
 
 ---
 
-### 💻 Tecnologias Utilizadas
+### Base de Dados
+
+A base contém dados individuais da World Values Survey. As principais variáveis incluem:
+
+- Indicador binário de felicidade
+- `Q32`: concordância com a ideia de que ser dona de casa é tão satisfatório quanto trabalhar
+- `Q33`: concordância com prioridade masculina no emprego
+- `Q29`: concordância com homens como melhores líderes políticos
+- Idade
+- Gênero
+- Estado civil
+- Peso amostral
+
+---
+
+### Metodologia
+
+A análise inclui:
+
+- Recodificação da variável de felicidade
+- Construção de indicadores de normas de gênero
+- Estatísticas descritivas ponderadas
+- Gráficos de barras e distribuições
+- Modelos Logit e Probit com `svyglm()`
+- Cálculo e interpretação de efeitos marginais
+- Comparação dos modelos estimados
+
+---
+
+### Tecnologias Utilizadas
+
 - Linguagem: **R**
-- Pacotes: `tidyverse`, `survey`, `gt`, `ggplot2`, `stargazer`, `quasibinomial`, `svycontrast`
+- Pacotes principais:
+  - `tidyverse`
+  - `dplyr`
+  - `stargazer`
+  - `gt`
+  - `survey`
+  - `sandwich`
+  - `lmtest`
+  - `ggplot2`
+  - `ggthemes`
+  - `margins`
+  - `readxl`
 
 ---
 
-### ▶️ Como Executar
-1. Baixe e salve o arquivo `wvs_world.csv` no mesmo diretório do script.
-2. Execute o script `APS2_script.R` em um ambiente R com os pacotes listados.
-3. Os outputs (gráficos, tabelas e modelos) serão exibidos diretamente no console.
+### Como Reproduzir
 
-Atenciosamente,  
-Hicham Tayfour
+1. Mantenha `wvs_world.zip` no diretório do projeto.
+
+2. Execute:
+
+   ```r
+   source("APS 2 - Bloco 2.R")
+   ```
+
+3. Para renderizar o relatório:
+
+   ```r
+   quarto::quarto_render("APS 2 - Bloco 2.qmd")
+   ```
+
+---
+
+### Conclusão
+
+O projeto aplica modelos binários para avaliar a associação entre normas de gênero e felicidade declarada. A análise combina fundamentação microeconômica, estatísticas ponderadas e regressões, mantendo interpretação associativa.
+
+Atenciosamente,
+**Hicham Tayfour**

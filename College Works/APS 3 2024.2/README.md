@@ -1,66 +1,102 @@
-## 📘 APS 3 — Economia da Educação e Experimentos (Microeconomia IV - Insper)
+## APS 3 - Economia da Educação e Projeto STAR (Microeconomia IV | 2024.2)
 
-### 🎯 Objetivo do Trabalho
-Investigar se a formação dos professores (especificamente, possuir mestrado) modera o efeito do tamanho das turmas no desempenho dos alunos em Língua Portuguesa, com base nos dados experimentais do Projeto STAR (Student-Teacher Achievement Ratio).
+### Objetivo do Trabalho
 
----
+Este projeto investiga se a formação dos professores, especificamente possuir mestrado, modera o efeito do tamanho das turmas no desempenho dos alunos.
 
-### 📊 Base de Dados: Projeto STAR
-- Coorte de alunos do Tennessee (EUA), alocados aleatoriamente em:
-  - **Small**: Turmas pequenas (13–17 alunos)
-  - **Regular**: Turmas regulares (22–25 alunos)
-  - **Aide**: Turmas regulares com assistente
-- Variável dependente: `readscore` (nota em português)
-- Variável de moderação: `tchmasters` (professor com mestrado)
+A análise utiliza dados do **Projeto STAR (Student-Teacher Achievement Ratio)**, experimento educacional realizado no Tennessee.
 
 ---
 
-### 🧪 Etapas da Análise
+### Estrutura do Projeto
 
-#### **Etapa I — Teoria Econômica**
-- A hipótese microeconômica parte do pressuposto de que **professores com maior formação acadêmica potencializam os efeitos positivos de turmas menores** sobre o desempenho dos alunos.
+- `APS 3 - Bloco 3.R`
+  Script principal com tratamento da base, estatísticas descritivas, regressões e gráficos.
 
-#### **Etapa II — Estatísticas Descritivas**
-- Foram calculadas:
-  - Média, mínimo, máximo e desvio padrão do `readscore`
-  - Proporção de professores com mestrado em cada tipo de turma
-- Resultados apresentados em tabela customizada com `gt`.
+- `APS 3 - Bloco 3.qmd`
+  Relatório em Quarto com narrativa, código e resultados.
 
-#### **Etapa III — Regressão Múltipla**
-- Modelo linear estimado:
-
-  $$
-  \text{readscore}_i = \beta_0 + \beta_1 \cdot \text{small}_i + \beta_2 \cdot \text{regular}_i + \beta_3 \cdot \text{tchmasters}_i + \beta_4 (\text{small}_i \times \text{tchmasters}_i) + \beta_5 (\text{regular}_i \times \text{tchmasters}_i) + \epsilon_i
-  $$
-
-- Resultados apresentados com `stargazer`.
-
-#### **Etapa IV — Efeitos Fixos de Escola**
-- Adição de 78 dummies para controlar heterogeneidade entre escolas (`factor(schid)`).
-- Teste de significância conjunta via `anova()`.
-
-#### **Etapa V — Verificação da Aleatorização**
-- Estimado um **modelo de probabilidade linear (LPM)** para verificar se a alocação em turmas pequenas (`small`) depende de características observáveis.
-- Variáveis incluídas: gênero (`boy`), raça, merenda gratuita (`freelunch`) e cor do professor (`tchwhite`).
+- `Star.dta`
+  Base de dados utilizada na análise.
 
 ---
 
-### 📈 Visualizações
-- **Gráfico de densidade** da variável `readscore`, por tipo de turma.
-- **Boxplot** comparativo entre os grupos.
+### Fundamentação Teórica
+
+O trabalho parte da hipótese de que professores com maior formação acadêmica podem potencializar os efeitos positivos de turmas menores sobre o desempenho dos alunos.
+
+O desenho do Projeto STAR permite explorar uma base experimental, com alocação de alunos em diferentes tipos de turma.
 
 ---
 
-### 💻 Tecnologias Utilizadas
+### Base de Dados
+
+A base contém informações sobre alunos, turmas, professores e desempenho escolar.
+
+As variáveis centrais incluem:
+
+- `readscore`: desempenho em leitura
+- Tipo de turma: pequena, regular ou regular com assistente
+- `tchmasters`: indicador de professor com mestrado
+- Escola
+- Características individuais dos alunos
+
+---
+
+### Metodologia
+
+A análise inclui:
+
+- Estatísticas descritivas por tipo de turma
+- Proporção de professores com mestrado
+- Regressão múltipla com interações
+- Efeitos fixos de escola
+- Teste de significância conjunta
+- Modelo de probabilidade linear para verificar aleatorização
+- Gráficos de densidade e boxplots
+
+---
+
+### Tecnologias Utilizadas
+
 - Linguagem: **R**
-- Pacotes: `tidyverse`, `gt`, `stargazer`, `ggplot2`, `survey`, `lmtest`, `margins`
+- Pacotes principais:
+  - `tidyverse`
+  - `dplyr`
+  - `stargazer`
+  - `gt`
+  - `survey`
+  - `sandwich`
+  - `lmtest`
+  - `ggplot2`
+  - `ggthemes`
+  - `margins`
+  - `readxl`
+  - `haven`
 
 ---
 
-### ▶️ Como Executar
-1. Salve o arquivo `Star.dta` no mesmo diretório do script.
-2. Execute o script `APS3_script.R` em um ambiente R com os pacotes instalados.
-3. Verifique a saída dos gráficos e tabelas, que serão exibidos no console.
+### Como Reproduzir
+
+1. Mantenha `Star.dta` no mesmo diretório do script.
+
+2. Execute:
+
+   ```r
+   source("APS 3 - Bloco 3.R")
+   ```
+
+3. Para renderizar o relatório:
+
+   ```r
+   quarto::quarto_render("APS 3 - Bloco 3.qmd")
+   ```
+
+---
+
+### Conclusão
+
+O projeto combina teoria econômica da educação e análise empírica com dados experimentais. A estratégia avalia tanto efeitos médios quanto heterogeneidade associada à formação docente, incluindo controles por escola e verificação da aleatorização.
 
 Atenciosamente,
-Hicham Tayfour
+**Hicham Tayfour**

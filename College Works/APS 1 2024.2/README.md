@@ -1,65 +1,110 @@
-## 📘 APS 1 — Economia do Crime e Dados em Painel (Microeconomia IV - Insper)
+## APS 1 - Economia do Crime e Dados em Painel (Microeconomia IV | 2024.2)
 
-### 🎯 Objetivo do Trabalho
-Analisar o impacto das **leis Right-to-Carry (RTC)** sobre a taxa de crimes contra a propriedade nos estados norte-americanos, utilizando modelos de dados em painel entre 1977 e 2014.
+### Objetivo do Trabalho
 
----
+Este projeto analisa o impacto das leis **Right-to-Carry (RTC)** sobre crimes contra a propriedade nos estados norte-americanos entre 1977 e 2014.
 
-### 📊 Base de Dados
-- **Base1_APS1.dta**: presença das leis RTC por estado e ano.
-- **Base2_APS1.dta**: taxas de criminalidade por estado.
-- **Base3_APS1.dta**: variáveis explicativas (desemprego, densidade populacional, etc.).
-
-As três bases foram unificadas via `merge()` pelas variáveis `state` e `year`.
+O objetivo é avaliar se a adoção dessas leis está associada a mudanças nas taxas de criminalidade, utilizando modelos de dados em painel.
 
 ---
 
-### 🧪 Etapas da Análise
+### Estrutura do Projeto
 
-#### **Etapa I — Teoria Econômica**
-- Fundamento teórico com base em **Song & Hao (2022)** e **He & Barkowski (2020)**.
-- A teoria do criminoso racional sugere que o comportamento criminal depende do **custo esperado do crime** (risco de punição, encarceramento, etc.).
-- Hipótese econômica: **A adoção de leis RTC não reduz — e pode até aumentar — as taxas de crimes contra a propriedade**, ao gerar externalidades indesejadas.
+- `APS 1 - Bloco 1.R`
+  Script principal com tratamento das bases, estatísticas descritivas, gráficos e modelos de painel.
 
-#### **Etapa II — Estatísticas Descritivas**
-- Tabela `gt` com:
-  - Média, mínimo, máximo e desvio padrão das variáveis `ln_property_rate`, `ln_incarc_rate`, `unemployment_rate` e `density`.
-- Cálculo da média da taxa de crimes antes e depois das leis RTC.
+- `APS 1 - Bloco 1.qmd`
+  Relatório em Quarto com narrativa, código e resultados.
 
-#### **Etapa III — Visualizações**
-- **Boxplot**: distribuição da taxa de crimes antes e depois das leis RTC.
-- **Gráfico de dispersão**: relação entre taxa de encarceramento e taxa de crimes, com linha de regressão.
+- `Base1_APS1.dta`
+  Base com presença das leis RTC por estado e ano.
 
-#### **Etapa IV — Estimações com Dados em Painel**
-- Modelos estimados com `plm()`:
-  - **Pooled OLS**
-  - **Efeitos Fixos (within)**
-  - **Efeitos Aleatórios (random)**
-- Regressão estimada:
+- `Base2_APS1.dta`
+  Base com taxas de criminalidade por estado.
 
-  $$\text{ln\_property\_rate}_{it} = \beta_0 + \beta_1 \cdot \text{RTC}_{it} + \beta_2 \cdot \ln(\text{incarc\_rate}_{it}) + \beta_3 \cdot \text{unemployment}_{it} + \beta_4 \cdot \text{density}_{it} + \epsilon_{it}$$
-
-- Resultados organizados com `stargazer()`.
-
-#### **Etapa V — Escolha do Modelo**
-- Aplicação do **Teste de Hausman** (`phtest`) entre efeitos fixos e aleatórios.
-- Discussão sobre identificação e causalidade com base em heterogeneidade entre estados e tempo.
+- `Base3_APS1.dta`
+  Base com variáveis explicativas, como encarceramento, desemprego e densidade populacional.
 
 ---
 
-### 💻 Tecnologias Utilizadas
+### Fundamentação Teórica
+
+O trabalho parte da teoria econômica do crime, segundo a qual o comportamento criminal depende do custo esperado do crime. A adoção de leis RTC pode alterar incentivos ao modificar riscos percebidos, externalidades e condições de segurança.
+
+A hipótese discutida é que a adoção de leis RTC não necessariamente reduz crimes contra a propriedade e pode produzir efeitos ambíguos ou indesejados.
+
+---
+
+### Base de Dados
+
+As três bases são integradas por `state` e `year`, formando um painel estadual ao longo do tempo.
+
+As principais variáveis incluem:
+
+- Taxa de crimes contra a propriedade
+- Indicador de lei RTC
+- Taxa de encarceramento
+- Taxa de desemprego
+- Densidade populacional
+- Estado e ano
+
+---
+
+### Metodologia
+
+A análise inclui:
+
+- União das três bases
+- Criação de variáveis em log
+- Estatísticas descritivas antes e depois da adoção das leis
+- Boxplots e gráficos de dispersão
+- Estimação de modelos `plm`
+- Pooled OLS
+- Efeitos fixos
+- Efeitos aleatórios
+- Teste de Hausman para escolha de modelo
+- Discussão sobre identificação e causalidade
+
+---
+
+### Tecnologias Utilizadas
+
 - Linguagem: **R**
-- Pacotes: `plm`, `gt`, `stargazer`, `haven`, `ggplot2`, `dplyr`, `tidyverse`, `sandwich`
+- Pacotes principais:
+  - `haven`
+  - `plm`
+  - `tidyverse`
+  - `dplyr`
+  - `gt`
+  - `pastecs`
+  - `fastDummies`
+  - `stargazer`
+  - `ggthemes`
+  - `sandwich`
 
 ---
 
-### ▶️ Como Executar
-1. Salve os arquivos `Base1_APS1.dta`, `Base2_APS1.dta` e `Base3_APS1.dta` no mesmo diretório do script.
-2. Execute o script `APS1_script.R` em um ambiente R com os pacotes instalados.
-3. A saída inclui:
-   - Tabela descritiva formatada
-   - Gráficos de comparação
-   - Modelos econométricos e testes estatísticos
+### Como Reproduzir
 
-Atenciosamente,  
-Hicham Tayfour
+1. Mantenha as bases `.dta` no mesmo diretório do script.
+
+2. Execute:
+
+   ```r
+   source("APS 1 - Bloco 1.R")
+   ```
+
+3. Para renderizar o relatório:
+
+   ```r
+   quarto::quarto_render("APS 1 - Bloco 1.qmd")
+   ```
+
+---
+
+### Conclusão
+
+O trabalho usa dados em painel para discutir a relação entre leis RTC e crimes contra a propriedade. A análise combina teoria econômica, estatísticas descritivas e modelos econométricos, destacando a importância de controlar heterogeneidade entre estados e tempo.
+
+Atenciosamente,
+**Hicham Tayfour**
