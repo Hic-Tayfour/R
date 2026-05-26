@@ -24,7 +24,7 @@ author: |
       Hicham Munir Tayfour – <a href="mailto:hichamt@al.insper.edu.br">hichamt@al.insper.edu.br</a><br>
       Laura Borri Magro – <a href="mailto:laurabm1@al.insper.edu.br">laurabm1@al.insper.edu.br</a><br>
       Pedro Henrique Lima Zimmermann – <a href="mailto:pedrohlz@al.insper.edu.br">pedrohlz@al.insper.edu.br</a><br>
-      Mariam Eduarda Mesquita Netto de Faria – <a href="mailto:mariaemnf@al.insper.edu.br">mariaemnf@al.insper.edu.br</a>
+      Maria Eduarda Mesquita Netto de Faria – <a href="mailto:mariaemnf@al.insper.edu.br">mariaemnf@al.insper.edu.br</a>
     </p>
   </div>
 
@@ -369,7 +369,8 @@ airports <- read_parquet("airports.parquet") |>
            str_replace_all("[^A-Z0-9 ]", " ") |>
            str_squish(),
          iso_a3 = unname(pais_iso3[pais_limpo])) |>
-  select(icao, iata, nome_aeroporto, municipio, estado, pais, iso_a3, aeronave_critica, latitude, longitude) |>
+  select(icao, iata, nome_aeroporto, municipio, estado, pais, iso_a3,
+         aeronave_critica, latitude, longitude) |>
   set_variable_labels(icao = "Código ICAO do Aeródromo (4 Letras)",
                       iata = "Código IATA do Aeródromo (3 Letras)",
                       nome_aeroporto = "Nome oficial e completo do aeroporto",
@@ -378,8 +379,8 @@ airports <- read_parquet("airports.parquet") |>
                       pais = "País de localização",
                       iso_a3 = "Código ISO-3 do País",
                       aeronave_critica = "Aeronave crítica para dimensionamento da infraestrutura do aeródromo",
-                      latitude = "Latitude geográfica (graus decimais)",
-                      longitude = "Longitude geográfica (graus decimais)")
+                      latitude = "Latitude em graus decimais",
+                      longitude = "Longitude em graus decimais")
 
 rm(pais_iso3)
 
