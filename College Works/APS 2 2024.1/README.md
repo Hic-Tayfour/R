@@ -1,95 +1,78 @@
-## APS 2 - Criminalidade, Armas e Licenciamento (Econometria | 2024.1)
+## 📘 APS — Econometria (Insper | 2024.2)
 
-### Objetivo do Trabalho
+### 🎯 Objetivo do Trabalho
+Investigar, por meio de análise exploratória e preparação para modelos econométricos, a relação entre **criminalidade (homicídios)** e variáveis socioeconômicas nos estados norte-americanos, com foco especial na influência da **licença obrigatória para posse de armas** (`Lice`).
 
-Este projeto investiga a relação entre **criminalidade**, posse de armas e variáveis socioeconômicas nos estados norte-americanos, com foco na presença de licença obrigatória para posse de armas.
-
-O objetivo é realizar uma análise exploratória e preparar a base para estudos econométricos posteriores.
-
----
-
-### Estrutura do Projeto
-
-- `APS 2 Econometria.R`
-  Script principal com importação, estatísticas descritivas, visualizações, transformações e mapas.
-
-- `APS econo.xlsx`
-  Base de dados utilizada no trabalho.
+A análise compara estatísticas, distribuições e correlações entre estados **com** e **sem exigência de licença**.
 
 ---
 
-### Base de Dados
+### 📂 Base de Dados
 
-A unidade de análise é o estado norte-americano. As principais variáveis são:
+- Arquivo: `APS econo.xlsx`  
+- Unidade de análise: Estados norte-americanos  
+- Variáveis analisadas:
 
-- `State`: estado
-- `Hom`: homicídios por 100 mil habitantes
-- `Guns`: armas por 100 mil habitantes
-- `IpC`: PIB per capita
-- `Urb`: urbanização
-- `Poli`: policiais por 100 mil habitantes
-- `Gini`: desigualdade
-- `Lice`: indicador de licença obrigatória para armas
-
----
-
-### Metodologia
-
-A análise inclui:
-
-- Estatísticas descritivas gerais
-- Correlações entre variáveis quantitativas
-- Histogramas e boxplots
-- Identificação de outliers
-- Separação da amostra por exigência de licença
-- Transformações logarítmicas
-- Matrizes de dispersão
-- Mapa temático dos Estados Unidos
+| Variável | Descrição |
+|----------|-----------|
+| `State`  | Nome do estado |
+| `Hom`    | Homicídios por 100 mil habitantes |
+| `Guns`   | Armas por 100 mil habitantes |
+| `IpC`    | PIB per capita |
+| `Urb`    | Taxa de urbanização (%) |
+| `Poli`   | Policiais por 100 mil habitantes |
+| `Gini`   | Índice de Gini (desigualdade) |
+| `Lice`   | Licença obrigatória para armas (0 = não exige, 1 = exige) |
 
 ---
 
-### Resultados Gerados
+### 📊 Etapas da Análise
 
-O script gera tabelas e gráficos para comparar estados com e sem exigência de licença, além de visualizações sobre a distribuição espacial e estatística da criminalidade.
+#### 1. 📈 Análise Exploratória Geral
+- Estatísticas descritivas: média, mediana, máximo, mínimo, variância, desvio padrão.
+- Correlação entre variáveis quantitativas.
+- Histogramas e boxplots para visualização das distribuições.
+- Identificação de **outliers** por variável.
+
+#### 2. 🧪 Separação por Licença (`Lice`)
+- Criação de duas bases: com e sem exigência de licença.
+- Estatísticas descritivas separadas para cada grupo.
+- Comparações visuais (boxplots, histogramas) entre os grupos.
+
+#### 3. 🔁 Transformação Logarítmica
+- Cálculo do logaritmo natural (ln) das variáveis quantitativas.
+- Criação de nova base (`Ln_Dados`) para análises com possíveis relações não-lineares.
+- Matrizes de dispersão e correlação com variáveis em log.
+
+#### 4. 🌀 Análise de Dispersão
+- Gráficos de dispersão entre `Hom` e todas as outras variáveis, com e sem transformação logarítmica.
+- Avaliação visual da direção e força das relações.
+
+#### 5. 🗺️ Mapa de Calor
+- Mapa dos EUA com preenchimento proporcional à taxa de homicídios por estado.
+- Visualização espacial da criminalidade.
 
 ---
 
-### Tecnologias Utilizadas
+### 💻 Tecnologias Utilizadas
 
 - Linguagem: **R**
-- Pacotes principais:
-  - `readxl`
-  - `ggplot2`
-  - `GGally`
-  - `gridExtra`
-  - `whitestrap`
-  - `tseries`
-  - `dplyr`
-  - `tidyverse`
-  - `moments`
-  - `DescTools`
-  - `DT`
-  - `maps`
+- Bibliotecas:
+  - `tidyverse`, `ggplot2`, `gridExtra`, `GGally`, `readxl`, `DescTools`, `DT`, `maps`
 
 ---
 
-### Como Reproduzir
+### ▶️ Como Executar
 
-1. Mantenha `APS econo.xlsx` no mesmo diretório do script.
-
-2. Execute:
-
-   ```r
-   source("APS 2 Econometria.R")
-   ```
-
-3. O código retorna tabelas, gráficos e diagnósticos exploratórios.
+1. Coloque o arquivo `APS econo.xlsx` no mesmo diretório do script R.
+2. Execute o script no RStudio com os pacotes instalados.
+3. O código gera:
+   - Tabelas interativas com `DT`
+   - Histogramas, boxplots e dispersões
+   - Mapa temático da taxa de homicídios
+   - Análises segmentadas por política de licenciamento
 
 ---
 
-### Conclusão
-
-O projeto organiza uma leitura exploratória da relação entre homicídios, armas e características socioeconômicas. A separação por licença obrigatória permite observar diferenças preliminares entre grupos de estados, sem ainda estabelecer interpretação causal.
-
-Atenciosamente,
-**Hicham Tayfour**
+Atenciosamente,  
+Hicham Tayfour

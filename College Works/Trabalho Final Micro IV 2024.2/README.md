@@ -1,117 +1,99 @@
-## Trabalho Final - Construção de Hospitais e Mortalidade Infantil (Microeconomia IV | 2024.2)
+## 📘 Trabalho Final — Construção de Hospitais & Mortalidade Infantil (Microeconomia IV | 2024.2)
 
-### Objetivo do Trabalho
+### 🎯 Objetivo do Trabalho
 
-Este projeto avalia se a construção de hospitais nas microrregiões de saúde impactou a **taxa de mortalidade infantil** no Brasil entre 2014 e 2019.
+Avaliar se a construção de hospitais nas microrregiões da saúde impacta a taxa de mortalidade infantil no Brasil, entre 2014 e 2019.
 
-A análise combina teoria microeconômica da demanda por saúde, microdados públicos e estimação de efeitos causais com Difference-in-Differences escalonado.
-
----
-
-### Estrutura do Projeto
-
-- `TrabFinMicroIV.R`
-  Script principal com tratamento dos dados, estatísticas descritivas, visualizações e estimações.
-
-- `Trabalho Final Microeconomia IV.qmd`
-  Relatório em Quarto com narrativa, código e resultados.
-
-- `Base de Dados.md`
-  Documentação das bases utilizadas no projeto.
-
-- `Data/`
-  Pasta com bases locais do projeto.
+A análise envolve:
+- Construção teórica baseada no modelo de demanda por saúde (Grossman, 1972)
+- Tratamento e integração de microdados do DataSUS e IBGE
+- Geração de estatísticas e visualizações geográficas
+- Estimativa de efeitos causais com Staggered Difference-in-Differences (DiD)
 
 ---
 
-### Fundamentação Teórica
+### 📂 Estrutura dos Dados
 
-O trabalho parte do modelo de demanda por saúde de **Grossman (1972)**. A construção de hospitais é interpretada como uma redução do custo de acesso a serviços de saúde, o que pode aumentar o investimento em saúde infantil e reduzir a mortalidade.
+- **Mortalidade Infantil** (`SIM-DOINF`)  
+- **Natalidade Infantil** (`SINASC`)  
+- **Estabelecimentos de Saúde (Hospitais)** (`CNES-ST`)  
+- **PIB per capita e Geolocalização** (IBGE: `PIB.xls`, `CADMUN.xls`)  
 
-O mecanismo teórico central é:
-
-$$
-\text{Mais hospitais} \Rightarrow \text{menor custo de acesso} \Rightarrow \text{maior investimento em saúde} \Rightarrow \text{menor mortalidade infantil}
-$$
-
----
-
-### Base de Dados
-
-O projeto integra bases públicas de mortalidade, natalidade, estabelecimentos de saúde e informações municipais:
-
-- **SIM-DOINF**: óbitos infantis
-- **SINASC**: nascidos vivos
-- **CNES-ST**: estabelecimentos de saúde
-- **IBGE**: PIB per capita e geolocalização
-
-Após o tratamento, os dados são agregados por microrregião de saúde e ano.
+Após o tratamento, os dados foram agregados por **microrregião da saúde** e **ano**.
 
 ---
 
-### Metodologia
+### 🧼 Limpeza e Padronização
 
-A análise inclui:
-
-- Tratamento de microdados de mortalidade e natalidade
-- Integração de bases por microrregião e ano
-- Cálculo da taxa de mortalidade infantil
-- Identificação de microrregiões que receberam novos hospitais
-- Mapas e visualizações descritivas
-- Estimação com Staggered Difference-in-Differences
-- Discussão das hipóteses de tendências paralelas e não antecipação
-
----
-
-### Principais Resultados
-
-Os efeitos médios estimados não são estatisticamente significativos. Assim, no período analisado, não há evidência robusta de que a construção de hospitais tenha reduzido a taxa de mortalidade infantil nas microrregiões estudadas.
+- Conversão e filtragem de datas (óbito/nascimento)
+- Codificação e tratamento de variáveis categóricas (sexo, tipo de parto, escolaridade, etc.)
+- Integração dos datasets por `MICROCOD` e `ano`
+- Cálculo da **taxa de mortalidade infantil**:  
+  \[
+  \text{Taxa} = \frac{\text{Óbitos de menores de 1 ano}}{\text{Nascidos vivos}} \times 1000
+  \]
+- Cálculo da **variação no número de hospitais** por microrregião
 
 ---
 
-### Tecnologias Utilizadas
+### 📊 Análises Descritivas
+
+#### 📌 Mortalidade Infantil:
+- Hexágonos geográficos por ano (2014–2019)
+- Gráficos de violino e linha
+- Estatísticas descritivas: média, mínimo, máximo, desvio-padrão
+
+#### 📌 Natalidade:
+- Mesma estrutura analítica da mortalidade infantil
+
+#### 📌 Hospitais:
+- Evolução do número de hospitais
+- Microrregiões que receberam novos hospitais
+- Análise da criação de unidades por ano
+
+#### 📌 Taxa de Mortalidade Infantil:
+- Cálculo da razão mortalidade/natalidade
+- Visualizações: mapas, violinos e linha
+- Comparação ao longo do tempo (2014–2019)
+
+---
+
+### 🔍 Análises Específicas
+
+#### 1. **Modelo Microeconômico (Grossman, 1972)**
+- Pais maximizam utilidade com restrição orçamentária
+- Construção de hospitais reduz custo de acesso (`p_M`) → aumento do investimento em saúde infantil → redução da mortalidade
+
+#### 2. **Estratégia Empírica: Staggered DiD (Callaway & Sant’Anna, 2021)**
+- Estima o efeito da construção de hospitais em momentos distintos nas microrregiões
+- Controla para:
+  - Efeitos fixos regionais e temporais
+  - Tendências paralelas e não-antecipação
+- Comparações feitas apenas com regiões ainda não tratadas no ano de análise
+
+#### 3. **Resultados**
+- Efeitos médios do tratamento **não estatisticamente significativos**
+- **Hipótese nula não rejeitada**: construção de hospitais **não apresenta evidência robusta de redução na taxa de mortalidade infantil** no período analisado
+
+---
+
+### 💻 Tecnologias Utilizadas
 
 - Linguagem: **R**
-- Pacotes principais:
-  - `rnaturalearth`
-  - `microdatasus`
-  - `RColorBrewer`
-  - `patchwork`
-  - `tidyverse`
-  - `stargazer`
-  - `ggthemes`
-  - `readxl`
-  - `ggpubr`
-  - `fixest`
-  - `purrr`
-  - `broom`
-  - `did`
-  - `sf`
-  - `gt`
+- Bibliotecas: `tidyverse`, `microdatasus`, `sf`, `did`, `fixest`, `patchwork`, `ggplot2`, `gt`, `readxl`, `stargazer`, entre outras
 
 ---
 
-### Como Reproduzir
+### ▶️ Como Reproduzir
 
-1. Mantenha os arquivos de dados na pasta `Data/`.
-
-2. Execute:
-
-   ```r
-   source("TrabFinMicroIV.R")
-   ```
-
-3. Para renderizar o relatório:
-
-   ```r
-   quarto::quarto_render("Trabalho Final Microeconomia IV.qmd")
-   ```
+1. Importar os dados do repositório GitHub do grupo
+2. Executar o script `TrabFinalMicro.R` para:
+   - Baixar, carregar e tratar os dados
+   - Gerar as análises descritivas
+   - Estimar os efeitos com DiD escalonado
+3. Analisar os resultados via gráficos e tabelas geradas
 
 ---
 
-### Conclusão
-
-O trabalho mostra que a expansão de hospitais, no recorte analisado, não apresenta evidência estatística robusta de redução da mortalidade infantil. A análise reforça a importância de combinar teoria econômica, construção cuidadosa de base e estratégia empírica adequada para avaliar políticas públicas.
-
-Atenciosamente,
-**Hicham Munir Tayfour**
+Atenciosamente,  
+**Hicham Munir Tayfour**  

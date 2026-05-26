@@ -1,90 +1,72 @@
-## APS 3 - Determinantes da Taxa de Homicídios (Econometria | 2024.1)
+## 📘 APS — Econometria (Insper | 2024.2)
 
-### Objetivo do Trabalho
+### 🎯 Objetivo do Trabalho
+Investigar os determinantes da taxa de homicídios nos estados norte-americanos utilizando **modelos de regressão linear**, com foco na relação entre criminalidade e fatores socioeconômicos como **armas, PIB per capita, urbanização, policiamento e desigualdade**.
 
-Este projeto estima modelos de regressão linear para investigar os determinantes da taxa de homicídios nos estados norte-americanos.
-
-A análise considera fatores como armas, PIB per capita, urbanização, policiamento e desigualdade.
-
----
-
-### Estrutura do Projeto
-
-- `APS 3 Econometria.R`
-  Script principal com regressões, análise de resíduos, testes estatísticos e gráficos.
-
-- `APS econo.xlsx`
-  Base de dados utilizada no trabalho.
+O trabalho realiza análises de resíduos, testes de hipóteses e previsões a partir do modelo ajustado.
 
 ---
 
-### Base de Dados
+### 📂 Base de Dados
 
-A unidade de análise é o estado norte-americano. A variável dependente é:
-
-- `Hom`: homicídios por 100 mil habitantes
-
-As variáveis explicativas incluem:
-
-- `ln_Guns`
-- `ln_IpC`
-- `Urb`
-- `Poli`
-- `Gini`
+- Arquivo: `APS econo.xlsx`
+- Unidade de análise: Estados norte-americanos
+- Variável dependente: `Hom` (Homicídios por 100 mil habitantes)
+- Variáveis independentes:
+  - `ln_Guns`: Logaritmo do número de armas
+  - `ln_IpC`: Logaritmo do PIB per capita
+  - `Urb`: Taxa de urbanização
+  - `Poli`: Policiais por 100 mil habitantes
+  - `Gini`: Índice de Gini
 
 ---
 
-### Fundamentação Metodológica
+### 📊 Etapas da Análise
 
-O trabalho usa regressão linear para avaliar associações entre criminalidade e fatores socioeconômicos. Além da estimação do modelo múltiplo, o projeto verifica suposições importantes por meio de análise de resíduos e testes formais.
-
----
-
-### Metodologia
-
-A análise inclui:
-
-- Estimação de modelo linear múltiplo
-- Avaliação de significância dos coeficientes
+#### 1. 🧮 Estimação do Modelo Linear Múltiplo
+- Modelo ajustado: `Hom ~ ln_Guns + ln_IpC + Urb + Poli + Gini`
+- Avaliação dos coeficientes com significância estatística (`p-value`)
 - Tabela formatada com `gt`
+
+#### 2. 📉 Análise dos Resíduos
 - Histograma e densidade dos resíduos
-- Teste de Jarque-Bera
-- Teste de Breusch-Pagan
-- Regressões simples para variáveis selecionadas
-- Gráficos de valores observados versus previstos
+- Teste de normalidade dos resíduos (Jarque-Bera)
+- Dispersão dos resíduos e resíduos ao quadrado
+- Teste de heterocedasticidade (Breusch-Pagan)
+
+#### 3. 🔍 Modelos Simples de Regressão
+- Estimados separadamente para:
+  - `ln_IpC`
+  - `Poli`
+  - `Gini`
+- Geração de gráficos com:
+  - Linha de regressão
+  - Intervalo de confiança
+  - Pontos observados
+
+#### 4. 📈 Visualização Final
+- Comparação entre valores observados e valores previstos pelo modelo múltiplo
 
 ---
 
-### Tecnologias Utilizadas
+### 💻 Tecnologias Utilizadas
 
 - Linguagem: **R**
-- Pacotes principais:
-  - `tidyverse`
-  - `gt`
-  - `readxl`
-  - `moments`
-  - `lmtest`
-  - `dplyr`
+- Bibliotecas:
+  - `tidyverse`, `gt`, `ggplot2`, `readxl`, `lmtest`, `moments`, `broom`
 
 ---
 
-### Como Reproduzir
+### ▶️ Como Executar
 
-1. Mantenha `APS econo.xlsx` no mesmo diretório do script.
-
-2. Execute:
-
-   ```r
-   source("APS 3 Econometria.R")
-   ```
-
-3. O código retorna tabelas de regressão, testes estatísticos e gráficos de diagnóstico.
+1. Coloque o arquivo `APS econo.xlsx` no mesmo diretório do script.
+2. Execute o código no RStudio com os pacotes instalados.
+3. O script gerará:
+   - Tabela de regressão formatada (`gt`)
+   - Gráficos de resíduos e previsões
+   - Testes estatísticos (Jarque-Bera e Breusch-Pagan)
 
 ---
 
-### Conclusão
-
-O projeto avança da análise exploratória para a modelagem econométrica, permitindo avaliar associações condicionais entre homicídios e variáveis socioeconômicas. A interpretação depende das hipóteses do modelo linear e dos diagnósticos de resíduos.
-
-Atenciosamente,
-**Hicham Tayfour**
+Atenciosamente,  
+Hicham Tayfour
