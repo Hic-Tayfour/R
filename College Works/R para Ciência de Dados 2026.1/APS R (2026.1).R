@@ -1951,4 +1951,3 @@ voos |>
                 table.border.bottom.color = "black",
                 table_body.hlines.color = "#ececec",
                 table.border.top.style = "hidden")
-
