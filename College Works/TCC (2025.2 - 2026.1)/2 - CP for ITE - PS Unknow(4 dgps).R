@@ -677,4 +677,3 @@ tibble(id = 1:nrow(tst1), lower = lower_ite, upper = upper_ite, true_tau = true_
      cobertura_zero = "Taxa de Cobertura do Zero (Insignificância Causal)",
      cobertura_tau = "Cobertura Marginal do ITE Real (Validade)",
      largura_media = "Largura Média dos Intervalos Conformais"))
-
