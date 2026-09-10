@@ -11,7 +11,7 @@ O objetivo central é comparar estratégias de rebalanceamento **puramente fixo*
 
 ## Estrutura do Projeto
 
-- `Algotrading.R`  
+- `Paper Algotrading.R`  
   Script principal em R contendo:
   - Aquisição e tratamento dos dados
   - Engenharia de *features*
